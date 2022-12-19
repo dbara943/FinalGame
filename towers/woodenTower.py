@@ -4,25 +4,29 @@ import os
 import math
 import time
 
-class ArcherTowerLong(Tower):
+
+tower_imgs1 = []
+archer_imgs1 = []
+
+# load archer tower
+tower_imgs1.append(pygame.transform.scale(
+    pygame.image.load(os.path.join("images/turrets/towers", str(1) + ".png" )), (64, 64)))       
+
+# load projectile shooter
+archer_imgs1.append(pygame.transform.scale(
+    pygame.image.load(os.path.join("images/turrets/projectiles", str(1) + ".png" )), (25, 25))) 
+
+class WoodenTower(Tower):
     def __init__(self, x, y):
         super().__init__(x, y)
-        self.tower_imgs = []
-        self.archer_imgs = []
+        self.tower_imgs = tower_imgs1[:]
+        self.archer_imgs = archer_imgs1[:]
         self.archer_count = 0
         self.range = 150
         self.inRange = False
         self.left = True
         self.timer = time.time()      
         self.damage = 1
-        
-        # load archer tower
-        self.tower_imgs.append(pygame.transform.scale(
-            pygame.image.load(os.path.join("images/turrets/towers", str(1) + ".png" )), (64, 64)))       
-        
-        # load projectile shooter
-        self.archer_imgs.append(pygame.transform.scale(
-            pygame.image.load(os.path.join("images/turrets/projectiles", str(1) + ".png" )), (25, 25))) 
                     
     def draw(self, win):
         
@@ -50,6 +54,7 @@ class ArcherTowerLong(Tower):
         self.range = r
 
     def attack(self, enemies):
+        
         for enemy in enemies:
             x = enemy.x
             y = enemy.y
@@ -65,9 +70,9 @@ class ArcherTowerLong(Tower):
         
         if len(enemy_closest) > 0:            
             first_enemy = enemy_closest[0]
-            if time.time() - self.timer >= 0.5:
+            if time.time() - self.timer >= 1:
                 self.timer = time.time()
-                if first_enemy.hit() == True:
+                if first_enemy.hit(self.damage) == True:
                     enemies.remove(first_enemy)
                   
             if first_enemy.x > self.x and not (self.left):
@@ -78,3 +83,31 @@ class ArcherTowerLong(Tower):
                 self.left = True
                 for x, img in enumerate(self.archer_imgs):
                     self.archer_imgs[x] = pygame.transform.flip(img, True, False)
+
+
+"""
+METAL TOWER 
+"""
+
+tower_imgs2 = []
+archer_imgs2 = []
+                    
+# load archer tower
+tower_imgs2.append(pygame.transform.scale(
+    pygame.image.load(os.path.join("images/turrets/towers", str(2) + ".png" )), (64, 64)))       
+
+# load projectile shooter
+archer_imgs2.append(pygame.transform.scale(
+    pygame.image.load(os.path.join("images/turrets/projectiles", str(2) + ".png" )), (25, 25))) 
+
+class MetalTower(WoodenTower):
+     def __init__(self, x, y):
+        super().__init__(x, y)
+        self.tower_imgs = tower_imgs2[:]
+        self.archer_imgs = archer_imgs2[:]
+        self.archer_count = 0
+        self.range = 200
+        self.inRange = False
+        self.left = True
+        self.timer = time.time()      
+        self.damage = 2

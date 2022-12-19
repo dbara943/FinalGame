@@ -8,7 +8,7 @@ from enemies.cyclop import Cyclop
 from enemies.impostor import Impostor
 from enemies.ogre import Ogre
 from enemies.evilVillager import EvilVillager
-from towers.archerTower import ArcherTowerLong
+from towers.woodenTower import WoodenTower, MetalTower
 import time
 import random
 
@@ -18,7 +18,7 @@ class Game:
         self.height = 720
         self.win = pygame.display.set_mode((self.width, self.height))
         self.enemies = [Forkman(), Swordman(), Knight(), Goblin(), Cyclop(), Impostor(), Ogre(), EvilVillager()]
-        self.towers = [ArcherTowerLong(750, 500), ArcherTowerLong(500, 500), ArcherTowerLong(250, 500)]
+        self.towers = [WoodenTower(750, 500), MetalTower(500, 500), WoodenTower(250, 500)]
         self.progress = 0
         self.money = 1000
         self.bg = pygame.image.load(os.path.join("images", "bg.png"))
@@ -45,7 +45,7 @@ class Game:
             #loop through enemies
             to_del = []
             for en in self.enemies:
-                if en.x < -15: 
+                if en.x <= 285 and en.y <= 400: 
                     to_del.append(en)
                     
                     
@@ -62,13 +62,14 @@ class Game:
     def draw(self):
         self.win.blit(self.bg, (0,0))
         
-        #draw enemies 
-        for en in self.enemies:
-            en.draw(self.win)
-        
         #draw towers
         for tw in self.towers:
             tw.draw(self.win)
+            
+        #draw enemies 
+        for en in self.enemies:
+            en.draw(self.win)    
+            
         pygame.display.update()
         
 g = Game()

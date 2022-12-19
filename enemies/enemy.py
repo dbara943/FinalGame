@@ -65,7 +65,7 @@ class Enemy:
            for x, img in enumerate(self.imgs):
                self.imgs[x] = pygame.transform.flip(img, True, False)
        
-       move_x, move_y = (self.x + dirn[0], self.y + dirn[1])
+       move_x, move_y = ((self.x + dirn[0]), (self.y + dirn[1]))
        self.dis += length
        
        self.x = move_x
@@ -84,11 +84,11 @@ class Enemy:
                if self.x <= x2 and self.y >= y2:
                    self.path_pos += 1
             else:
-               if self.x <= x2 and self.y <= y2:
+               if self.x <= x2 and self.y >= y2:
                    self.path_pos += 1 
        
-    def hit(self):
-        self.health -= 1
+    def hit(self, damage):
+        self.health -= damage
         if self.health <= 0:
             return True
         return False
