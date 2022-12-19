@@ -22,19 +22,14 @@ class WoodenTower(Tower):
         self.tower_imgs = tower_imgs1[:]
         self.archer_imgs = archer_imgs1[:]
         self.archer_count = 0
-        self.range = 150
+        self.range = 125
         self.inRange = False
         self.left = True
         self.timer = time.time()      
         self.damage = 1
                     
     def draw(self, win):
-        
-        #draw the range of the tower
-        surface = pygame.Surface((self.range*4, self.range*4), pygame.SRCALPHA, 32)
-        pygame.draw.circle(surface, (128,128,128, 128), (self.range, self.range), self.range, 0)   
-        win.blit(surface, (self.x - self.range, self.y - self.range))
-        
+        super().draw_radius(win)
         super().draw(win)  
         if self.inRange:     
             self.archer_count+= 1
@@ -54,12 +49,12 @@ class WoodenTower(Tower):
         self.range = r
 
     def attack(self, enemies):
-        
+        enemy_closest = []
         for enemy in enemies:
             x = enemy.x
             y = enemy.y
             
-            enemy_closest = []
+
             self.inRange = False
             dis = math.sqrt((self.x - x)**2 + (self.y - y)**2)
             if dis < self.range:
@@ -80,11 +75,9 @@ class WoodenTower(Tower):
                 for x, img in enumerate(self.archer_imgs):
                     self.archer_imgs[x] = pygame.transform.flip(img, True, False)
             elif self.left and first_enemy.x < self.x:
-                self.left = True
+                self.left = False
                 for x, img in enumerate(self.archer_imgs):
                     self.archer_imgs[x] = pygame.transform.flip(img, True, False)
-
-
 """
 METAL TOWER 
 """
@@ -106,8 +99,87 @@ class MetalTower(WoodenTower):
         self.tower_imgs = tower_imgs2[:]
         self.archer_imgs = archer_imgs2[:]
         self.archer_count = 0
-        self.range = 200
+        self.range = 125
         self.inRange = False
         self.left = True
         self.timer = time.time()      
         self.damage = 2
+"""
+GOLDEN TOWER 
+"""
+
+tower_imgs3 = []
+archer_imgs3 = []
+                    
+# load archer tower
+tower_imgs3.append(pygame.transform.scale(
+    pygame.image.load(os.path.join("images/turrets/towers", str(3) + ".png" )), (64, 64)))       
+
+# load projectile shooter
+archer_imgs3.append(pygame.transform.scale(
+    pygame.image.load(os.path.join("images/turrets/projectiles", str(3) + ".png" )), (25, 25))) 
+
+class GoldenTower(WoodenTower):
+     def __init__(self, x, y):
+        super().__init__(x, y)
+        self.tower_imgs = tower_imgs3[:]
+        self.archer_imgs = archer_imgs3[:]
+        self.archer_count = 0
+        self.range = 125
+        self.inRange = False
+        self.left = True
+        self.timer = time.time()      
+        self.damage = 2
+"""
+FIRE TOWER 
+"""
+
+tower_imgs4 = []
+archer_imgs4 = []
+                    
+# load archer tower
+tower_imgs4.append(pygame.transform.scale(
+    pygame.image.load(os.path.join("images/turrets/towers", str(4) + ".png" )), (64, 64)))       
+
+# load projectile shooter
+archer_imgs4.append(pygame.transform.scale(
+    pygame.image.load(os.path.join("images/turrets/projectiles", str(4) + ".png" )), (25, 25))) 
+
+class FireTower(WoodenTower):
+     def __init__(self, x, y):
+        super().__init__(x, y)
+        self.tower_imgs = tower_imgs4[:]
+        self.archer_imgs = archer_imgs4[:]
+        self.archer_count = 0
+        self.range = 125
+        self.inRange = False
+        self.left = True
+        self.timer = time.time()      
+        self.damage = 2
+        
+"""
+BLAZE TOWER 
+"""
+
+tower_imgs5 = []
+archer_imgs5 = []
+                    
+# load archer tower
+tower_imgs5.append(pygame.transform.scale(
+    pygame.image.load(os.path.join("images/turrets/towers", str(5) + ".png" )), (64, 64)))       
+
+# load projectile shooter
+archer_imgs5.append(pygame.transform.scale(
+    pygame.image.load(os.path.join("images/turrets/projectiles", str(5) + ".png" )), (25, 25))) 
+
+class BlazeTower(WoodenTower):
+     def __init__(self, x, y):
+        super().__init__(x, y)
+        self.tower_imgs = tower_imgs5[:]
+        self.archer_imgs = archer_imgs5[:]
+        self.archer_count = 0
+        self.range = 125
+        self.inRange = False
+        self.left = True
+        self.timer = time.time()      
+        self.damage = 2       

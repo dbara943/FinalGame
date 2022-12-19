@@ -12,6 +12,6 @@ for x in range(20):
 class Goblin(Enemy):
     def __init__(self):
         super().__init__()
-        self.imgs = imgs
-        self.max_health = 3
+        self.max_health = 1
         self.health = self.max_health
+        self.imgs = imgs
