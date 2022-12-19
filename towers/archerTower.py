@@ -10,19 +10,19 @@ class ArcherTowerLong(Tower):
         self.tower_imgs = []
         self.archer_imgs = []
         self.archer_count = 0
-        self.range = 200
+        self.range = 150
         self.inRange = False
         self.left = True
-        self.timer = time.time()       
-        # load archer towers
-        for x in range(1,5):
-            self.tower_imgs.append(pygame.transform.scale(
-                pygame.image.load(os.path.join("images/turrets/towers", str(x) + ".png" )), (64, 64)))       
+        self.timer = time.time()      
+        self.damage = 1
         
-        # load archer images
-        for x in range(1,5):
-            self.archer_imgs.append(pygame.transform.scale(
-                pygame.image.load(os.path.join("images/turrets/projectiles", str(x) + ".png" )), (32, 32))) 
+        # load archer tower
+        self.tower_imgs.append(pygame.transform.scale(
+            pygame.image.load(os.path.join("images/turrets/towers", str(1) + ".png" )), (64, 64)))       
+        
+        # load projectile shooter
+        self.archer_imgs.append(pygame.transform.scale(
+            pygame.image.load(os.path.join("images/turrets/projectiles", str(1) + ".png" )), (25, 25))) 
                     
     def draw(self, win):
         
@@ -44,7 +44,7 @@ class ArcherTowerLong(Tower):
             add = -25
         else:
             add = -archer.get_width() + 10
-        win.blit(archer, ((self.x + self.width/2 + add), (self.y - archer.get_height() - 30)))       
+        win.blit(archer, ((self.x + self.width/2 + add + 10), (self.y - archer.get_height() - 5)))       
         
     def change_range(self, r):
         self.range = r

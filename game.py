@@ -18,7 +18,7 @@ class Game:
         self.height = 720
         self.win = pygame.display.set_mode((self.width, self.height))
         self.enemies = [Forkman(), Swordman(), Knight(), Goblin(), Cyclop(), Impostor(), Ogre(), EvilVillager()]
-        self.towers = [ArcherTowerLong(500, 500)]
+        self.towers = [ArcherTowerLong(750, 500), ArcherTowerLong(500, 500), ArcherTowerLong(250, 500)]
         self.progress = 0
         self.money = 1000
         self.bg = pygame.image.load(os.path.join("images", "bg.png"))
@@ -30,10 +30,10 @@ class Game:
         clock = pygame.time.Clock()
         
         while run:
-            if time.time() - self.timer >= 2:
+            if time.time() - self.timer >= random.randrange(1,3):
                 self.timer = time.time()
                 self.enemies.append(random.choice([Forkman(), Swordman(), Knight(), Goblin(), Cyclop(), Impostor(), Ogre(), EvilVillager()]))
-            clock.tick(20)
+            clock.tick(100)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     run = False
