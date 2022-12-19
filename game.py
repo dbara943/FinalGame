@@ -1,25 +1,39 @@
 import pygame
 import os
+from enemies.forkman import Forkman
+from enemies.swordman import Swordman
+from enemies.knight import Knight
+from enemies.goblin import Goblin
+from enemies.cyclop import Cyclop
+from enemies.impostor import Impostor
+from enemies.ogre import Ogre
+from enemies.evilVillager import EvilVillager
+from towers.archerTower import ArcherTowerLong
+import time
+import random
 
 class Game:
     def __init__(self):
         self.width = 1024
         self.height = 720
-        self.window = pygame.display.set_mode((self.width, self.height))
-        self.enemies = []
-        self.towers = []
+        self.win = pygame.display.set_mode((self.width, self.height))
+        self.enemies = [Forkman(), Swordman(), Knight(), Goblin(), Cyclop(), Impostor(), Ogre(), EvilVillager()]
+        self.towers = [ArcherTowerLong(500, 500)]
         self.progress = 0
         self.money = 1000
         self.bg = pygame.image.load(os.path.join("images", "bg.png"))
         self.bg = pygame.transform.scale(self.bg, (self.width, self.height))
-        self.clicks = [] #remove afterwards 
+        self.timer = time.time()
         
     def run(self):
         run = True
         clock = pygame.time.Clock()
         
         while run:
-            clock.tick(60)
+            if time.time() - self.timer >= 2:
+                self.timer = time.time()
+                self.enemies.append(random.choice([Forkman(), Swordman(), Knight(), Goblin(), Cyclop(), Impostor(), Ogre(), EvilVillager()]))
+            clock.tick(20)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     run = False
@@ -27,15 +41,34 @@ class Game:
                 pos = pygame.mouse.get_pos()
                 
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    self.clicks.append(pos)
-                    print(self.clicks)
+                    pass
+            #loop through enemies
+            to_del = []
+            for en in self.enemies:
+                if en.x < -15: 
+                    to_del.append(en)
+                    
+                    
+            #delete all enemies from the screen
+            for d in to_del:
+                self.enemies.remove(d)
+                
+            for tw in self.towers:
+                tw.attack(self.enemies)    
+                
             self.draw()
         pygame.quit
         
     def draw(self):
-        self.window.blit(self.bg, (0,0))
-        for p in self.clicks:
-            pygame.draw.circle(self.window, (255,0,0), (p[0], p[1]), 5, 0)
+        self.win.blit(self.bg, (0,0))
+        
+        #draw enemies 
+        for en in self.enemies:
+            en.draw(self.win)
+        
+        #draw towers
+        for tw in self.towers:
+            tw.draw(self.win)
         pygame.display.update()
         
 g = Game()
