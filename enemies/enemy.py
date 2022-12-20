@@ -25,11 +25,7 @@ class Enemy:
 
         if self.animation_count >= len(self.imgs):
             self.animation_count = 0
-        
-        #delete afterwards        
-        for dot in self.path:
-            pygame.draw.circle(win, (255,0,0), dot, 10, 0)
-            
+                 
         win.blit(self.img, (self.x - self.img.get_width()/2, self.y - self.img.get_height()/2 - 35))
         self.draw_health_bar(win)
         self.move()

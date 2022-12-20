@@ -36,7 +36,7 @@ waves = [
     [0,0,0,0,20,20,10,0],
     [0,10,15,15,20,15,35,2],
     [20,20,30,40,50,60,70,5],
-    [0,0,0,0,0,0,0,0]
+    [0,0,0,0,0,0,0,0],
 ]
 pygame.mixer.init()
 music = pygame.mixer.music.load(os.path.join("sounds", "music.mp3"))
@@ -53,7 +53,7 @@ class Game:
         self.win = pygame.display.set_mode((self.width, self.height))
         self.enemies = []
         self.towers = []
-        self.lives = 50
+        self.lives = 20
         self.money = 200
         self.bg = pygame.image.load(os.path.join("images", "bg.png"))
         self.bg = pygame.transform.scale(self.bg, (self.width, self.height))
@@ -106,8 +106,7 @@ class Game:
                         if self.moving_object.name in towers_names:
                             self.towers.append(self.moving_object)
                         self.moving_object.moving = False
-                        self.moving_object = None
-                                
+                        self.moving_object = None      
                     else:
                         pass
                     side_menu_button = self.menu.get_clicked(pos[0], pos[1])
@@ -139,6 +138,7 @@ class Game:
                     to_del.append(en)
 
             for d in to_del:
+                sound_1.play()
                 self.lives -=1
                 print(self.lives)
                 self.enemies.remove(d)
@@ -149,7 +149,7 @@ class Game:
             if self.lives <= 0:
                 print("You lose!")    
                 run = False
-            if self.current_wave == 10:
+            if self.wave >= 10:
                 print("You win!")
                 
             self.draw()
@@ -157,13 +157,10 @@ class Game:
         
     def draw(self):
         self.win.blit(self.bg, (0,0))
-        
         for tw in self.towers:
             tw.draw(self.win)
-        
         if self.moving_object:
             self.moving_object.draw(self.win)
-            
         for en in self.enemies:
             en.draw(self.win)    
         

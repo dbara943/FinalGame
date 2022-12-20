@@ -4,11 +4,23 @@ import os
 import math
 import time
 from menu.menu import Menu
+import random
 
 menu_bg = pygame.transform.scale(pygame.image.load(os.path.join("images", "menu.png")), (150, 75))
 upgrade_btn = pygame.transform.scale(pygame.image.load(os.path.join("images", "upgrade.png")), (50, 50))
 tower_imgs1 = []
 archer_imgs1 = []
+pygame.mixer.init()
+sound_1 = pygame.mixer.Sound("sounds/1.mp3")
+sound_2 = pygame.mixer.Sound("sounds/2.mp3")
+sound_3 = pygame.mixer.Sound("sounds/3.mp3")
+sound_4 = pygame.mixer.Sound("sounds/4.mp3")
+sound_5 = pygame.mixer.Sound("sounds/5.mp3")
+pygame.mixer.Sound.set_volume(sound_1, 1)
+pygame.mixer.Sound.set_volume(sound_2, 0.1)
+pygame.mixer.Sound.set_volume(sound_3, 0.5)
+pygame.mixer.Sound.set_volume(sound_4, 0.5)
+pygame.mixer.Sound.set_volume(sound_5, 0.5)
 
 # load archer tower
 tower_imgs1.append(pygame.transform.scale(
@@ -63,6 +75,7 @@ class WoodenTower(Tower):
         money = 0
         self.inRange = False
         enemy_closest = []
+
         for enemy in enemies:
             x = enemy.x
             y = enemy.y
@@ -76,7 +89,11 @@ class WoodenTower(Tower):
             first_enemy = enemy_closest[0]
             if time.time() - self.timer >= 1:
                 self.timer = time.time()
+                
+                sound_2.play()
+                    
                 if first_enemy.hit(self.damage) == True:
+                    sound_3.play()
                     money = first_enemy.money
                     enemies.remove(first_enemy)
                   
