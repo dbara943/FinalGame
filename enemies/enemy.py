@@ -9,7 +9,7 @@ class Enemy:
         self.health = 1
         self.max_health = 0
         self.velocity = 3
-        self.path = [(300, 600), (325, 640), (340, 635), (380, 620), (440, 600), (535, 575), (950, 510), (285, 400)]
+        self.path = [(300, 600), (325, 640), (340, 635), (380, 620), (440, 600), (535, 575), (1050, 510), (300, 375)]
         self.x = self.path[0][0]
         self.y = self.path[0][1]        
         self.img = None

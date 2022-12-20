@@ -3,8 +3,10 @@ from .tower import Tower
 import os
 import math
 import time
+from menu.menu import Menu
 
-
+menu_bg = pygame.transform.scale(pygame.image.load(os.path.join("images", "menu.png")), (150, 75))
+upgrade_btn = pygame.transform.scale(pygame.image.load(os.path.join("images", "upgrade.png")), (50, 50))
 tower_imgs1 = []
 archer_imgs1 = []
 
@@ -27,11 +29,20 @@ class WoodenTower(Tower):
         self.left = True
         self.timer = time.time()      
         self.damage = 1
-                    
+        self.width = 0
+        self.menu = Menu(self, self.x, self.y, menu_bg, [250, "MAX"])
+        self.menu.add_btn(upgrade_btn, "Upgrade")                      
+        self.moving = False
+        self.name = "woodenTower"
+        
+    def get_upgrade_cost(self):
+        return self.menu.get_item_cost()
+
     def draw(self, win):
         super().draw_radius(win)
         super().draw(win)  
-        if self.inRange:     
+        
+        if self.inRange and not self.moving:     
             self.archer_count+= 1
             if self.archer_count >= len(self.archer_imgs) * 10:
                 self.archer_count = 0
@@ -49,18 +60,16 @@ class WoodenTower(Tower):
         self.range = r
 
     def attack(self, enemies):
+        money = 0
+        self.inRange = False
         enemy_closest = []
         for enemy in enemies:
             x = enemy.x
             y = enemy.y
-            
-
-            self.inRange = False
             dis = math.sqrt((self.x - x)**2 + (self.y - y)**2)
             if dis < self.range:
                 self.inRange = True
                 enemy_closest.append(enemy)
-                
         enemy_closest.sort(key= lambda x: x.x)
         
         if len(enemy_closest) > 0:            
@@ -68,6 +77,7 @@ class WoodenTower(Tower):
             if time.time() - self.timer >= 1:
                 self.timer = time.time()
                 if first_enemy.hit(self.damage) == True:
+                    money = first_enemy.money
                     enemies.remove(first_enemy)
                   
             if first_enemy.x > self.x and not (self.left):
@@ -78,10 +88,12 @@ class WoodenTower(Tower):
                 self.left = False
                 for x, img in enumerate(self.archer_imgs):
                     self.archer_imgs[x] = pygame.transform.flip(img, True, False)
+        return money
 """
 METAL TOWER 
 """
-
+menu_bg = pygame.transform.scale(pygame.image.load(os.path.join("images", "menu.png")), (150, 75))
+upgrade_btn = pygame.transform.scale(pygame.image.load(os.path.join("images", "upgrade.png")), (50, 50))
 tower_imgs2 = []
 archer_imgs2 = []
                     
@@ -104,10 +116,14 @@ class MetalTower(WoodenTower):
         self.left = True
         self.timer = time.time()      
         self.damage = 2
+        self.menu = Menu(self, self.x, self.y, menu_bg, [250, "MAX"])
+        self.menu.add_btn(upgrade_btn, "Upgrade")   
+        self.name = "metalTower"
 """
 GOLDEN TOWER 
 """
-
+menu_bg = pygame.transform.scale(pygame.image.load(os.path.join("images", "menu.png")), (150, 75))
+upgrade_btn = pygame.transform.scale(pygame.image.load(os.path.join("images", "upgrade.png")), (50, 50))
 tower_imgs3 = []
 archer_imgs3 = []
                     
@@ -130,10 +146,14 @@ class GoldenTower(WoodenTower):
         self.left = True
         self.timer = time.time()      
         self.damage = 2
+        self.menu = Menu(self, self.x, self.y, menu_bg, [250, "MAX"])
+        self.menu.add_btn(upgrade_btn, "Upgrade") 
+        self.name = "goldenTower"  
 """
 FIRE TOWER 
 """
-
+menu_bg = pygame.transform.scale(pygame.image.load(os.path.join("images", "menu.png")), (150, 75))
+upgrade_btn = pygame.transform.scale(pygame.image.load(os.path.join("images", "upgrade.png")), (50, 50))
 tower_imgs4 = []
 archer_imgs4 = []
                     
@@ -156,11 +176,14 @@ class FireTower(WoodenTower):
         self.left = True
         self.timer = time.time()      
         self.damage = 2
-        
+        self.menu = Menu(self, self.x, self.y, menu_bg, [250, "MAX"])
+        self.menu.add_btn(upgrade_btn, "Upgrade")           
+        self.name = "fireTower"
 """
 BLAZE TOWER 
 """
-
+menu_bg = pygame.transform.scale(pygame.image.load(os.path.join("images", "menu.png")), (150, 75))
+upgrade_btn = pygame.transform.scale(pygame.image.load(os.path.join("images", "upgrade.png")), (50, 50))
 tower_imgs5 = []
 archer_imgs5 = []
                     
@@ -183,3 +206,6 @@ class BlazeTower(WoodenTower):
         self.left = True
         self.timer = time.time()      
         self.damage = 2       
+        self.menu = Menu(self, self.x, self.y, menu_bg, [250, "MAX"])
+        self.menu.add_btn(upgrade_btn, "Upgrade")   
+        self.name = "blazeTower"

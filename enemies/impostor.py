@@ -12,6 +12,8 @@ for x in range(20):
 class Impostor(Enemy):
     def __init__(self):
         super().__init__()
-        self.max_health = 1
+        self.name = "impostor"
+        self.money = 20
+        self.max_health = 20
         self.health = self.max_health
         self.imgs = imgs

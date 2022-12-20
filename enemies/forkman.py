@@ -12,6 +12,8 @@ for x in range(20):
 class Forkman(Enemy):
     def __init__(self):
         super().__init__()
+        self.name = "forkman"
+        self.money = 1
         self.max_health = 1
         self.health = self.max_health
         self.imgs = imgs

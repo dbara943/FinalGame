@@ -12,6 +12,8 @@ for x in range(20):
 class Swordman(Enemy):
     def __init__(self):
         super().__init__()
-        self.max_health = 1
+        self.enemy = "swordman"
+        self.money = 3
+        self.max_health = 3
         self.health = self.max_health
         self.imgs = imgs

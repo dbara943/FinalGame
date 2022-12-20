@@ -12,6 +12,8 @@ for x in range(20):
 class Cyclop(Enemy):
     def __init__(self):
         super().__init__()
-        self.max_health = 50
+        self.enemy = "cyclop"
+        self.money = 10
+        self.max_health = 10
         self.health = self.max_health
         self.imgs = imgs
