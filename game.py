@@ -13,6 +13,7 @@ from menu.menu import VerticalMenu
 import time
 import random
 pygame.font.init()
+pygame.display.set_caption('Island Defenders')
 
 lives_img = pygame.image.load(os.path.join("images", "heart.png"))
 money_img = pygame.image.load(os.path.join("images", "money.png"))
