@@ -11,11 +11,11 @@ upgrade_btn = pygame.transform.scale(pygame.image.load(os.path.join("images", "u
 tower_imgs1 = []
 archer_imgs1 = []
 pygame.mixer.init()
-sound_1 = pygame.mixer.Sound("sounds/1.mp3")
-sound_2 = pygame.mixer.Sound("sounds/2.mp3")
-sound_3 = pygame.mixer.Sound("sounds/3.mp3")
-sound_4 = pygame.mixer.Sound("sounds/4.mp3")
-sound_5 = pygame.mixer.Sound("sounds/5.mp3")
+sound_1 = pygame.mixer.Sound("sounds/1.wav")
+sound_2 = pygame.mixer.Sound("sounds/2.wav")
+sound_3 = pygame.mixer.Sound("sounds/3.wav")
+sound_4 = pygame.mixer.Sound("sounds/4.wav")
+sound_5 = pygame.mixer.Sound("sounds/5.wav")
 pygame.mixer.Sound.set_volume(sound_1, 1)
 pygame.mixer.Sound.set_volume(sound_2, 0.1)
 pygame.mixer.Sound.set_volume(sound_3, 0.5)

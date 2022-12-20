@@ -36,16 +36,17 @@ waves = [
     [0,0,10,20,20,0,0,0],
     [0,0,0,0,20,20,10,0],
     [0,10,15,15,20,15,35,2],
-    [20,20,30,40,50,60,70,5],
-    [0,0,0,0,0,0,0,0],
+    [20,20,30,40,50,60,70,25],
+    [20,20,30,40,50,60,70,25],
+    [20,20,30,40,50,60,70,25],
 ]
 pygame.mixer.init()
-music = pygame.mixer.music.load(os.path.join("sounds", "music.mp3"))
-sound_1 = pygame.mixer.Sound("sounds/1.mp3")
-sound_2 = pygame.mixer.Sound("sounds/2.mp3")
-sound_3 = pygame.mixer.Sound("sounds/3.mp3")
-sound_4 = pygame.mixer.Sound("sounds/4.mp3")
-sound_5 = pygame.mixer.Sound("sounds/5.mp3")
+music = pygame.mixer.music.load(os.path.join("sounds", "music.wav"))
+sound_1 = pygame.mixer.Sound("sounds/1.wav")
+sound_2 = pygame.mixer.Sound("sounds/2.wav")
+sound_3 = pygame.mixer.Sound("sounds/3.wav")
+sound_4 = pygame.mixer.Sound("sounds/4.wav")
+sound_5 = pygame.mixer.Sound("sounds/5.wav")
 
 class Game:
     def __init__(self):
