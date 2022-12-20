@@ -5,11 +5,12 @@ pygame.font.init()
 money_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "money.png")), (20, 20))
 
 class Button():
-    def __init__(self, x, y, img, name):
+    def __init__(self, menu, img, name):
         self.name = name
         self.img = img
-        self.x = x
-        self.y = y
+        self.x = menu.x
+        self.y = menu.y
+        self.menu = menu
         self.width = self.img.get_width()
         self.height = self.img.get_height()
 
@@ -22,6 +23,10 @@ class Button():
     
     def draw(self, win):
         win.blit(self.img, (self.x, self.y))
+    
+    def update(self):
+        self.x = self.menu.x
+        self.y = self.menu.y        
         
 class VerticalButton(Button):
     def __init__(self, x, y, img, name, cost):
@@ -51,7 +56,7 @@ class Menu():
         self.items += 1
         btn_x = self.x - self.bg.get_width()/2 + 10
         btn_y = self.y - 75 + 10
-        self.buttons.append(Button(btn_x, btn_y, img, name))
+        self.buttons.append(Button(self, img, name))
     
     def get_item_cost(self):
         return self.item_cost[self.tower.level - 1]
@@ -68,8 +73,12 @@ class Menu():
         for btn in self.buttons:
             if btn.click(X, Y):
                 return btn.name
-            
         return None
+    
+    def update(self):
+        for btn in self.buttons:
+            btn.update()
+            
 class VerticalMenu(Menu):
     def __init__(self, x, y, img):
         self.x = x

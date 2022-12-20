@@ -115,7 +115,7 @@ class MetalTower(WoodenTower):
         self.inRange = False
         self.left = True
         self.timer = time.time()      
-        self.damage = 2
+        self.damage = 3
         self.menu = Menu(self, self.x, self.y, menu_bg, [250, "MAX"])
         self.menu.add_btn(upgrade_btn, "Upgrade")   
         self.name = "metalTower"
@@ -145,7 +145,7 @@ class GoldenTower(WoodenTower):
         self.inRange = False
         self.left = True
         self.timer = time.time()      
-        self.damage = 2
+        self.damage = 5
         self.menu = Menu(self, self.x, self.y, menu_bg, [250, "MAX"])
         self.menu.add_btn(upgrade_btn, "Upgrade") 
         self.name = "goldenTower"  
@@ -175,7 +175,7 @@ class FireTower(WoodenTower):
         self.inRange = False
         self.left = True
         self.timer = time.time()      
-        self.damage = 2
+        self.damage = 8
         self.menu = Menu(self, self.x, self.y, menu_bg, [250, "MAX"])
         self.menu.add_btn(upgrade_btn, "Upgrade")           
         self.name = "fireTower"
@@ -205,7 +205,7 @@ class BlazeTower(WoodenTower):
         self.inRange = False
         self.left = True
         self.timer = time.time()      
-        self.damage = 2       
+        self.damage = 10       
         self.menu = Menu(self, self.x, self.y, menu_bg, [250, "MAX"])
         self.menu.add_btn(upgrade_btn, "Upgrade")   
         self.name = "blazeTower"
