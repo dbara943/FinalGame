@@ -31,6 +31,7 @@ archer_imgs1.append(pygame.transform.scale(
     pygame.image.load(os.path.join("images/turrets/projectiles", str(1) + ".png" )), (25, 25))) 
 
 class WoodenTower(Tower):
+    buy_price = 100
     def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs1[:]
@@ -38,12 +39,11 @@ class WoodenTower(Tower):
         self.archer_count = 0
         self.range = 125
         self.inRange = False
-        self.left = True
+        self.facing_left = False
         self.timer = time.time()      
         self.damage = 1
         self.width = 0
-        self.menu = Menu(self, self.x, self.y, menu_bg, [250, "MAX"])
-        self.menu.add_btn(upgrade_btn, "Upgrade")                      
+        self._setup_menu()
         self.moving = False
         self.name = "woodenTower"
         
@@ -62,10 +62,8 @@ class WoodenTower(Tower):
             self.archer_count = 0
             
         archer = self.archer_imgs[self.archer_count//10]
-        if self.left == True:
-            add = -25
-        else:
-            add = -archer.get_width() + 10
+        # Lucznik przechyla sie w strone wroga (wczesniej w przeciwna).
+        add = -32 if self.facing_left else -12
         win.blit(archer, ((self.x + self.width/2 + add + 10), (self.y - archer.get_height() - 5)))       
         
     def change_range(self, r):
@@ -97,12 +95,13 @@ class WoodenTower(Tower):
                     money = first_enemy.money
                     enemies.remove(first_enemy)
                   
-            if first_enemy.x > self.x and not (self.left):
-                self.left = True
+            # Lucznik zwraca sie w strone wroga (wczesniej byl odwrocony).
+            if first_enemy.x < self.x and not self.facing_left:
+                self.facing_left = True
                 for x, img in enumerate(self.archer_imgs):
                     self.archer_imgs[x] = pygame.transform.flip(img, True, False)
-            elif self.left and first_enemy.x < self.x:
-                self.left = False
+            elif first_enemy.x > self.x and self.facing_left:
+                self.facing_left = False
                 for x, img in enumerate(self.archer_imgs):
                     self.archer_imgs[x] = pygame.transform.flip(img, True, False)
         return money
@@ -123,18 +122,18 @@ archer_imgs2.append(pygame.transform.scale(
     pygame.image.load(os.path.join("images/turrets/projectiles", str(2) + ".png" )), (25, 25))) 
 
 class MetalTower(WoodenTower):
-     def __init__(self, x, y):
+    buy_price = 200
+    def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs2[:]
         self.archer_imgs = archer_imgs2[:]
         self.archer_count = 0
         self.range = 125
         self.inRange = False
-        self.left = True
+        self.facing_left = False
         self.timer = time.time()      
         self.damage = 3
-        self.menu = Menu(self, self.x, self.y, menu_bg, [250, "MAX"])
-        self.menu.add_btn(upgrade_btn, "Upgrade")   
+        self._setup_menu()
         self.name = "metalTower"
 """
 GOLDEN TOWER 
@@ -153,18 +152,18 @@ archer_imgs3.append(pygame.transform.scale(
     pygame.image.load(os.path.join("images/turrets/projectiles", str(3) + ".png" )), (25, 25))) 
 
 class GoldenTower(WoodenTower):
-     def __init__(self, x, y):
+    buy_price = 300
+    def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs3[:]
         self.archer_imgs = archer_imgs3[:]
         self.archer_count = 0
         self.range = 125
         self.inRange = False
-        self.left = True
+        self.facing_left = False
         self.timer = time.time()      
         self.damage = 5
-        self.menu = Menu(self, self.x, self.y, menu_bg, [250, "MAX"])
-        self.menu.add_btn(upgrade_btn, "Upgrade") 
+        self._setup_menu()
         self.name = "goldenTower"  
 """
 FIRE TOWER 
@@ -183,18 +182,18 @@ archer_imgs4.append(pygame.transform.scale(
     pygame.image.load(os.path.join("images/turrets/projectiles", str(4) + ".png" )), (25, 25))) 
 
 class FireTower(WoodenTower):
-     def __init__(self, x, y):
+    buy_price = 400
+    def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs4[:]
         self.archer_imgs = archer_imgs4[:]
         self.archer_count = 0
         self.range = 125
         self.inRange = False
-        self.left = True
+        self.facing_left = False
         self.timer = time.time()      
         self.damage = 8
-        self.menu = Menu(self, self.x, self.y, menu_bg, [250, "MAX"])
-        self.menu.add_btn(upgrade_btn, "Upgrade")           
+        self._setup_menu()
         self.name = "fireTower"
 """
 BLAZE TOWER 
@@ -213,16 +212,16 @@ archer_imgs5.append(pygame.transform.scale(
     pygame.image.load(os.path.join("images/turrets/projectiles", str(5) + ".png" )), (25, 25))) 
 
 class BlazeTower(WoodenTower):
-     def __init__(self, x, y):
+    buy_price = 500
+    def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs5[:]
         self.archer_imgs = archer_imgs5[:]
         self.archer_count = 0
         self.range = 125
         self.inRange = False
-        self.left = True
+        self.facing_left = False
         self.timer = time.time()      
         self.damage = 10       
-        self.menu = Menu(self, self.x, self.y, menu_bg, [250, "MAX"])
-        self.menu.add_btn(upgrade_btn, "Upgrade")   
+        self._setup_menu()
         self.name = "blazeTower"

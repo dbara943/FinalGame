@@ -5,14 +5,15 @@ pygame.font.init()
 money_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "money.png")), (20, 20))
 
 class Button():
-    def __init__(self, menu, img, name):
+    def __init__(self, menu, img, name, dx=0, dy=0):
         self.name = name
         self.img = img
-        self.x = menu.x
-        self.y = menu.y
         self.menu = menu
+        self.dx = dx
+        self.dy = dy
         self.width = self.img.get_width()
         self.height = self.img.get_height()
+        self.update()
 
     def click(self, X, Y):
         
@@ -25,8 +26,8 @@ class Button():
         win.blit(self.img, (self.x, self.y))
     
     def update(self):
-        self.x = self.menu.x
-        self.y = self.menu.y        
+        self.x = self.menu.x + self.dx
+        self.y = self.menu.y + self.dy
         
 class VerticalButton(Button):
     def __init__(self, x, y, img, name, cost):
@@ -50,24 +51,29 @@ class Menu():
         self.items = 0
         self.bg = img
         self.font = pygame.font.SysFont("arial", 30)
+        self.small_font = pygame.font.SysFont("arial", 20)
         self.tower = tower
 
-    def add_btn(self, img, name):
+    def add_btn(self, img, name, dx=0, dy=0):
         self.items += 1
-        btn_x = self.x - self.bg.get_width()/2 + 10
-        btn_y = self.y - 75 + 10
-        self.buttons.append(Button(self, img, name))
+        self.buttons.append(Button(self, img, name, dx, dy))
     
     def get_item_cost(self):
         return self.item_cost[self.tower.level - 1]
         
     def draw(self, win):
-        win.blit(self.bg, (self.x - self.bg.get_width()/2, self.y - 80))
+        win.blit(self.bg, (self.x - self.bg.get_width()/2, self.y - 90))
         for item in self.buttons:
             item.draw(win)
-            win.blit(money_img, (item.x + item.width + 50, item.y + 20))
-            text = self.font.render(str(self.item_cost[self.tower.level - 1]), 1, (255,255,255))    
-            win.blit(text, (item.x + item.width + 30 - text.get_width()/2, item.y + money_img.get_height() - 8))
+            if item.name == "Sell":
+                label = "+$" + str(self.tower.sell_value())
+                color = (130, 255, 130)
+            else:
+                label = "$" + str(self.item_cost[self.tower.level - 1])
+                color = (255, 255, 255)
+            text = self.small_font.render(label, 1, color)
+            win.blit(text, (item.x + item.width//2 - text.get_width()//2,
+                            item.y + item.height + 4))
             
     def get_clicked(self, X, Y):
         for btn in self.buttons:
@@ -104,10 +110,15 @@ class VerticalMenu(Menu):
 
     def draw(self, win):
         win.blit(self.bg, (self.x - self.bg.get_width()/2, self.y-120))
+        coin = pygame.transform.scale(money_img, (22, 22))
         for item in self.buttons:
             item.draw(win)
-            win.blit(money_img, (item.x - 15, item.y + item.height + 10))
+            # Moneta i cena jako jedna wycentrowana grupa pod przyciskiem
             text = self.font.render(str(item.cost), 1, (255,255,255))
-            win.blit(text, (item.x + item.width/2 - text.get_width()/2 + 7, item.y + item.height + 5))
+            group_w = coin.get_width() + 6 + text.get_width()
+            gx = item.x + item.width/2 - group_w/2
+            gy = item.y + item.height + 8
+            win.blit(coin, (gx, gy))
+            win.blit(text, (gx + coin.get_width() + 6, gy - 2))
     
     

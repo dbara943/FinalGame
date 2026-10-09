@@ -9,7 +9,12 @@ class Enemy:
         self.health = 1
         self.max_health = 0
         self.velocity = 3
-        self.path = [(300, 600), (325, 640), (340, 635), (380, 620), (440, 600), (535, 575), (1050, 510), (300, 375)]
+        # Punkty dobrane do namalowanej drogi: dolna droga w prawo,
+        # zakret w gore, gorna droga z powrotem do bazy.
+        self.path = [(300, 600), (325, 640), (340, 635), (380, 620), (440, 600),
+                     (535, 575), (700, 560), (850, 543), (980, 512),
+                     (1040, 462), (1000, 415), (800, 412), (600, 414),
+                     (400, 410), (300, 375)]
         self.x = self.path[0][0]
         self.y = self.path[0][1]        
         self.img = None
@@ -18,7 +23,9 @@ class Enemy:
         self.move_count = 0
         self.move_dis = 0
         self.imgs = []
-        self.flipped = False    
+        self.flipped = False
+        self.reached_end = False
+        self._imgs_copied = False
     def draw(self, win):
         self.img = self.imgs[self.animation_count]
         self.animation_count += 1
@@ -45,43 +52,51 @@ class Enemy:
         return False
     
     def move(self):
-       x1,y1 = self.path[self.path_pos]
+       if self.reached_end:
+           return
+       # Kazdy wrog dostaje wlasna kopie obrazkow - wczesniej wszystkie
+       # instancje tego samego typu dzielily jedna liste i odwracanie
+       # jednego odwracalo wszystkie.
+       if not self._imgs_copied:
+           self.imgs = self.imgs[:]
+           self._imgs_copied = True
+       x1, y1 = self.path[self.path_pos]
        if self.path_pos + 1 >= len(self.path):
-           x2, y2 = (285, 388)
-       else:    
+           x2, y2 = self.path[self.path_pos]
+       else:
            x2, y2 = self.path[self.path_pos + 1]
-       
-       dirn = ((x2 - x1)*2, (y2 - y1)*2) 
-       length = math.sqrt((dirn[0])**2 + (dirn[1])**2)
-       dirn = (dirn[0]/length, dirn[1]/length)
-       
-       
+
+       dx, dy = x2 - x1, y2 - y1
+       length = math.sqrt(dx**2 + dy**2)
+       if length == 0:
+           dirn = (0, 0)
+       else:
+           dirn = (dx / length, dy / length)
+
        if dirn[0] < 0 and not(self.flipped):
            self.flipped = True
            for x, img in enumerate(self.imgs):
                self.imgs[x] = pygame.transform.flip(img, True, False)
-       
-       move_x, move_y = ((self.x + dirn[0]), (self.y + dirn[1]))
-       self.dis += length
-       
-       self.x = move_x
-       self.y = move_y 
-       
-       #Go to next point
-       if dirn[0] >= 0: #moving right
-           if dirn[1] >= 0: #moving
-               if self.x >= x2 and self.y >= y2:
-                   self.path_pos += 1
+       elif dirn[0] > 0 and self.flipped:
+           self.flipped = False
+           for x, img in enumerate(self.imgs):
+               self.imgs[x] = pygame.transform.flip(img, True, False)
+
+       # Predkosc wroga (kiedys atrybut velocity byl ignorowany).
+       # Dzielimy przez 3, zeby zachowac dotychczasowe tempo gry.
+       step_len = self.velocity / 3.0
+       dist_to_target = math.sqrt((x2 - self.x)**2 + (y2 - self.y)**2)
+       step_len = min(step_len, dist_to_target)
+       self.x += dirn[0] * step_len
+       self.y += dirn[1] * step_len
+       self.dis += step_len
+
+       # Dotarl do punktu docelowego?
+       if dist_to_target <= self.velocity / 3.0 + 1:
+           if self.path_pos + 1 >= len(self.path):
+               self.reached_end = True
            else:
-               if self.x >= x2 and self.y <= y2:
-                   self.path_pos += 1
-       else: #moving left
-            if dirn[1] >= 0: #moving
-               if self.x <= x2 and self.y >= y2:
-                   self.path_pos += 1
-            else:
-               if self.x <= x2 and self.y >= y2:
-                   self.path_pos += 1 
+               self.path_pos += 1
        
     def hit(self, damage):
         self.health -= damage
