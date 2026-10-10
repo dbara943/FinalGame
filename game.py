@@ -86,6 +86,8 @@ class Game:
         self.gold_notifications = []  # Widoczne powiadomienia o zlocie [(tekst, timer)]
         self.corpses = []  # Trupy wrogow: [img, x, y, timer]
         self.early_wave_rect = None  # R2: prostokat przycisku "Nastepna fala"
+        self.wave_modifier = None  # U8: modyfikator fali (swift/rich/swarm)
+        self.show_all_ranges = False  # U10: pokaz wszystkie zasiegi
         if not sound:
             pygame.mixer.music.set_volume(0)
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
@@ -127,7 +129,11 @@ class Game:
             for i in range(len(self.current_wave)):
                 if self.current_wave[i] != 0:
                     self.current_wave[i] -= 1
-                    self.enemies.append(self.enemy_classes[i]())
+                    en = self.enemy_classes[i]()
+                    # U8: SWIFT - +30% predkosci
+                    if self.wave_modifier == "swift":
+                        en.velocity *= 1.3
+                    self.enemies.append(en)
                     break
 
     def advance_wave(self):
@@ -170,12 +176,25 @@ class Game:
             self._wave_start_lives = self.lives
             self.wave_banner_text = f"FALA {self.wave + 1}"  # V3
             self.wave_banner_timer = 120  # 2 sekundy
-            # Boss na falach 4 i 8; fala 10 (ostatnia) to sam boss.
+            # U8: modyfikator co 3 fale (nie na bossach)
+            self.wave_modifier = None
+            wave_num = self.wave + 1
+            if wave_num % 3 == 0 and wave_num % 4 != 0 and wave_num != 10:
+                mod = random.choice(["swift", "rich", "swarm"])
+                self.wave_modifier = mod
+                if mod == "swift":
+                    self.wave_banner_text += " [SWIFT!]"
+                elif mod == "rich":
+                    self.wave_banner_text += " [RICH!]"
+                elif mod == "swarm":
+                    self.current_wave = [int(c * 1.5) for c in self.current_wave]
+                    self.wave_banner_text += " [SWARM!]"
+            # Boss na falach 4 i 8; fala 10 (ostatnia) to sam boss FINALNY.
             if (self.wave + 1) % 4 == 0 and self.wave + 1 < 10:
                 self.enemies.append(Boss())
                 self.wave_banner_text = f"FALA {self.wave + 1} - BOSS!"
             elif self.wave + 1 == 10:
-                self.enemies.append(Boss())
+                self.enemies.append(Boss(final=True))
                 self.wave_banner_text = "FINALNA FALA - BOSS!"
         self.waiting_for_clear = False
     def run(self):
@@ -237,12 +256,24 @@ class Game:
                         if cost != "MAX" and self.money >= cost:
                             self.money -= cost
                             self.selected_tower.upgrade(cost)
+                    # U10: R - pokaz/ukryj wszystkie zasiegi
+                    if event.key == pygame.K_r:
+                        self.show_all_ranges = not self.show_all_ranges
                     if event.key == pygame.K_s and self.selected_tower:
                         self.money += self.selected_tower.sell_value()
                         self.towers.remove(self.selected_tower)
                         self.selected_tower = None
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
+                    # Ability dock - klikniecie aktywuje umiejetnosc
+                    if hasattr(self, 'ability_slots'):
+                        for rect, tname in self.ability_slots:
+                            if rect.collidepoint(pos):
+                                for tw in self.towers:
+                                    if type(tw).__name__.startswith(tname) and tw.ability_cooldown <= 0:
+                                        tw.activate_ability(self.enemies, self.projectiles)
+                                        break
+                                continue
                     # R2: przycisk wczesniejszej fali
                     if self.early_wave_rect and self.early_wave_rect.collidepoint(pos):
                         bonus = len(self.enemies) * 5
@@ -398,6 +429,14 @@ class Game:
         # Update wrogow (animacje, ruch, timery) - TU, nie w draw()!
         for en in self.enemies:
             en.update()
+            # Boss finalny przywoluje miniony
+            if isinstance(en, Boss) and en.get_summon_request():
+                for _ in range(2):
+                    m = Forkman()
+                    m.x, m.y = en.x - 30, en.y + 20
+                    m.path_pos = en.path_pos
+                    self.enemies.append(m)
+                self.gold_notifications.append(["Boss przywoluje posilki!", 120])
         to_del = []
         for en in self.enemies:
             if en.reached_end:
@@ -413,6 +452,9 @@ class Game:
                 # Wrog zabity pociskiem - kasa za niego.
                 # Golden Touch: podwojna kasa
                 reward = d.money
+                # U8: RICH - +50% zlota
+                if self.wave_modifier == "rich":
+                    reward = int(reward * 1.5)
                 for tw in self.towers:
                     if getattr(tw, '_gold_rush', False) and tw.ability_active > 0:
                         reward = d.money * 2
@@ -441,6 +483,9 @@ class Game:
                 # R5: zapamietaj wieze
                 if proj.source_tower:
                     hit_enemy.last_hit_by = proj.source_tower
+                # U6: Critical hit - 15% szansy na 2x obrazen
+                is_crit = random.random() < 0.15
+                crit_mult = 2.0 if is_crit else 1.0
                 # Splash damage: obrazenia obszarowe dla Fire/Blaze.
                 if proj.splash_radius > 0:
                     for en in self.enemies:
@@ -448,16 +493,20 @@ class Game:
                             continue
                         dist = math.sqrt((en.x - hit_enemy.x)**2 + (en.y - hit_enemy.y)**2)
                         if dist < proj.splash_radius:
-                            dmg = proj.damage * en.get_damage_mult(proj.damage_type)
+                            dmg = proj.damage * crit_mult * en.get_damage_mult(proj.damage_type)
                             if en.hit(dmg):
                                 tower_sound_3.play()
-                            self.damage_numbers.append([en.x, en.y - 40, str(int(dmg)), 30])
+                            dmg_text = str(int(dmg)) + ("!" if is_crit else "")
+                            dmg_color = (255, 220, 50) if is_crit else None
+                            self.damage_numbers.append([en.x, en.y - 40, dmg_text, 30, dmg_color])
                             self.stats_damage += int(dmg)
                 else:
-                    dmg = proj.damage * hit_enemy.get_damage_mult(proj.damage_type)
+                    dmg = proj.damage * crit_mult * hit_enemy.get_damage_mult(proj.damage_type)
                     if hit_enemy.hit(dmg):
                         tower_sound_3.play()
-                    self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 40, str(int(dmg)), 30])
+                    dmg_text = str(int(dmg)) + ("!" if is_crit else "")
+                    dmg_color = (255, 220, 50) if is_crit else None
+                    self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 40, dmg_text, 30, dmg_color])
                     self.stats_damage += int(dmg)
                 # Slow: MetalTower spowalnia trafionych.
                 if proj.slow_on_hit:
@@ -557,9 +606,18 @@ class Game:
             proj.draw(self.win)
         # Latajace liczby obrazen
         font_dmg = pygame.font.SysFont("arial", 18, bold=True)
-        for x, y, text, timer in self.damage_numbers:
-            alpha = min(255, timer * 8)
-            label = font_dmg.render(text, True, (255, 100, 100))
+        font_crit = pygame.font.SysFont("arial", 22, bold=True)
+        for item in self.damage_numbers:
+            # Obsluga starego formatu (4 elementy) i nowego (5 z kolorem)
+            if len(item) == 5:
+                x, y, text, timer, color = item
+            else:
+                x, y, text, timer = item
+                color = None
+            if color:
+                label = font_crit.render(text, True, color)
+            else:
+                label = font_dmg.render(text, True, (255, 100, 100))
             self.win.blit(label, (x - label.get_width()//2, y))
         # V3: banner fali
         if self.wave_banner_timer > 0:
@@ -593,29 +651,49 @@ class Game:
             by = 70 + i * 50
             self.win.blit(bg, (bx, by))
             self.win.blit(label, (bx + 15, by + 22 - label.get_height() // 2))
-        # R1: Pasek HP bossa na gorze ekranu
+        # R1: Pasek HP bossa - wyrazisty, nie zlewa sie z UI
         for en in self.enemies:
             if isinstance(en, Boss) and not en.dying and not en.dead:
-                bar_w, bar_h = 400, 18
+                bar_w, bar_h = 500, 22
                 bx = self.width // 2 - bar_w // 2
-                by = 12
+                by = 8
                 ratio = max(0.0, min(1.0, en.health / en.max_health))
-                # Tlo
+                # Tlo - ciemne z czerwona obwiednia
                 bg = pygame.Surface((bar_w, bar_h), pygame.SRCALPHA)
-                pygame.draw.rect(bg, (20, 10, 10, 220), bg.get_rect(), border_radius=9)
-                pygame.draw.rect(bg, (180, 40, 40, 255), bg.get_rect(), 2, border_radius=9)
+                pygame.draw.rect(bg, (15, 5, 5, 240), bg.get_rect(), border_radius=11)
+                pygame.draw.rect(bg, (200, 50, 50, 255), bg.get_rect(), 3, border_radius=11)
                 self.win.blit(bg, (bx, by))
-                # Wypelnienie
-                fill_w = int((bar_w - 4) * ratio)
+                # Wypelnienie z gradientem
+                fill_w = int((bar_w - 6) * ratio)
                 if fill_w > 0:
-                    fg = pygame.Surface((fill_w, bar_h - 4), pygame.SRCALPHA)
-                    pygame.draw.rect(fg, (220, 60, 60), fg.get_rect(), border_radius=7)
-                    self.win.blit(fg, (bx + 2, by + 2))
-                # Napis BOSS
-                boss_font = pygame.font.SysFont("arial", 14, bold=True)
-                blabel = boss_font.render("BOSS", True, (255, 200, 200))
-                self.win.blit(blabel, (bx + bar_w // 2 - blabel.get_width() // 2, by + bar_h // 2 - blabel.get_height() // 2))
-                break  # tylko jeden pasek
+                    fg = pygame.Surface((fill_w, bar_h - 6), pygame.SRCALPHA)
+                    # Gradient: jasna czerwien u gory
+                    for i in range(bar_h - 6):
+                        t = i / (bar_h - 6)
+                        r = int(230 - t * 40)
+                        g = int(70 - t * 30)
+                        pygame.draw.line(fg, (r, g, 50), (0, i), (fill_w, i))
+                    # Zaokraglenie przez maske
+                    mask = pygame.Surface((fill_w, bar_h - 6), pygame.SRCALPHA)
+                    pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect(), border_radius=8)
+                    fg.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                    self.win.blit(fg, (bx + 3, by + 3))
+                # Czaszka + nazwa
+                boss_font = pygame.font.SysFont("arial", 16, bold=True)
+                skull = "☠ BOSS" if not getattr(en, 'final', False) else "☠ FINAL BOSS"
+                if getattr(en, 'enraged', False):
+                    skull += " (WSCIEKLY!)"
+                    scol = (255, 100, 100)
+                else:
+                    scol = (255, 220, 220)
+                blabel = boss_font.render(skull, True, scol)
+                # Cien pod tekstem
+                shadow = boss_font.render(skull, True, (0, 0, 0))
+                tx = bx + bar_w // 2 - blabel.get_width() // 2
+                ty = by + bar_h // 2 - blabel.get_height() // 2
+                self.win.blit(shadow, (tx + 1, ty + 1))
+                self.win.blit(blabel, (tx, ty))
+                break
         
         # R2: Przycisk "Nastepna fala" - wczesniejsze przywolanie za bonus
         # (gdy statek odplynal ale wrogowie jeszcze sa na mapie)
@@ -636,6 +714,25 @@ class Game:
         else:
             self.early_wave_rect = None
         
+        # Ability dock - pasek umiejetnosci na dole
+        self.draw_ability_dock()
+        
+        # U9: podglad zasiegu wiezy ze sklepu (hover)
+        if not self.moving_object:
+            pos = pygame.mouse.get_pos()
+            hovered = self.menu.get_hovered(pos[0], pos[1])
+            if hovered:
+                # Tymczasowa wieza do pokazania zasiegu
+                tmp = {"t1": WoodenTower, "t2": MetalTower, "t3": GoldenTower,
+                       "t4": FireTower, "t5": BlazeTower}.get(hovered)
+                if tmp:
+                    tw = tmp(pos[0], pos[1])
+                    tw.draw_radius(self.win)
+        # U10: pokaz wszystkie zasiegi (R)
+        if self.show_all_ranges:
+            for tw in self.towers:
+                tw.draw_radius(self.win)
+        
         # R4: siatka stawiania z walidacja (gdy przecigasz wieze)
         if self.moving_object:
             self.draw_placement_grid(self.win, self.moving_object.x, self.moving_object.y)
@@ -644,6 +741,62 @@ class Game:
         self.draw_hud()
 
         pygame.display.update()
+
+    def draw_ability_dock(self):
+        """Pasek 5 umiejetnosci (po jednej na typ wiezy). Kliknij aby aktywowac."""
+        tower_types = [
+            ("Wooden", "Rapid Fire", (139, 90, 43)),
+            ("Metal", "Frost Nova", (120, 130, 140)),
+            ("Golden", "Golden Touch", (212, 175, 55)),
+            ("Fire", "Meteor", (220, 80, 40)),
+            ("Blaze", "Armageddon", (180, 40, 180)),
+        ]
+        slot_w, slot_h = 110, 64
+        gap = 8
+        total_w = 5 * slot_w + 4 * gap
+        start_x = self.width // 2 - total_w // 2
+        y = self.height - slot_h - 10
+        self.ability_slots = []
+        
+        for i, (tname, aname, color) in enumerate(tower_types):
+            x = start_x + i * (slot_w + gap)
+            rect = pygame.Rect(x, y, slot_w, slot_h)
+            self.ability_slots.append((rect, tname))
+            ready_tower = None
+            cooling = None
+            for tw in self.towers:
+                if type(tw).__name__.startswith(tname):
+                    if tw.ability_cooldown <= 0:
+                        ready_tower = tw
+                        break
+                    elif cooling is None:
+                        cooling = tw
+            bg = pygame.Surface((slot_w, slot_h), pygame.SRCALPHA)
+            if ready_tower:
+                pygame.draw.rect(bg, (*color, 230), bg.get_rect(), border_radius=10)
+                pygame.draw.rect(bg, (255, 255, 255, 200), bg.get_rect(), 2, border_radius=10)
+            elif cooling:
+                pygame.draw.rect(bg, (40, 50, 65, 230), bg.get_rect(), border_radius=10)
+                cd_ratio = cooling.ability_cooldown / cooling.ability_max_cooldown
+                overlay_h = int(slot_h * cd_ratio)
+                pygame.draw.rect(bg, (0, 0, 0, 150), (0, 0, slot_w, overlay_h), border_radius=10)
+            else:
+                pygame.draw.rect(bg, (30, 35, 45, 180), bg.get_rect(), border_radius=10)
+            self.win.blit(bg, (x, y))
+            f1 = pygame.font.SysFont("arial", 13, bold=True)
+            f2 = pygame.font.SysFont("arial", 11)
+            t1 = f1.render(aname, True, (255, 255, 255))
+            self.win.blit(t1, (x + slot_w//2 - t1.get_width()//2, y + 6))
+            if ready_tower:
+                t2 = f2.render("GOTOWA - kliknij", True, (255, 255, 200))
+            elif cooling:
+                secs = cooling.ability_cooldown // 60
+                t2 = f2.render(f"{secs}s", True, (180, 180, 180))
+            else:
+                t2 = f2.render("brak wiezy", True, (120, 120, 120))
+            self.win.blit(t2, (x + slot_w//2 - t2.get_width()//2, y + 28))
+            t3 = f2.render(tname, True, (200, 200, 200))
+            self.win.blit(t3, (x + slot_w//2 - t3.get_width()//2, y + 44))
 
     def draw_placement_grid(self, win, mx, my):
         """R4: Siatka + podswietlenie poprawnosci miejsca."""
@@ -769,18 +922,8 @@ class Game:
             prio_text = f"Target: {self.selected_tower.target_priority} (T)"
             label = font_small.render(prio_text, True, (255, 255, 0))
             self.win.blit(label, (10, 125))
-            # Umiejetnosc aktywna
-            tw = self.selected_tower
-            if hasattr(tw, 'ability_name'):
-                if tw.ability_cooldown > 0:
-                    cd_sec = tw.ability_cooldown // 60
-                    ab_text = f"{tw.ability_name}: {cd_sec}s (Q)"
-                    color = (150, 150, 150)
-                else:
-                    ab_text = f"{tw.ability_name}: GOTOWE (Q)"
-                    color = (100, 255, 100)
-                label = font_small.render(ab_text, True, color)
-                self.win.blit(label, (10, 145))
+            # Umiejetnosc aktywna - STARY tekst zastepuje ability dock na dole
+            pass
     def add_tower(self, name):
         x, y = pygame.mouse.get_pos()
         name_list = ["t1", "t2", "t3", "t4", "t5"]

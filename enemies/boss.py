@@ -14,15 +14,41 @@ hurt_imgs = load_anim(8, 'hurt', (160, 160))
 attack_imgs = load_anim(8, 'attack', (160, 160))
 
 class Boss(Enemy):
-    """Boss pojawiajacy sie co 4 fale. Bardzo wytrzymaly, wolny, wysoka nagroda."""
-    def __init__(self):
+    """Boss pojawiajacy sie co 4 fale. Bardzo wytrzymaly, wolny, wysoka nagroda.
+    Fala 10: wzmocniony (800 HP, enrage, przywoluje miniony)."""
+    def __init__(self, final=False):
         super().__init__()
         self.name = "boss"
-        self.money = 150
-        self.max_health = 400
+        self.money = 150 if not final else 300
+        self.max_health = 400 if not final else 800
         self.health = self.max_health
         self.velocity = 1.5
+        self.base_velocity = 1.5
+        self.final = final  # Boss finalny z fali 10
+        self.enraged = False
+        self.summoned_at = set()  # progi HP przy ktorych przywolal miniony
         self.imgs = imgs
         self.die_imgs = die_imgs
         self.hurt_imgs = hurt_imgs
         self.attack_imgs = attack_imgs
+
+    def update(self):
+        super().update()
+        if self.final and not self.dying and not self.dead:
+            ratio = self.health / self.max_health
+            # Enrage przy 50% HP: +60% predkosci
+            if ratio <= 0.5 and not self.enraged:
+                self.enraged = True
+                self.velocity = self.base_velocity * 1.6
+            # Przywolywanie minionow przy 75%/50%/25%
+            for threshold in (0.75, 0.5, 0.25):
+                if ratio <= threshold and threshold not in self.summoned_at:
+                    self.summoned_at.add(threshold)
+                    self._summon_request = True
+
+    def get_summon_request(self):
+        """Zwraca True raz gdy boss chce przywolac miniony."""
+        if getattr(self, '_summon_request', False):
+            self._summon_request = False
+            return True
+        return False

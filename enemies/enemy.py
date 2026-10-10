@@ -67,14 +67,16 @@ class Enemy:
                                              unsetcolor=(0, 0, 0, 0))
                 self._flash_cache = {'img': self.img, 'surf': flash_surf}
             img_to_draw = self._flash_cache['surf']
-        # V2: wskaznik spowolnienia - niebieska poswiata (sylwetka)
+        # V2: wskaznik spowolnienia - subtelne krysztalki lodu u stop (nie zaslania modelu)
         if self.slow_timer > 0:
-            if not hasattr(self, '_slow_cache') or self._slow_cache.get('img') is not img_to_draw:
-                mask = pygame.mask.from_surface(img_to_draw)
-                slow_surf = mask.to_surface(setcolor=(120, 190, 255, 130),
-                                            unsetcolor=(0, 0, 0, 0))
-                self._slow_cache = {'img': img_to_draw, 'surf': slow_surf}
-            img_to_draw = self._slow_cache['surf']
+            # Male niebieskie romby u podstawy wroga
+            for ox, oy in [(-12, 12), (0, 16), (12, 12)]:
+                pts = [(self.x + ox, self.y + oy - 6),
+                       (self.x + ox + 5, self.y + oy),
+                       (self.x + ox, self.y + oy + 6),
+                       (self.x + ox - 5, self.y + oy)]
+                pygame.draw.polygon(win, (150, 210, 255, 200), pts)
+                pygame.draw.polygon(win, (220, 240, 255, 255), pts, 1)
         win.blit(img_to_draw, (self.x - img_to_draw.get_width()/2, self.y - img_to_draw.get_height()/2 - 35))
         if not self.dying:
             self.draw_health_bar(win)

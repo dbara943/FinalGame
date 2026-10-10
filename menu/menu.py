@@ -132,6 +132,13 @@ class Menu():
             if btn.click(X, Y):
                 return btn.name
         return None
+
+    def get_hovered(self, X, Y):
+        """U9: zwraca nazwe przycisku pod kursorem (do podgladu zasiegu)."""
+        for btn in self.buttons:
+            if btn.click(X, Y):
+                return btn.name
+        return None
     
     def update(self):
         for btn in self.buttons:

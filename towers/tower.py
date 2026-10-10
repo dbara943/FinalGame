@@ -60,6 +60,18 @@ class Tower:
             pygame.draw.ellipse(shadow, (0, 0, 0, alpha), shadow.get_rect())
             win.blit(shadow, (self.x - sw // 2, self.y + 28 - sh // 2))
         win.blit(img, (self.x-img.get_width()//2, self.y-img.get_height()//2))
+        # U7: gwiazdki poziomu nad wieza
+        for i in range(self.level):
+            sx = self.x - (self.level - 1) * 9 + i * 18
+            sy = self.y - img.get_height() // 2 - 14
+            # Gwiazdka (5-katna)
+            pts = []
+            for k in range(10):
+                ang = math.pi / 5 * k - math.pi / 2
+                r = 7 if k % 2 == 0 else 3
+                pts.append((sx + r * math.cos(ang), sy + r * math.sin(ang)))
+            pygame.draw.polygon(win, (255, 215, 0), pts)
+            pygame.draw.polygon(win, (180, 140, 0), pts, 1)
 
         if self.selected:
             # R3: linia celowania do aktualnego celu

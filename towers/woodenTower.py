@@ -66,24 +66,52 @@ class WoodenTower(Tower):
         super().draw_radius(win)
         super().draw(win)  
         
-        # Widoczny reload (proca): po strzale wieza jest "pusta",
-        # pocisk pojawia sie z powrotem gdy reload sie konczy.
-        # attack_cooldown > 0 = przeladowanie, == 0 = gotowa do strzalu.
+        # Kierunkowa animacja przeladowania (proca):
+        # - pocisk widoczny na wiezy gdy gotowa
+        # - celuje w strone wroga (offset w kierunku celu)
+        # - po strzale znika (pusta), wraca podczas reloadu
+        tgt = getattr(self, 'current_target', None)
         reloading = self.attack_cooldown > 0
-        if reloading:
-            return  # nie rysuj lucznika - wieza pusta
+        
+        if reloading and self.attack_cooldown > 45:
+            # Pierwsze 15 tickow po strzale: pusta wieza
+            return
         
         if self.inRange and not self.moving:     
-            self.archer_count+= 1
+            self.archer_count += 1
             if self.archer_count >= len(self.archer_imgs) * 10:
                 self.archer_count = 0
         else:
             self.archer_count = 0
-            
-        archer = self.archer_imgs[self.archer_count//10]
-        # Lucznik przechyla sie w strone wroga (wczesniej w przeciwna).
-        add = -32 if self.facing_left else -12
-        win.blit(archer, ((self.x + self.width/2 + add + 10), (self.y - archer.get_height() - 5)))       
+        
+        proj_img = self.archer_imgs[self.archer_count // 10]
+        
+        # Pozycja pocisku: celowanie w strone wroga
+        px, py = self.x, self.y - 35
+        if tgt is not None and not tgt.dying and not tgt.dead:
+            # Kat do celu
+            dx = tgt.x - self.x
+            dy = tgt.y - (self.y - 35)
+            dist = math.hypot(dx, dy)
+            if dist > 0:
+                # Offset w kierunku celu (jak napieta proca)
+                pull = 12 if not reloading else 6
+                px = self.x + (dx / dist) * pull
+                py = (self.y - 35) + (dy / dist) * pull
+                # Obrot pocisku w kierunku celu
+                angle = math.degrees(math.atan2(-dy, dx))
+                proj_img = pygame.transform.rotate(proj_img, angle)
+        
+        # Animacja ladowania: pocisk rosnie podczas reloadu
+        if reloading:
+            progress = 1.0 - (self.attack_cooldown / 60.0)
+            scale = 0.5 + 0.5 * progress
+            w = int(proj_img.get_width() * scale)
+            h = int(proj_img.get_height() * scale)
+            if w > 0 and h > 0:
+                proj_img = pygame.transform.scale(proj_img, (w, h))
+        
+        win.blit(proj_img, (px - proj_img.get_width() // 2, py - proj_img.get_height() // 2))       
         
     def change_range(self, r):
         self.range = r
