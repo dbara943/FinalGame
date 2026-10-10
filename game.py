@@ -114,6 +114,16 @@ class Game:
         self.build_queue = []  # Q14: kolejka budowy
         self.tower_filter = None  # Q15: filtr wiez
         self.display_money = 200  # Niespodzianka 4: animowany licznik zlota
+        # Wizualne: fale, odbicia, niebo
+        self.wave_phase = 0  # faza fal wody
+        self.shooting_stars = []  # spadajace gwiazdy
+        self.fireflies = [(random.randint(100, 1000), random.randint(300, 600)) for _ in range(12)]
+        self.butterflies = [(random.randint(200, 900), random.randint(350, 550), random.random()*6) for _ in range(5)]
+        self.bird_flocks = []  # klucze ptakow
+        self.flowers = [(random.randint(150, 950), random.randint(380, 620), random.choice([(255,150,180),(255,255,150),(200,150,255)])) for _ in range(15)]
+        self.boss_footprints = []  # slady stop bossa
+        self.lightning_timer = 0  # blyskawica
+        self.morning_fog = 0  # mgla poranna
         if not sound:
             pygame.mixer.music.pause()
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
@@ -588,6 +598,14 @@ class Game:
             if getattr(en, '_dust', False):
                 en._dust = False
                 self.particles.burst(en.x, en.y + 15, (180, 160, 140), count=2, speed=1, life=20, size=3, gravity=-0.05)
+            # Slad lodu za spowolnionymi
+            if en.slow_timer > 0 and random.random() < 0.15:
+                self.particles.burst(en.x, en.y + 10, (180, 220, 255), count=1, speed=0.5, life=20, size=2, gravity=0)
+            # Slady stop bossa
+            if isinstance(en, Boss) and random.random() < 0.15:
+                self.boss_footprints.append([en.x, en.y + 10, 300])
+                if len(self.boss_footprints) > 20:
+                    self.boss_footprints.pop(0)
             # Boss finalny: ryk przy enrage
             if isinstance(en, Boss) and en.get_roar_request():
                 sound_roar.play()
@@ -653,6 +671,17 @@ class Game:
             tw._synergy = tw.get_synergy_bonus(self.towers)
             # 7: deszcz -10% zasiegu
             tw._rain_mod = 0.9 if self.raining else 1.0
+            # Wizualne: czasteczki idle wiez
+            if random.random() < 0.05:
+                tname = type(tw).__name__
+                if tname == "FireTower":
+                    self.particles.burst(tw.x, tw.y - 40, (255, 120, 40), count=1, speed=1, life=25, size=3, gravity=-0.1)
+                elif tname == "GoldenTower":
+                    self.particles.burst(tw.x, tw.y - 40, (255, 215, 0), count=1, speed=0.8, life=30, size=2, gravity=-0.05)
+                elif tname == "MetalTower":
+                    self.particles.burst(tw.x, tw.y - 40, (180, 220, 255), count=1, speed=0.8, life=25, size=2, gravity=-0.05)
+                elif tname == "BlazeTower":
+                    self.particles.burst(tw.x, tw.y - 40, (200, 100, 255), count=1, speed=1, life=25, size=3, gravity=-0.1)
             # A5: efekt ulepszenia
             if getattr(tw, '_upgrade_fx', False):
                 tw._upgrade_fx = False
@@ -662,6 +691,8 @@ class Game:
             if tw.attack(self.enemies, self.projectiles):
                 # V4: muzzle flash przy strzale
                 self.muzzle_flashes.append([tw.x, tw.y - 30, 6])
+                # Dym z lufy
+                self.particles.burst(tw.x, tw.y - 35, (150, 150, 150), count=2, speed=1, life=20, size=3, gravity=-0.08)
 
         # Pociski leca do celow; trafienie zadaje obrazenia.
         for proj in self.projectiles[:]:
@@ -819,9 +850,16 @@ class Game:
             ox = random.randint(-4, 4)
             oy = random.randint(-4, 4)
         self.win.blit(self.bg, (ox, oy))
+        # Wizualne: niebo i woda
+        self.draw_sky_effects()
+        self.draw_water_effects()
         # B1: cykl dnia/nocy - przyciemnienie
         self.draw_day_night()
         self.ship.draw(self.win)
+        # Iskry z komina statku (gdy plynie)
+        if self.ship.state == self.ship.SAILING and random.random() < 0.2:
+            self.particles.burst(self.ship.x, self.ship.y - 30, (255, 150, 50),
+                               count=2, speed=1.5, life=25, size=3, gravity=-0.15)
         # 5: linia synergii miedzy wiezami tego samego typu
         drawn_links = set()
         for tw in self.towers:
@@ -1075,6 +1113,53 @@ class Game:
             sy = 550 - ((t * 20 + i * 30) % 60)
             alpha = int(80 * (1 - ((t * 20 + i * 30) % 60) / 60))
             pygame.draw.circle(self.win, (150, 150, 150, alpha), (int(sx), int(sy)), 8)
+        # Pochodnie przy zamku (migoczacy ogien)
+        for tx, ty in [(240, 330), (320, 330)]:
+            flame_h = 12 + 4 * math.sin(t * 10 + tx)
+            pygame.draw.polygon(self.win, (255, 120, 20),
+                              [(tx-6, ty), (tx, ty-flame_h), (tx+6, ty)])
+            pygame.draw.polygon(self.win, (255, 220, 100),
+                              [(tx-3, ty), (tx, ty-flame_h*0.6), (tx+3, ty)])
+            pygame.draw.circle(self.win, (255, 200, 120, 60), (tx, ty-8), 18)
+        # Flaga na zamku
+        wave = math.sin(t * 4) * 5
+        pygame.draw.line(self.win, (100, 70, 40), (280, 280), (280, 250), 3)
+        pygame.draw.polygon(self.win, (200, 50, 50),
+                          [(280, 250), (305, 253 + wave), (280, 260)])
+        # Motyle (dzien)
+        phase = (self.wave // 2) % 4
+        if phase in (0, 1):
+            for i, (bx, by, ph) in enumerate(self.butterflies):
+                bx = (bx + t * 10) % 900 + 100
+                by = by + 15 * math.sin(t * 2 + ph)
+                wing = 5 + 3 * math.sin(t * 12 + ph)
+                pygame.draw.ellipse(self.win, (255, 180, 220), (bx-wing, by-3, wing*2, 6))
+        # Kwiaty
+        for fx, fy, col in self.flowers:
+            pygame.draw.circle(self.win, col, (fx, fy), 4)
+            pygame.draw.circle(self.win, (255, 255, 200), (fx, fy), 2)
+        # Klucz ptakow (losowo)
+        if random.random() < 0.002 and len(self.bird_flocks) < 2:
+            self.bird_flocks.append([0, random.randint(80, 180), 0])
+        for flock in self.bird_flocks[:]:
+            flock[0] += 3; flock[2] += 1
+            for i in range(5):
+                bx = flock[0] - i * 25
+                by = flock[1] + abs(i - 2) * 12
+                wing = 6 * math.sin(t * 8 + i)
+                pygame.draw.line(self.win, (60, 60, 60), (bx-8, by+wing), (bx, by), 2)
+                pygame.draw.line(self.win, (60, 60, 60), (bx, by), (bx+8, by+wing), 2)
+            if flock[0] > self.width + 100:
+                self.bird_flocks.remove(flock)
+        # Slady stop bossa
+        for fp in self.boss_footprints[:]:
+            fp[2] -= 1
+            if fp[2] <= 0:
+                self.boss_footprints.remove(fp)
+            else:
+                alpha = int(100 * fp[2] / 300)
+                pygame.draw.ellipse(self.win, (60, 50, 40, alpha),
+                                  (fp[0]-15, fp[1]-8, 30, 16))
         # Q17: zegar sesji
         mins = self.game_time // 3600
         secs = (self.game_time // 60) % 60
@@ -1163,6 +1248,7 @@ class Game:
     def draw_day_night(self):
         """B1: Cykl dnia/nocy - przyciemnienie co 2 fale."""
         phase = (self.wave // 2) % 4  # 0=dzien, 1=zachod, 2=noc, 3=swit
+        t = pygame.time.get_ticks() / 1000.0
         if phase == 1:
             overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
             overlay.fill((255, 150, 50, 40))
@@ -1179,6 +1265,20 @@ class Game:
             overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
             overlay.fill((255, 200, 150, 30))
             self.win.blit(overlay, (0, 0))
+            # Mgla poranna (15s)
+            if self.morning_fog < 900:
+                self.morning_fog += 1
+                fog = pygame.Surface((self.width, 200), pygame.SRCALPHA)
+                fog.fill((220, 230, 240, int(60 * (1 - self.morning_fog / 900))))
+                self.win.blit(fog, (0, 520))
+        else:
+            self.morning_fog = 0
+            # Cienie chmur (dzien)
+            for i, (base_x, cy, size) in enumerate(self.clouds):
+                cx = (base_x + t * 8) % (self.width + 200) - 100
+                shadow = pygame.Surface((size * 3, size), pygame.SRCALPHA)
+                pygame.draw.ellipse(shadow, (0, 0, 0, 40), shadow.get_rect())
+                self.win.blit(shadow, (cx - size * 1.5 + 30, 450))
         # B4: tecza po deszczu (10s po koncu deszczu)
         if hasattr(self, '_rainbow_timer') and self._rainbow_timer > 0:
             self._rainbow_timer -= 1
@@ -1187,6 +1287,21 @@ class Game:
                 pygame.draw.arc(self.win, (*c, 100), 
                               (self.width//2 - 200, 100, 400, 200), 
                               math.pi, 2 * math.pi, 8 - i)
+        # B6: blyskawice w deszczu
+        if self.raining:
+            if random.random() < 0.005:
+                self.lightning_timer = 8
+            if self.lightning_timer > 0:
+                self.lightning_timer -= 1
+                flash = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+                flash.fill((255, 255, 255, int(80 * self.lightning_timer / 8)))
+                self.win.blit(flash, (0, 0))
+                # Blyskawica
+                lx = random.randint(200, 900)
+                pts = [(lx, 0)]
+                for j in range(8):
+                    pts.append((lx + random.randint(-30, 30), (j+1) * 60))
+                pygame.draw.lines(self.win, (255, 255, 200), False, pts, 3)
 
     def save_game(self):
         """Q11: Zapis gry do pliku."""
@@ -1224,6 +1339,81 @@ class Game:
         self.enemies = []
         self.current_wave = waves[self.wave][:]
         self.gold_notifications.append(["Game loaded (F9)", 120])
+
+    def draw_sky_effects(self):
+        """Wizualne: niebo (slonce, ksiezyc, gwiazdy, zorza, spadajace gwiazdy)."""
+        t = pygame.time.get_ticks() / 1000.0
+        phase = (self.wave // 2) % 4
+        # Slonce w dzien / ksiezyc w nocy
+        if phase in (0, 1, 3):
+            sun_x = 900 - (self.wave % 2) * 200
+            sun_y = 80
+            pygame.draw.circle(self.win, (255, 240, 150, 200), (sun_x, sun_y), 35)
+            pygame.draw.circle(self.win, (255, 250, 200), (sun_x, sun_y), 25)
+        if phase == 2:
+            # Ksiezyc
+            pygame.draw.circle(self.win, (220, 220, 240), (850, 70), 28)
+            pygame.draw.circle(self.win, (15, 15, 35), (842, 64), 24)  # krater
+            # Migoczace gwiazdy
+            for i in range(30):
+                sx = (i * 173) % self.width
+                sy = (i * 97) % 180
+                tw = 100 + 80 * math.sin(t * 3 + i)
+                pygame.draw.circle(self.win, (255, 255, 255, int(tw)), (sx, sy), 2)
+            # Spadajace gwiazdy (losowo)
+            if random.random() < 0.01 and len(self.shooting_stars) < 3:
+                self.shooting_stars.append([random.randint(0, self.width), 0, random.randint(-8, -4)])
+            for s in self.shooting_stars[:]:
+                s[0] += 6; s[1] -= s[2]
+                pygame.draw.line(self.win, (255, 255, 255, 200), (s[0], s[1]), (s[0]-20, s[1]+10), 2)
+                if s[1] < -20:
+                    self.shooting_stars.remove(s)
+            # Zorza polarna
+            for i in range(5):
+                ax = 200 + i * 150
+                ay = 60 + 20 * math.sin(t * 0.8 + i)
+                alpha = int(60 + 40 * math.sin(t * 1.2 + i * 2))
+                s = pygame.Surface((100, 80), pygame.SRCALPHA)
+                pygame.draw.ellipse(s, (100, 255, 180, alpha), s.get_rect())
+                self.win.blit(s, (ax - 50, ay - 40))
+            # Swietliki
+            for fx, fy in self.fireflies:
+                glow = 100 + 80 * math.sin(t * 4 + fx)
+                pygame.draw.circle(self.win, (255, 255, 150, int(glow)), (fx, fy), 3)
+
+    def draw_water_effects(self):
+        """Wizualne: woda (fale, odbicia, kilwater, pecherzyki)."""
+        t = pygame.time.get_ticks() / 1000.0
+        # Fale (3 warstwy)
+        for layer in range(3):
+            for i in range(20):
+                wx = (i * 60 + t * (10 + layer * 5)) % (self.width + 60) - 30
+                wy = 640 + layer * 25 + 8 * math.sin(t * 1.5 + i + layer)
+                alpha = 80 - layer * 20
+                pygame.draw.arc(self.win, (255, 255, 255, alpha),
+                              (wx - 25, wy - 8, 50, 16), math.pi, 2 * math.pi, 2)
+        # Kilwater statku
+        if self.ship.state == self.ship.SAILING:
+            for i in range(8):
+                wx = self.ship.x - i * 15
+                wy = self.ship.y + 10 + random.randint(-5, 5)
+                alpha = int(120 * (1 - i / 8))
+                pygame.draw.circle(self.win, (255, 255, 255, alpha), (int(wx), int(wy)), 6 - i // 2)
+        # Odbicie ksiezyca w nocy
+        phase = (self.wave // 2) % 4
+        if phase == 2:
+            for i in range(10):
+                mx = 850 + random.randint(-20, 20)
+                my = 650 + i * 8
+                pygame.draw.line(self.win, (220, 220, 240, 100), (mx - 15, my), (mx + 15, my), 2)
+        # Pecherzyki przy brzegu
+        for i in range(8):
+            bx = (i * 140 + t * 20) % self.width
+            by = 630 + 5 * math.sin(t * 2 + i)
+            pygame.draw.circle(self.win, (200, 230, 255, 120), (int(bx), int(by)), 3)
+        # Fale o skaly (splash)
+        if random.random() < 0.1:
+            self.particles.burst(150, 620, (255, 255, 255), count=3, speed=2, life=20, size=3)
 
     def draw_ability_dock(self):
         """Pasek 5 umiejetnosci (po jednej na typ wiezy). Kliknij aby aktywowac."""

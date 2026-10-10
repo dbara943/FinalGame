@@ -66,9 +66,19 @@ class Enemy:
         # Czyste rysowanie - bez zmiany stanu (stan zmienia update()).
         if self.img is None:
             return
-        # 6: zlota obwiednia dla elitarnych
+        # 6: zlota obwiednia dla elitarnych + pulsujaca aura
         if self.elite:
-            pygame.draw.circle(win, (255, 215, 0, 150), (int(self.x), int(self.y - 35)), 34, 3)
+            t = pygame.time.get_ticks() / 1000.0
+            pulse = 3 + 2 * math.sin(t * 5)
+            pygame.draw.circle(win, (255, 215, 0, 150), (int(self.x), int(self.y - 35)), int(34 + pulse), 3)
+            # Aura
+            aura = pygame.Surface((90, 90), pygame.SRCALPHA)
+            pygame.draw.circle(aura, (255, 215, 0, 40), (45, 45), 40)
+            win.blit(aura, (self.x - 45, self.y - 80))
+        # Slad lodu za spowolnionymi
+        if self.slow_timer > 0 and random.random() < 0.2:
+            # (rysowane przez game.py particles)
+            pass
         # V5: miekki cien pod wrogiem (gradientowy, nie twarda elipsa)
         self._draw_soft_shadow(win, self.x, self.y + 18, 50, 14)
         img_to_draw = self.img
