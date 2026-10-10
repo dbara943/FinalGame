@@ -41,8 +41,8 @@ waves = [
     [0,0,0,0,20,20,10,0],
     [0,10,15,15,20,15,35,2],
     [20,20,30,40,50,60,70,25],
-    [20,20,30,40,50,60,70,25],
-    [20,20,30,40,50,60,70,25],
+    [25,25,35,45,55,65,75,30],
+    [30,30,40,50,60,70,80,35],
 ]
 pygame.mixer.init()
 music = pygame.mixer.music.load(os.path.join("sounds", "music.wav"))
@@ -59,6 +59,7 @@ class Game:
         self.win = pygame.display.set_mode((self.width, self.height))
         self.enemies = []
         self.towers = []
+        self.projectiles = []
         self.lives = lives
         self.money = money
         self.sound = sound
@@ -171,14 +172,29 @@ class Game:
             for en in self.enemies:
                 if en.reached_end:
                     to_del.append(en)
+                elif en.dead:
+                    to_del.append(en)
 
             for d in to_del:
-                sound_1.play()
-                self.lives -= 1
+                if d.reached_end:
+                    sound_1.play()
+                    self.lives -= 1
+                else:
+                    # Wrog zabity pociskiem - kasa za niego.
+                    self.money += d.money
                 self.enemies.remove(d)
 
             for tw in self.towers:
-                self.money += tw.attack(self.enemies)
+                tw.attack(self.enemies, self.projectiles)
+
+            # Pociski leca do celow; trafienie zadaje obrazenia.
+            for proj in self.projectiles[:]:
+                hit_enemy = proj.move()
+                if hit_enemy is not None:
+                    if hit_enemy.hit(proj.damage):
+                        tower_sound_3.play()
+                if proj.done:
+                    self.projectiles.remove(proj)
 
             if self.lives <= 0:
                 self.show_end_screen(False)
@@ -220,7 +236,9 @@ class Game:
         if self.moving_object:
             self.moving_object.draw(self.win)
         for en in self.enemies:
-            en.draw(self.win)    
+            en.draw(self.win)
+        for proj in self.projectiles:
+            proj.draw(self.win)
         
         self.menu.draw(self.win)
         self.draw_hud()

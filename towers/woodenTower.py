@@ -1,5 +1,6 @@
 import pygame
 from .tower import Tower
+from .projectile import Projectile
 import os
 import math
 import time
@@ -69,12 +70,13 @@ class WoodenTower(Tower):
     def change_range(self, r):
         self.range = r
 
-    def attack(self, enemies):
-        money = 0
+    def attack(self, enemies, projectiles):
         self.inRange = False
         enemy_closest = []
 
         for enemy in enemies:
+            if enemy.dying or enemy.dead or enemy.reached_end:
+                continue
             x = enemy.x
             y = enemy.y
             dis = math.sqrt((self.x - x)**2 + (self.y - y)**2)
@@ -87,13 +89,11 @@ class WoodenTower(Tower):
             first_enemy = enemy_closest[0]
             if time.time() - self.timer >= 1:
                 self.timer = time.time()
-                
                 sound_2.play()
-                    
-                if first_enemy.hit(self.damage) == True:
-                    sound_3.play()
-                    money = first_enemy.money
-                    enemies.remove(first_enemy)
+                # Pocisk leci do wroga zamiast natychmiastowego hita.
+                projectiles.append(Projectile(
+                    self.x, self.y - 30,
+                    self.archer_imgs[0], first_enemy, self.damage))
                   
             # Lucznik zwraca sie w strone wroga (wczesniej byl odwrocony).
             if first_enemy.x < self.x and not self.facing_left:
@@ -104,7 +104,6 @@ class WoodenTower(Tower):
                 self.facing_left = False
                 for x, img in enumerate(self.archer_imgs):
                     self.archer_imgs[x] = pygame.transform.flip(img, True, False)
-        return money
 """
 METAL TOWER 
 """

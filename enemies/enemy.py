@@ -1,5 +1,17 @@
 import pygame
 import math
+import os
+
+def load_anim(folder_num, anim_name, size=(64, 64)):
+    """Laduje klatki animacji wroga (np. 'die', 'hurt').
+    Pliki: images/enemies/<folder>/<folder>_enemies_1_<anim>_0XX.png"""
+    frames = []
+    for x in range(20):
+        fname = "%d_enemies_1_%s_0%02d.png" % (folder_num, anim_name, x)
+        path = os.path.join("images/enemies", str(folder_num), fname)
+        if os.path.exists(path):
+            frames.append(pygame.transform.scale(pygame.image.load(path), size))
+    return frames
 
 class Enemy:    
     def __init__(self):
@@ -23,19 +35,36 @@ class Enemy:
         self.move_count = 0
         self.move_dis = 0
         self.imgs = []
+        self.die_imgs = []
+        self.hurt_imgs = []
         self.flipped = False
         self.reached_end = False
         self._imgs_copied = False
+        self.dying = False
+        self.dead = False
+        self.die_count = 0
+        self.hurt_timer = 0
     def draw(self, win):
-        self.img = self.imgs[self.animation_count]
-        self.animation_count += 1
-
-        if self.animation_count >= len(self.imgs):
-            self.animation_count = 0
+        if self.dying:
+            if self.die_count < len(self.die_imgs):
+                self.img = self.die_imgs[self.die_count]
+                self.die_count += 1
+            else:
+                self.dead = True
+                return
+        elif self.hurt_timer > 0 and self.hurt_imgs:
+            self.img = self.hurt_imgs[(6 - self.hurt_timer) % len(self.hurt_imgs)]
+            self.hurt_timer -= 1
+        else:
+            self.img = self.imgs[self.animation_count]
+            self.animation_count += 1
+            if self.animation_count >= len(self.imgs):
+                self.animation_count = 0
                  
         win.blit(self.img, (self.x - self.img.get_width()/2, self.y - self.img.get_height()/2 - 35))
-        self.draw_health_bar(win)
-        self.move()
+        if not self.dying:
+            self.draw_health_bar(win)
+            self.move()
         
     def draw_health_bar(self, win):
         length = 50
@@ -59,6 +88,8 @@ class Enemy:
        # jednego odwracalo wszystkie.
        if not self._imgs_copied:
            self.imgs = self.imgs[:]
+           self.die_imgs = self.die_imgs[:]
+           self.hurt_imgs = self.hurt_imgs[:]
            self._imgs_copied = True
        x1, y1 = self.path[self.path_pos]
        if self.path_pos + 1 >= len(self.path):
@@ -77,10 +108,18 @@ class Enemy:
            self.flipped = True
            for x, img in enumerate(self.imgs):
                self.imgs[x] = pygame.transform.flip(img, True, False)
+           for x, img in enumerate(self.die_imgs):
+               self.die_imgs[x] = pygame.transform.flip(img, True, False)
+           for x, img in enumerate(self.hurt_imgs):
+               self.hurt_imgs[x] = pygame.transform.flip(img, True, False)
        elif dirn[0] > 0 and self.flipped:
            self.flipped = False
            for x, img in enumerate(self.imgs):
                self.imgs[x] = pygame.transform.flip(img, True, False)
+           for x, img in enumerate(self.die_imgs):
+               self.die_imgs[x] = pygame.transform.flip(img, True, False)
+           for x, img in enumerate(self.hurt_imgs):
+               self.hurt_imgs[x] = pygame.transform.flip(img, True, False)
 
        # Predkosc wroga (kiedys atrybut velocity byl ignorowany).
        # Dzielimy przez 3, zeby zachowac dotychczasowe tempo gry.
@@ -99,8 +138,13 @@ class Enemy:
                self.path_pos += 1
        
     def hit(self, damage):
+        if self.dying or self.dead:
+            return False
         self.health -= damage
+        self.hurt_timer = 6
         if self.health <= 0:
+            self.dying = True
+            self.die_count = 0
             return True
         return False
     
