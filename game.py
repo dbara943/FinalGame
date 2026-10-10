@@ -80,6 +80,8 @@ class Game:
         self.wave_banner_text = ""  # V3: banner fali
         self.wave_banner_timer = 0
         self.muzzle_flashes = []  # V4: blyski przy strzale [(x, y, timer)]
+        self.waiting_for_clear = False  # Czekamy na wyczyszczenie planszy przed nastepna fala
+        self.gold_notifications = []  # Widoczne powiadomienia o zlocie [(tekst, timer)]
         if not sound:
             pygame.mixer.music.set_volume(0)
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
@@ -112,47 +114,66 @@ class Game:
         if self.won or self.ship.state != Ship.DOCKED:
             return
         if sum(self.current_wave) == 0:
-            self.ship.sail_out()
-            if self.endless:
-                # Tryb endless: generuj fale proceduralnie z rosnacym HP
-                self.endless_wave += 1
-                self.wave += 1
-                scale = 1 + self.endless_wave * 0.15
-                self.current_wave = [
-                    int(20 * scale), int(15 * scale), int(12 * scale), int(10 * scale),
-                    int(8 * scale), int(6 * scale), int(5 * scale), int(3 * scale),
-                ]
-                self.money += 200
-                if self.endless_wave % 4 == 0:
-                    self.enemies.append(Boss())
-            elif self.wave + 1 >= len(waves):
-                self.last_wave_done = True
-            else:
-                # Bonus za czysta fale (bez utraty zycia) + odsetki 5% od oszczednosci
-                if hasattr(self, '_wave_start_lives') and self.lives == self._wave_start_lives:
-                    bonus = 50 + self.wave * 10
-                    self.money += bonus
-                interest = int(self.money * 0.05)
-                self.money += interest
-                self.wave += 1
-                self.money += self.wave * 100
-                self.current_wave = waves[self.wave][:]
-                self._wave_start_lives = self.lives
-                self.wave_banner_text = f"FALA {self.wave + 1}"  # V3
-                self.wave_banner_timer = 120  # 2 sekundy
-                # Boss na falach 4 i 8; fala 10 (ostatnia) to sam boss.
-                if (self.wave + 1) % 4 == 0 and self.wave + 1 < 10:
-                    self.enemies.append(Boss())
-                    self.wave_banner_text = f"FALA {self.wave + 1} - BOSS!"
-                elif self.wave + 1 == 10:
-                    self.enemies.append(Boss())
-                    self.wave_banner_text = "FINALNA FALA - BOSS!"
+            # Rozladunek zakonczony - statek wyplywa, czekamy na wyczyszczenie planszy.
+            # Nastepna fala zacznie sie dopiero gdy nie bedzie wrogow na mapie.
+            if not self.waiting_for_clear:
+                self.waiting_for_clear = True
+                self.ship.sail_out()
         else:
             for i in range(len(self.current_wave)):
                 if self.current_wave[i] != 0:
                     self.current_wave[i] -= 1
                     self.enemies.append(self.enemy_classes[i]())
                     break
+
+    def advance_wave(self):
+        """Przechodzi do nastepnej fali: zloto, bonusy, powiadomienie. Wywolywane
+        gdy plansza jest wyczyszczona i statek ma wrocic."""
+        if self.endless:
+            # Tryb endless: generuj fale proceduralnie z rosnacym HP
+            self.endless_wave += 1
+            self.wave += 1
+            scale = 1 + self.endless_wave * 0.15
+            self.current_wave = [
+                int(20 * scale), int(15 * scale), int(12 * scale), int(10 * scale),
+                int(8 * scale), int(6 * scale), int(5 * scale), int(3 * scale),
+            ]
+            gold = 200
+            self.money += gold
+            self.gold_notifications.append([f"+{gold} zlota (fala endless)", 150])
+            if self.endless_wave % 4 == 0:
+                self.enemies.append(Boss())
+        elif self.wave + 1 >= len(waves):
+            self.last_wave_done = True
+        else:
+            # Zloto za fale: baza + bonus za czysta fale + odsetki
+            base_gold = (self.wave + 1) * 100
+            bonus = 0
+            if hasattr(self, '_wave_start_lives') and self.lives == self._wave_start_lives:
+                bonus = 50 + self.wave * 10
+            interest = int(self.money * 0.05)
+            total = base_gold + bonus + interest
+            self.money += total
+            # Widoczne powiadomienie o zlocie
+            parts = [f"+{base_gold} za fale"]
+            if bonus > 0:
+                parts.append(f"+{bonus} czysta fala")
+            if interest > 0:
+                parts.append(f"+{interest} odsetki")
+            self.gold_notifications.append([" | ".join(parts), 180])
+            self.wave += 1
+            self.current_wave = waves[self.wave][:]
+            self._wave_start_lives = self.lives
+            self.wave_banner_text = f"FALA {self.wave + 1}"  # V3
+            self.wave_banner_timer = 120  # 2 sekundy
+            # Boss na falach 4 i 8; fala 10 (ostatnia) to sam boss.
+            if (self.wave + 1) % 4 == 0 and self.wave + 1 < 10:
+                self.enemies.append(Boss())
+                self.wave_banner_text = f"FALA {self.wave + 1} - BOSS!"
+            elif self.wave + 1 == 10:
+                self.enemies.append(Boss())
+                self.wave_banner_text = "FINALNA FALA - BOSS!"
+        self.waiting_for_clear = False
     def run(self):
         if self.sound:
             pygame.mixer.music.play(loops=-1)
@@ -168,6 +189,14 @@ class Game:
             if self.ship.state == Ship.AWAY and not self.won:
                 if self.last_wave_done:
                     self.won = True
+                elif self.waiting_for_clear:
+                    # Statek odplynal po rozladunku - czekamy na wyczyszczenie planszy.
+                    # Nastepna fala dopiero gdy nie ma wrogow.
+                    if len(self.enemies) == 0:
+                        self.advance_wave()
+                        if not self.last_wave_done:
+                            # Statek wraca losowo z lewej lub prawej (sail_in losuje strone)
+                            self.ship.sail_in()
                 else:
                     self.ship.sail_in()
             pos = pygame.mouse.get_pos()                 
@@ -312,6 +341,11 @@ class Game:
         # V3: banner fali
         if self.wave_banner_timer > 0:
             self.wave_banner_timer -= 1
+        # Powiadomienia o zlocie
+        for gn in self.gold_notifications[:]:
+            gn[1] -= 1
+            if gn[1] <= 0:
+                self.gold_notifications.remove(gn)
         # V4: muzzle flashes
         for mf in self.muzzle_flashes[:]:
             mf[2] -= 1
@@ -497,6 +531,20 @@ class Game:
                 flash = pygame.Surface((radius*2, radius*2), pygame.SRCALPHA)
                 pygame.draw.circle(flash, (255, 220, 100, timer * 40), (radius, radius), radius)
                 self.win.blit(flash, (x - radius, y - radius))
+        # Powiadomienia o zlocie za fale (widoczne, pod HUDem)
+        gold_font = pygame.font.SysFont("arial", 28, bold=True)
+        for i, (text, timer) in enumerate(self.gold_notifications):
+            alpha = min(255, timer * 2)
+            # Tlo powiadomienia
+            label = gold_font.render(text, True, (255, 215, 0))
+            bg_w = label.get_width() + 30
+            bg = pygame.Surface((bg_w, 44), pygame.SRCALPHA)
+            pygame.draw.rect(bg, (8, 18, 38, 190), bg.get_rect(), border_radius=22)
+            pygame.draw.rect(bg, (255, 215, 0, 150), bg.get_rect(), 2, border_radius=22)
+            bx = self.width // 2 - bg_w // 2
+            by = 70 + i * 50
+            self.win.blit(bg, (bx, by))
+            self.win.blit(label, (bx + 15, by + 22 - label.get_height() // 2))
         
         self.menu.draw(self.win)
         self.draw_hud()
