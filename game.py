@@ -857,7 +857,7 @@ class Game:
         self.draw_day_night()
         self.ship.draw(self.win)
         # Iskry z komina statku (gdy plynie)
-        if self.ship.state == self.ship.SAILING and random.random() < 0.2:
+        if self.ship.state in (self.ship.IN, self.ship.OUT) and random.random() < 0.2:
             self.particles.burst(self.ship.x, self.ship.y - 30, (255, 150, 50),
                                count=2, speed=1.5, life=25, size=3, gravity=-0.15)
         # 5: linia synergii miedzy wiezami tego samego typu
@@ -1393,7 +1393,7 @@ class Game:
                 pygame.draw.arc(self.win, (255, 255, 255, alpha),
                               (wx - 25, wy - 8, 50, 16), math.pi, 2 * math.pi, 2)
         # Kilwater statku
-        if self.ship.state == self.ship.SAILING:
+        if self.ship.state in (self.ship.IN, self.ship.OUT):
             for i in range(8):
                 wx = self.ship.x - i * 15
                 wy = self.ship.y + 10 + random.randint(-5, 5)
