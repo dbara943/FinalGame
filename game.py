@@ -422,8 +422,6 @@ class Game:
                 if d.die_imgs:
                     corpse_img = d.die_imgs[-1]
                     self.corpses.append([corpse_img, d.x, d.y, 240])  # 4 sekundy
-                # Statystyki
-                self.total_kills += 1
                 # R5: licznik zabojstw wiezy
                 if d.last_hit_by:
                     d.last_hit_by.kills += 1
