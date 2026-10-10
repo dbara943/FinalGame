@@ -17,7 +17,7 @@ class Forkman(Enemy):
         super().__init__()
         self.name = "forkman"
         self.money = 1
-        self.max_health = 2
+        self.max_health = 1
         self.velocity = 4.5
         self.health = self.max_health
         self.imgs = imgs

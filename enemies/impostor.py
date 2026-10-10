@@ -17,7 +17,7 @@ class Impostor(Enemy):
         super().__init__()
         self.name = "impostor"
         self.money = 20
-        self.max_health = 30
+        self.max_health = 24
         self.velocity = 3.0
         self.health = self.max_health
         self.imgs = imgs

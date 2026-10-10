@@ -17,7 +17,7 @@ class EvilVillager(Enemy):
         super().__init__()
         self.name = "evilVillager"
         self.money = 80
-        self.max_health = 120
+        self.max_health = 95
         self.velocity = 1.8
         self.health = self.max_health
         self.imgs = imgs

@@ -17,7 +17,7 @@ class Swordman(Enemy):
         super().__init__()
         self.enemy = "swordman"
         self.money = 3
-        self.max_health = 5
+        self.max_health = 4
         self.velocity = 3.5
         self.health = self.max_health
         self.imgs = imgs

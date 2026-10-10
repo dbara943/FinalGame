@@ -17,7 +17,7 @@ class Cyclop(Enemy):
         super().__init__()
         self.enemy = "cyclop"
         self.money = 10
-        self.max_health = 15
+        self.max_health = 12
         self.velocity = 2.5
         self.health = self.max_health
         self.imgs = imgs

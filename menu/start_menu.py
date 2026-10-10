@@ -1,4 +1,5 @@
 import pygame
+import os
 
 DIFFICULTIES = [
     ("EASY", 30, 300),
@@ -12,7 +13,15 @@ class StartMenu:
     def __init__(self, width, height, bg):
         self.width = width
         self.height = height
-        self.win = pygame.display.set_mode((width, height))
+        self.win = pygame.display.set_mode((width, height), pygame.SCALED | pygame.FULLSCREEN)
+        pygame.display.set_caption("Island Defenders")
+        self.bg = pygame.transform.scale(bg, (width, height))
+        # Dzwiek klikniecia w menu
+        try:
+            pygame.mixer.init()
+            self.click_sound = pygame.mixer.Sound(os.path.join("sounds", "4.wav"))
+        except:
+            self.click_sound = None
         pygame.display.set_caption("Island Defenders")
         self.bg = pygame.transform.scale(bg, (width, height))
         self.title_font = pygame.font.SysFont("arial", 76, bold=True)
@@ -99,19 +108,30 @@ class StartMenu:
 
     def run(self):
         """Petla menu. Zwraca slownik z ustawieniami albo None przy wyjsciu."""
+        # Muzyka w menu (jesli dzwiek wlaczony)
+        try:
+            if self.sound:
+                pygame.mixer.music.load(os.path.join("sounds", "music.wav"))
+                pygame.mixer.music.play(loops=-1)
+        except:
+            pass
         running = True
         while running:
             self.clock.tick(60)
             mouse = pygame.mouse.get_pos()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    pygame.mixer.music.stop()
                     return None
                 if event.type == pygame.MOUSEBUTTONDOWN:
+                    if self.click_sound and self.sound:
+                        self.click_sound.play()
                     if self.show_help:
                         self.show_help = False
                         continue
                     pos = event.pos
                     if self.buttons["start"].collidepoint(pos):
+                        pygame.mixer.music.stop()
                         name, lives, money = DIFFICULTIES[self.diff_idx]
                         return {"difficulty": name, "lives": lives,
                                 "money": money, "sound": self.sound}
@@ -119,8 +139,17 @@ class StartMenu:
                         self.diff_idx = (self.diff_idx + 1) % len(DIFFICULTIES)
                     elif self.buttons["sound"].collidepoint(pos):
                         self.sound = not self.sound
+                        # Wlacz/wylacz muzyke w menu na biezaco
+                        try:
+                            if self.sound:
+                                pygame.mixer.music.play(loops=-1)
+                            else:
+                                pygame.mixer.music.stop()
+                        except:
+                            pass
                     elif self.buttons["help"].collidepoint(pos):
                         self.show_help = True
                     elif self.buttons["quit"].collidepoint(pos):
+                        pygame.mixer.music.stop()
                         return None
             self.draw(mouse)

@@ -17,7 +17,7 @@ class Knight(Enemy):
         super().__init__()
         self.name = "knight"
         self.money = 5
-        self.max_health = 8
+        self.max_health = 6
         self.velocity = 3.0
         self.health = self.max_health
         self.imgs = imgs

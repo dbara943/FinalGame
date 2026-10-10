@@ -17,7 +17,7 @@ class Goblin(Enemy):
         super().__init__()
         self.name = "goblin"
         self.money = 6
-        self.max_health = 9
+        self.max_health = 7
         self.velocity = 4.0
         self.health = self.max_health
         self.imgs = imgs

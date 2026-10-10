@@ -17,7 +17,7 @@ class Ogre(Enemy):
         super().__init__()
         self.enemy = "ogre"
         self.money = 50
-        self.max_health = 75
+        self.max_health = 60
         self.velocity = 2.0
         self.health = self.max_health
         self.imgs = imgs

@@ -18,7 +18,7 @@ class Boss(Enemy):
         super().__init__()
         self.name = "boss"
         self.money = 150
-        self.max_health = 600
+        self.max_health = 400
         self.health = self.max_health
         self.velocity = 1.5
         self.imgs = imgs

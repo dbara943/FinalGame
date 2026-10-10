@@ -33,18 +33,16 @@ wave_bg = pygame.transform.scale(pygame.image.load(os.path.join("images","wave.p
 
 towers_names = ["woodenTower", "metalTower", "goldenTower", "fireTower", "blazeTower"]
 waves = [
-    [50,0,0,0,0,0,0,0],
-    [40,10,0,0,0,0,0,0],
-    [30,20,0,0,0,0,0,0],
-    [20,20,10,0,0,0,0,0],
-    [10,10,20,10,0,0,0,0],
-    [5,5,20,10,10,0,0,0],
-    [0,0,10,20,20,0,0,0],
-    [0,0,0,0,20,20,10,0],
-    [0,10,15,15,20,15,35,2],
-    [20,20,30,40,50,60,70,25],
-    [25,25,35,45,55,65,75,30],
-    [30,30,40,50,60,70,80,35],
+    [40,0,0,0,0,0,0,0],
+    [30,10,0,0,0,0,0,0],
+    [25,15,5,0,0,0,0,0],
+    [15,15,10,5,0,0,0,0],
+    [10,10,15,10,5,0,0,0],
+    [5,5,15,10,10,5,0,0],
+    [0,0,10,15,15,10,5,0],
+    [0,0,0,10,15,15,10,5],
+    [0,5,10,10,15,15,20,10],
+    [0,0,0,0,0,0,0,0],  # Fala 10: sam boss
 ]
 pygame.mixer.init()
 music = pygame.mixer.music.load(os.path.join("sounds", "music.wav"))
@@ -58,12 +56,14 @@ class Game:
     def __init__(self, lives=20, money=200, sound=True):
         self.width = 1124
         self.height = 720
-        self.win = pygame.display.set_mode((self.width, self.height))
+        self.win = pygame.display.set_mode((self.width, self.height), pygame.SCALED | pygame.FULLSCREEN)
         self.enemies = []
         self.towers = []
         self.projectiles = []
         self.lives = lives
         self.money = money
+        self._start_lives = lives
+        self._start_money = money
         self.sound = sound
         self.paused = False
         self.speed = 1  # 1x, 2x, 3x
@@ -117,8 +117,10 @@ class Game:
                 self.money += self.wave * 100
                 self.current_wave = waves[self.wave][:]
                 self._wave_start_lives = self.lives
-                # Boss co 4 fale (fale 4, 8, 12) - pojawia sie na poczatku fali.
-                if (self.wave + 1) % 4 == 0:
+                # Boss na falach 4 i 8; fala 10 (ostatnia) to sam boss.
+                if (self.wave + 1) % 4 == 0 and self.wave + 1 < 10:
+                    self.enemies.append(Boss())
+                elif self.wave + 1 == 10:
                     self.enemies.append(Boss())
         else:
             for i in range(len(self.current_wave)):
@@ -210,14 +212,40 @@ class Game:
                         break
 
             if self.lives <= 0:
-                self.show_end_screen(False)
-                run = False
+                if self.show_end_screen(False):
+                    self.reset_game()
+                else:
+                    run = False
             elif self.won:
-                self.show_end_screen(True)
-                run = False
+                if self.show_end_screen(True):
+                    self.reset_game()
+                else:
+                    run = False
 
             self.draw()
         pygame.quit()
+
+    def reset_game(self):
+        """Resetuje stan gry do poczatku (na potrzeby przycisku RESTART)."""
+        self.enemies = []
+        self.towers = []
+        self.projectiles = []
+        self.damage_numbers = []
+        self.lives = self._start_lives
+        self.money = self._start_money
+        self.wave = 0
+        self.current_wave = waves[self.wave][:]
+        self.won = False
+        self.last_wave_done = False
+        self.paused = False
+        self.speed = 1
+        self.selected_tower = None
+        self.moving_object = None
+        self.timer = time.time()
+        self._wave_start_lives = self._start_lives
+        self.ship = Ship(os.path.join("images", "ship.png"), dock_x=300, dock_y=665,
+                         screen_w=self.width)
+        self.ship.sail_in()
 
     def update_game_logic(self):
         """Jedna iteracja logiki gry (ruch wrogow, ataki, pociski)."""
@@ -286,26 +314,48 @@ class Game:
                 self.damage_numbers.remove(dn)
 
     def show_end_screen(self, won):
+        """Ekran koncowy. Zwraca True jesli gracz chce zrestartowac, False jesli wyjsc."""
         big_font = pygame.font.SysFont("arial", 70)
         small_font = pygame.font.SysFont("arial", 30)
         title = "YOU WIN! The island is saved!" if won else "YOU LOSE! The monsters broke through!"
         color = (60, 200, 90) if won else (220, 60, 60)
+        # Przyciski
+        restart_rect = pygame.Rect(self.width//2 - 220, self.height//2 + 60, 200, 60)
+        quit_rect = pygame.Rect(self.width//2 + 20, self.height//2 + 60, 200, 60)
+        # Statyczna klatka tla (bez migotania - rysujemy raz)
+        self.win.blit(self.bg, (0, 0))
+        overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 170))
+        self.win.blit(overlay, (0, 0))
+        text = big_font.render(title, 1, color)
+        self.win.blit(text, (self.width // 2 - text.get_width() // 2, self.height // 2 - 60))
+        sub = small_font.render("Wave reached: " + str(self.wave + 1) + " / " + str(len(waves)), 1, (255, 255, 255))
+        self.win.blit(sub, (self.width // 2 - sub.get_width() // 2, self.height // 2 + 20))
+        pygame.display.update()
+        # Petla czeka na klikniecie przycisku (bez przerysowywania tla - brak migotania)
         waiting = True
         while waiting:
             for event in pygame.event.get():
-                if event.type == pygame.QUIT or event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
-                    waiting = False
-            self.draw()
-            overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 170))
-            self.win.blit(overlay, (0, 0))
-            text = big_font.render(title, 1, color)
-            self.win.blit(text, (self.width // 2 - text.get_width() // 2, self.height // 2 - 60))
-            sub = small_font.render("Wave reached: " + str(self.wave + 1) + " / " + str(len(waves)), 1, (255, 255, 255))
-            self.win.blit(sub, (self.width // 2 - sub.get_width() // 2, self.height // 2 + 20))
-            hint = small_font.render("Click anywhere to quit", 1, (180, 180, 180))
-            self.win.blit(hint, (self.width // 2 - hint.get_width() // 2, self.height // 2 + 70))
+                if event.type == pygame.QUIT:
+                    return False
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    pos = pygame.mouse.get_pos()
+                    if restart_rect.collidepoint(pos):
+                        return True
+                    if quit_rect.collidepoint(pos):
+                        return False
+            # Rysuj przyciski (tylko przyciski sie odswiezaja)
+            for rect, label_text, btn_color in [
+                (restart_rect, "RESTART", (60, 180, 80)),
+                (quit_rect, "QUIT", (180, 60, 60)),
+            ]:
+                pygame.draw.rect(self.win, btn_color, rect, border_radius=10)
+                pygame.draw.rect(self.win, (255, 255, 255), rect, 2, border_radius=10)
+                label = small_font.render(label_text, True, (255, 255, 255))
+                self.win.blit(label, (rect.x + rect.width//2 - label.get_width()//2,
+                                      rect.y + rect.height//2 - label.get_height()//2))
             pygame.display.update()
+        return False
         
     def draw(self):
         self.win.blit(self.bg, (0,0))
