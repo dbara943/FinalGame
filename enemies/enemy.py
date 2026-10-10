@@ -50,6 +50,7 @@ class Enemy:
         self.slow_timer = 0
         self.base_velocity = 3
         self.flash_timer = 0  # V1: bialy blysk przy trafieniu
+        self.last_hit_by = None  # R5: wieza ktora zadala ostatni cios
 
     def draw(self, win):
         # Czyste rysowanie - bez zmiany stanu (stan zmienia update()).

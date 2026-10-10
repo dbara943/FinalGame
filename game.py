@@ -85,6 +85,7 @@ class Game:
         self.waiting_for_clear = False  # Czekamy na wyczyszczenie planszy przed nastepna fala
         self.gold_notifications = []  # Widoczne powiadomienia o zlocie [(tekst, timer)]
         self.corpses = []  # Trupy wrogow: [img, x, y, timer]
+        self.early_wave_rect = None  # R2: prostokat przycisku "Nastepna fala"
         if not sound:
             pygame.mixer.music.set_volume(0)
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
@@ -242,6 +243,15 @@ class Game:
                         self.selected_tower = None
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
+                    # R2: przycisk wczesniejszej fali
+                    if self.early_wave_rect and self.early_wave_rect.collidepoint(pos):
+                        bonus = len(self.enemies) * 5
+                        self.money += bonus
+                        self.gold_notifications.append([f"+{bonus}$ bonus za pospiech!", 150])
+                        self.advance_wave()
+                        if not self.last_wave_done and not self.won:
+                            self.ship.sail_in()
+                        continue
                     # Przyciski pauzy i predkosci
                     if self.pause_btn_rect.collidepoint(pos):
                         self.paused = not self.paused
@@ -251,7 +261,19 @@ class Game:
                         continue
                     if self.moving_object:
                         if self.moving_object.name in towers_names:
-                            self.towers.append(self.moving_object)
+                            # R4: tylko na poprawnym miejscu
+                            gx = round(self.moving_object.x / 40) * 40
+                            gy = round(self.moving_object.y / 40) * 40
+                            if self.is_valid_placement(gx, gy):
+                                self.moving_object.x, self.moving_object.y = gx, gy
+                                self.moving_object.menu.x, self.moving_object.menu.y = gx, gy
+                                self.moving_object.menu.update()
+                                self.towers.append(self.moving_object)
+                            # else: niepoprawne - wieza znika (pieniadze przepadaja? nie - zwroc)
+                            else:
+                                # Zwroc pieniadze za wieze
+                                cost = self.menu.get_item_cost(self.moving_object.name)
+                                self.money += cost
                         self.moving_object.moving = False
                         self.moving_object = None      
                     else:
@@ -402,6 +424,9 @@ class Game:
                     self.corpses.append([corpse_img, d.x, d.y, 240])  # 4 sekundy
                 # Statystyki
                 self.total_kills += 1
+                # R5: licznik zabojstw wiezy
+                if d.last_hit_by:
+                    d.last_hit_by.kills += 1
                 self.stats_kills += 1
                 self.stats_gold += reward
             self.enemies.remove(d)
@@ -415,6 +440,9 @@ class Game:
         for proj in self.projectiles[:]:
             hit_enemy = proj.move()
             if hit_enemy is not None:
+                # R5: zapamietaj wieze
+                if proj.source_tower:
+                    hit_enemy.last_hit_by = proj.source_tower
                 # Splash damage: obrazenia obszarowe dla Fire/Blaze.
                 if proj.splash_radius > 0:
                     for en in self.enemies:
@@ -567,11 +595,110 @@ class Game:
             by = 70 + i * 50
             self.win.blit(bg, (bx, by))
             self.win.blit(label, (bx + 15, by + 22 - label.get_height() // 2))
+        # R1: Pasek HP bossa na gorze ekranu
+        for en in self.enemies:
+            if isinstance(en, Boss) and not en.dying and not en.dead:
+                bar_w, bar_h = 400, 18
+                bx = self.width // 2 - bar_w // 2
+                by = 12
+                ratio = max(0.0, min(1.0, en.health / en.max_health))
+                # Tlo
+                bg = pygame.Surface((bar_w, bar_h), pygame.SRCALPHA)
+                pygame.draw.rect(bg, (20, 10, 10, 220), bg.get_rect(), border_radius=9)
+                pygame.draw.rect(bg, (180, 40, 40, 255), bg.get_rect(), 2, border_radius=9)
+                self.win.blit(bg, (bx, by))
+                # Wypelnienie
+                fill_w = int((bar_w - 4) * ratio)
+                if fill_w > 0:
+                    fg = pygame.Surface((fill_w, bar_h - 4), pygame.SRCALPHA)
+                    pygame.draw.rect(fg, (220, 60, 60), fg.get_rect(), border_radius=7)
+                    self.win.blit(fg, (bx + 2, by + 2))
+                # Napis BOSS
+                boss_font = pygame.font.SysFont("arial", 14, bold=True)
+                blabel = boss_font.render("BOSS", True, (255, 200, 200))
+                self.win.blit(blabel, (bx + bar_w // 2 - blabel.get_width() // 2, by + bar_h // 2 - blabel.get_height() // 2))
+                break  # tylko jeden pasek
+        
+        # R2: Przycisk "Nastepna fala" - wczesniejsze przywolanie za bonus
+        # (gdy statek odplynal ale wrogowie jeszcze sa na mapie)
+        if self.waiting_for_clear and len(self.enemies) > 0 and not self.won and not self.last_wave_done:
+            btn_w, btn_h = 220, 44
+            bx = self.width - btn_w - 20
+            by = 70
+            self.early_wave_rect = pygame.Rect(bx, by, btn_w, btn_h)
+            # Bonus zalezy od liczby pozostalych wrogow
+            bonus = len(self.enemies) * 5
+            btn_bg = pygame.Surface((btn_w, btn_h), pygame.SRCALPHA)
+            pygame.draw.rect(btn_bg, (30, 90, 50, 230), btn_bg.get_rect(), border_radius=12)
+            pygame.draw.rect(btn_bg, (100, 255, 150, 180), btn_bg.get_rect(), 2, border_radius=12)
+            self.win.blit(btn_bg, (bx, by))
+            btn_font = pygame.font.SysFont("arial", 18, bold=True)
+            label = btn_font.render(f"NASTEPNA FALA +{bonus}$", True, (200, 255, 210))
+            self.win.blit(label, (bx + btn_w//2 - label.get_width()//2, by + btn_h//2 - label.get_height()//2))
+        else:
+            self.early_wave_rect = None
+        
+        # R4: siatka stawiania z walidacja (gdy przecigasz wieze)
+        if self.moving_object:
+            self.draw_placement_grid(self.win, self.moving_object.x, self.moving_object.y)
         
         self.menu.draw(self.win)
         self.draw_hud()
 
         pygame.display.update()
+
+    def draw_placement_grid(self, win, mx, my):
+        """R4: Siatka + podswietlenie poprawnosci miejsca."""
+        grid = 40
+        # Siatka
+        for x in range(0, self.width, grid):
+            pygame.draw.line(win, (255, 255, 255, 25), (x, 0), (x, self.height), 1)
+        for y in range(0, self.height, grid):
+            pygame.draw.line(win, (255, 255, 255, 25), (0, y), (self.width, y), 1)
+        # Przyciagnij do siatki
+        gx = round(mx / grid) * grid
+        gy = round(my / grid) * grid
+        valid = self.is_valid_placement(gx, gy)
+        color = (80, 220, 100, 120) if valid else (220, 80, 80, 120)
+        hl = pygame.Surface((grid, grid), pygame.SRCALPHA)
+        pygame.draw.rect(hl, color, hl.get_rect(), border_radius=6)
+        win.blit(hl, (gx - grid//2, gy - grid//2))
+        # Okrag zasiegu w miejscu stawiania
+        if hasattr(self.moving_object, 'range'):
+            r = self.moving_object.range
+            surf = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (150, 220, 255, 60), (r, r), r, 2)
+            win.blit(surf, (gx - r, gy - r))
+
+    def is_valid_placement(self, x, y):
+        """R4: Czy mozna postawic wieze w (x, y)."""
+        # Poza mapa / na menu bocznym
+        if x < 40 or x > self.width - 200 or y < 40 or y > self.height - 40:
+            return False
+        # Na drodze (punkty sciezki wroga)
+        path = [(300, 600), (325, 640), (340, 635), (380, 620), (440, 600),
+                (535, 575), (700, 560), (850, 543), (980, 512),
+                (1040, 462), (1000, 415), (800, 412), (600, 414),
+                (400, 410), (300, 375)]
+        for i in range(len(path) - 1):
+            x1, y1 = path[i]
+            x2, y2 = path[i + 1]
+            # Odleglosc punktu od odcinka
+            dx, dy = x2 - x1, y2 - y1
+            l2 = dx*dx + dy*dy
+            if l2 == 0:
+                dist = math.hypot(x - x1, y - y1)
+            else:
+                t = max(0, min(1, ((x - x1)*dx + (y - y1)*dy) / l2))
+                px, py = x1 + t*dx, y1 + t*dy
+                dist = math.hypot(x - px, y - py)
+            if dist < 50:
+                return False
+        # Na innej wiezy
+        for tw in self.towers:
+            if math.hypot(x - tw.x, y - tw.y) < 60:
+                return False
+        return True
 
     def draw_hud(self):
         # Rzad spojnych "pigulek": fala, zycia, kasa

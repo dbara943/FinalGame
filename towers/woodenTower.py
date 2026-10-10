@@ -90,6 +90,7 @@ class WoodenTower(Tower):
 
     def attack(self, enemies, projectiles):
         self.inRange = False
+        self.current_target = None
         enemy_closest = []
         shot_fired = False
 
@@ -115,6 +116,7 @@ class WoodenTower(Tower):
         
         if len(enemy_closest) > 0:            
             first_enemy = enemy_closest[0]
+            self.current_target = first_enemy  # R3: zapamietaj cel
             # Rapid Fire: 2x szybkosc ataku. Cooldown tick-based (60 = 1s).
             cooldown_ticks = 30 if getattr(self, '_rapid_fire', False) and self.ability_active > 0 else 60
             if self.attack_cooldown <= 0:
@@ -133,7 +135,8 @@ class WoodenTower(Tower):
                     self.archer_imgs[0], first_enemy, dmg,
                     splash_radius=splash,
                     slow_on_hit=getattr(self, 'slow_on_hit', False),
-                    damage_type=getattr(self, 'damage_type', 'physical')))
+                    damage_type=getattr(self, 'damage_type', 'physical'),
+                    source_tower=self))
                 shot_fired = True
                   
             # Lucznik zwraca sie w strone wroga (wczesniej byl odwrocony).

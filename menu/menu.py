@@ -64,7 +64,7 @@ class Menu():
     def draw(self, win):
         # Nowoczesny panel: rysowany programowo, bez grafiki tła
         tw = self.tower
-        panel_w, panel_h = 200, 130
+        panel_w, panel_h = 230, 130
         px = self.x - panel_w // 2
         py = self.y - 110
         
@@ -91,25 +91,25 @@ class Menu():
         btn_h = 36
         # Upgrade
         up_cost = self.item_cost[tw.level - 1] if tw.level < tw.max_level else "MAX"
-        self._draw_modern_btn(win, px + 12, btn_y, 86, btn_h, "UPGRADE", 
+        self._draw_modern_btn(win, px + 12, btn_y, 100, btn_h, "UPGRADE", 
                               str(up_cost), (46, 134, 193), tw.level >= tw.max_level)
         # Sell
         sell_val = tw.sell_value()
-        self._draw_modern_btn(win, px + 102, btn_y, 86, btn_h, "SELL",
+        self._draw_modern_btn(win, px + 118, btn_y, 100, btn_h, "SELL",
                               f"+${sell_val}", (46, 160, 90), False)
         
         # Statystyki wieży
         stat_font = pygame.font.SysFont("arial", 15)
-        stats = f"DMG {tw.damage}  |  RNG {tw.range}"
+        stats = f"DMG {tw.damage}  |  RNG {tw.range}  |  KILLS {tw.kills}"
         slabel = stat_font.render(stats, True, (170, 190, 210))
         win.blit(slabel, (px + panel_w//2 - slabel.get_width()//2, py + 92))
         
         # Aktualizuj pozycje klikalne przycisków
         if len(self.buttons) >= 2:
             self.buttons[0].x, self.buttons[0].y = px + 12, btn_y
-            self.buttons[0].width, self.buttons[0].height = 86, btn_h
-            self.buttons[1].x, self.buttons[1].y = px + 102, btn_y
-            self.buttons[1].width, self.buttons[1].height = 86, btn_h
+            self.buttons[0].width, self.buttons[0].height = 100, btn_h
+            self.buttons[1].x, self.buttons[1].y = px + 118, btn_y
+            self.buttons[1].width, self.buttons[1].height = 100, btn_h
     
     def _draw_modern_btn(self, win, x, y, w, h, title, sub, color, disabled):
         btn = pygame.Surface((w, h), pygame.SRCALPHA)
