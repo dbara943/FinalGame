@@ -19,6 +19,7 @@ class Impostor(Enemy):
         self.money = 20
         self.max_health = 24
         self.velocity = 3.0
+        self.slow_immune = True
         self.health = self.max_health
         self.imgs = imgs
         self.die_imgs = die_imgs

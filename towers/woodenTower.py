@@ -124,7 +124,8 @@ class WoodenTower(Tower):
                     self.x, self.y - 30,
                     self.archer_imgs[0], first_enemy, dmg,
                     splash_radius=splash,
-                    slow_on_hit=getattr(self, 'slow_on_hit', False)))
+                    slow_on_hit=getattr(self, 'slow_on_hit', False),
+                    damage_type=getattr(self, 'damage_type', 'physical')))
                   
             # Lucznik zwraca sie w strone wroga (wczesniej byl odwrocony).
             if first_enemy.x < self.x and not self.facing_left:
@@ -244,6 +245,7 @@ class FireTower(WoodenTower):
     buy_price = 400
     ability_name = "Meteor"
     ability_desc = "Potężny pocisk 3x obrażenia, duży splash"
+    damage_type = "fire"
     def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs4[:]
@@ -285,6 +287,7 @@ class BlazeTower(WoodenTower):
     buy_price = 500
     ability_name = "Armageddon"
     ability_desc = "Obrażenia dla WSZYSTKICH wrogów na mapie"
+    damage_type = "fire"
     def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs5[:]

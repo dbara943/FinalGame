@@ -71,6 +71,12 @@ class Game:
         self.speed_btn_rect = pygame.Rect(self.width - 60, 10, 50, 44)
         self._wave_start_lives = lives
         self.damage_numbers = []  # Latajace liczby obrazen [(x, y, tekst, timer)]
+        # Statystyki koncowe
+        self.stats_kills = 0
+        self.stats_gold = 0
+        self.stats_damage = 0
+        self.endless = False  # Tryb endless po wygranej
+        self.endless_wave = 0
         if not sound:
             pygame.mixer.music.set_volume(0)
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
@@ -104,7 +110,19 @@ class Game:
             return
         if sum(self.current_wave) == 0:
             self.ship.sail_out()
-            if self.wave + 1 >= len(waves):
+            if self.endless:
+                # Tryb endless: generuj fale proceduralnie z rosnacym HP
+                self.endless_wave += 1
+                self.wave += 1
+                scale = 1 + self.endless_wave * 0.15
+                self.current_wave = [
+                    int(20 * scale), int(15 * scale), int(12 * scale), int(10 * scale),
+                    int(8 * scale), int(6 * scale), int(5 * scale), int(3 * scale),
+                ]
+                self.money += 200
+                if self.endless_wave % 4 == 0:
+                    self.enemies.append(Boss())
+            elif self.wave + 1 >= len(waves):
                 self.last_wave_done = True
             else:
                 # Bonus za czysta fale (bez utraty zycia) + odsetki 5% od oszczednosci
@@ -161,6 +179,28 @@ class Game:
                     # Q: aktywacja umiejetnosci wybranej wiezy
                     if event.key == pygame.K_q and self.selected_tower:
                         self.selected_tower.activate_ability(self.enemies, self.projectiles)
+                    # Spacja: pauza
+                    if event.key == pygame.K_SPACE:
+                        self.paused = not self.paused
+                    # 1-5: wybor wiezy ze sklepu
+                    if event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5):
+                        idx = event.key - pygame.K_1
+                        tower_names = ["t1", "t2", "t3", "t4", "t5"]
+                        if idx < len(tower_names):
+                            cost = self.menu.get_item_cost(tower_names[idx])
+                            if self.money >= cost:
+                                self.money -= cost
+                                self.add_tower(tower_names[idx])
+                    # U: upgrade wybranej wiezy, S: sprzedaz
+                    if event.key == pygame.K_u and self.selected_tower:
+                        cost = self.selected_tower.menu.get_item_cost()
+                        if cost != "MAX" and self.money >= cost:
+                            self.money -= cost
+                            self.selected_tower.upgrade(cost)
+                    if event.key == pygame.K_s and self.selected_tower:
+                        self.money += self.selected_tower.sell_value()
+                        self.towers.remove(self.selected_tower)
+                        self.selected_tower = None
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
                     # Przyciski pauzy i predkosci
@@ -212,13 +252,21 @@ class Game:
                         break
 
             if self.lives <= 0:
-                if self.show_end_screen(False):
+                result = self.show_end_screen(False)
+                if result == "restart":
                     self.reset_game()
                 else:
                     run = False
             elif self.won:
-                if self.show_end_screen(True):
+                result = self.show_end_screen(True)
+                if result == "restart":
                     self.reset_game()
+                elif result == "continue":
+                    # Tryb endless: kontynuuj z proceduralnymi falami
+                    self.endless = True
+                    self.won = False
+                    self.last_wave_done = False
+                    self.ship.sail_in()
                 else:
                     run = False
 
@@ -237,12 +285,17 @@ class Game:
         self.current_wave = waves[self.wave][:]
         self.won = False
         self.last_wave_done = False
+        self.endless = False
+        self.endless_wave = 0
         self.paused = False
         self.speed = 1
         self.selected_tower = None
         self.moving_object = None
         self.timer = time.time()
         self._wave_start_lives = self._start_lives
+        self.stats_kills = 0
+        self.stats_gold = 0
+        self.stats_damage = 0
         self.ship = Ship(os.path.join("images", "ship.png"), dock_x=300, dock_y=665,
                          screen_w=self.width)
         self.ship.sail_in()
@@ -278,6 +331,8 @@ class Game:
                         reward = d.money * 2
                         break
                 self.money += reward
+                self.stats_kills += 1
+                self.stats_gold += reward
             self.enemies.remove(d)
 
         for tw in self.towers:
@@ -294,13 +349,17 @@ class Game:
                             continue
                         dist = math.sqrt((en.x - hit_enemy.x)**2 + (en.y - hit_enemy.y)**2)
                         if dist < proj.splash_radius:
-                            if en.hit(proj.damage):
+                            dmg = proj.damage * en.get_damage_mult(proj.damage_type)
+                            if en.hit(dmg):
                                 tower_sound_3.play()
-                            self.damage_numbers.append([en.x, en.y - 40, str(proj.damage), 30])
+                            self.damage_numbers.append([en.x, en.y - 40, str(int(dmg)), 30])
+                            self.stats_damage += int(dmg)
                 else:
-                    if hit_enemy.hit(proj.damage):
+                    dmg = proj.damage * hit_enemy.get_damage_mult(proj.damage_type)
+                    if hit_enemy.hit(dmg):
                         tower_sound_3.play()
-                    self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 40, str(proj.damage), 30])
+                    self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 40, str(int(dmg)), 30])
+                    self.stats_damage += int(dmg)
                 # Slow: MetalTower spowalnia trafionych.
                 if proj.slow_on_hit:
                     hit_enemy.apply_slow(90)  # 1.5 sekundy przy 60 FPS
@@ -314,14 +373,20 @@ class Game:
                 self.damage_numbers.remove(dn)
 
     def show_end_screen(self, won):
-        """Ekran koncowy. Zwraca True jesli gracz chce zrestartowac, False jesli wyjsc."""
+        """Ekran koncowy. Zwraca 'restart', 'continue' (endless), lub 'quit'."""
         big_font = pygame.font.SysFont("arial", 70)
         small_font = pygame.font.SysFont("arial", 30)
         title = "YOU WIN! The island is saved!" if won else "YOU LOSE! The monsters broke through!"
         color = (60, 200, 90) if won else (220, 60, 60)
         # Przyciski
-        restart_rect = pygame.Rect(self.width//2 - 220, self.height//2 + 60, 200, 60)
-        quit_rect = pygame.Rect(self.width//2 + 20, self.height//2 + 60, 200, 60)
+        if won:
+            restart_rect = pygame.Rect(self.width//2 - 330, self.height//2 + 160, 200, 60)
+            continue_rect = pygame.Rect(self.width//2 - 100, self.height//2 + 160, 200, 60)
+            quit_rect = pygame.Rect(self.width//2 + 130, self.height//2 + 160, 200, 60)
+        else:
+            restart_rect = pygame.Rect(self.width//2 - 220, self.height//2 + 160, 200, 60)
+            quit_rect = pygame.Rect(self.width//2 + 20, self.height//2 + 160, 200, 60)
+            continue_rect = None
         # Statyczna klatka tla (bez migotania - rysujemy raz)
         self.win.blit(self.bg, (0, 0))
         overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -331,39 +396,56 @@ class Game:
         self.win.blit(text, (self.width // 2 - text.get_width() // 2, self.height // 2 - 60))
         sub = small_font.render("Wave reached: " + str(self.wave + 1) + " / " + str(len(waves)), 1, (255, 255, 255))
         self.win.blit(sub, (self.width // 2 - sub.get_width() // 2, self.height // 2 + 20))
+        # Statystyki koncowe (R12)
+        stats_font = pygame.font.SysFont("arial", 24)
+        stats = [
+            f"Kills: {self.stats_kills}",
+            f"Gold earned: {self.stats_gold}",
+            f"Damage dealt: {self.stats_damage}",
+        ]
+        for i, s in enumerate(stats):
+            label = stats_font.render(s, True, (200, 200, 200))
+            self.win.blit(label, (self.width // 2 - label.get_width() // 2, self.height // 2 + 55 + i * 30))
         pygame.display.update()
         # Petla czeka na klikniecie przycisku (bez przerysowywania tla - brak migotania)
         waiting = True
         while waiting:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    return False
+                    return "quit"
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
                     if restart_rect.collidepoint(pos):
-                        return True
+                        return "restart"
                     if quit_rect.collidepoint(pos):
-                        return False
+                        return "quit"
+                    if continue_rect and continue_rect.collidepoint(pos):
+                        return "continue"
             # Rysuj przyciski (tylko przyciski sie odswiezaja)
-            for rect, label_text, btn_color in [
+            buttons = [
                 (restart_rect, "RESTART", (60, 180, 80)),
                 (quit_rect, "QUIT", (180, 60, 60)),
-            ]:
+            ]
+            if continue_rect:
+                buttons.insert(1, (continue_rect, "CONTINUE", (60, 120, 220)))
+            for rect, label_text, btn_color in buttons:
                 pygame.draw.rect(self.win, btn_color, rect, border_radius=10)
                 pygame.draw.rect(self.win, (255, 255, 255), rect, 2, border_radius=10)
                 label = small_font.render(label_text, True, (255, 255, 255))
                 self.win.blit(label, (rect.x + rect.width//2 - label.get_width()//2,
                                       rect.y + rect.height//2 - label.get_height()//2))
             pygame.display.update()
-        return False
+        return "quit"
         
     def draw(self):
         self.win.blit(self.bg, (0,0))
         self.ship.draw(self.win)
         for tw in self.towers:
             tw.draw(self.win)
+            tw.draw_radius(self.win)
         if self.moving_object:
             self.moving_object.draw(self.win)
+            self.moving_object.draw_radius(self.win)
         for en in self.enemies:
             en.draw(self.win)
         for proj in self.projectiles:

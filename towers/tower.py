@@ -55,7 +55,7 @@ class Tower:
             self.menu.draw(win)
 
     def draw_radius(self, win):
-        if self.selected:
+        if self.selected or getattr(self, 'moving', False):
             # Powierzchnia 2x zasieg wystarczy (wczesniej byla 4x za duza).
             surface = pygame.Surface((self.range*2, self.range*2), pygame.SRCALPHA, 32)
             pygame.draw.circle(surface, (128,128,128, 128), (self.range, self.range), self.range, 0)

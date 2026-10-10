@@ -158,5 +158,13 @@ class Enemy:
     def apply_slow(self, duration=60):
         """Naklada spowolnienie na wroga (duration w klatkach)."""
         if not self.dying and not self.dead:
+            # Impostor jest odporny na spowolnienie
+            if getattr(self, 'slow_immune', False):
+                return
             self.slow_timer = duration
+
+    def get_damage_mult(self, damage_type):
+        """Mnoznik obrazen uwzgledniajacy opornosci (R13)."""
+        resistances = getattr(self, 'resistances', {})
+        return resistances.get(damage_type, 1.0)
     

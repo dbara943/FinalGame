@@ -4,7 +4,7 @@ import math
 class Projectile:
     """Lecacy pocisk z wiezy do wroga. Kazda wieza ma wlasny wyglad."""
 
-    def __init__(self, x, y, img, target, damage, speed=9, splash_radius=0, slow_on_hit=False):
+    def __init__(self, x, y, img, target, damage, speed=9, splash_radius=0, slow_on_hit=False, damage_type="physical"):
         self.x = x
         self.y = y
         self.img = img
@@ -13,6 +13,7 @@ class Projectile:
         self.speed = speed
         self.splash_radius = splash_radius
         self.slow_on_hit = slow_on_hit
+        self.damage_type = damage_type
         self.done = False
 
     def move(self):
