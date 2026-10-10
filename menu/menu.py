@@ -186,7 +186,7 @@ class VerticalMenu(Menu):
         
         # Naglowek SKLEP
         hfont = pygame.font.SysFont("arial", 18, bold=True)
-        ht = hfont.render("SKLEP", True, (200, 220, 240))
+        ht = hfont.render("SHOP", True, (200, 220, 240))
         win.blit(ht, (px + panel_w//2 - ht.get_width()//2, py + 10))
         
         for idx, item in enumerate(self.buttons):
@@ -208,7 +208,7 @@ class VerticalMenu(Menu):
             # Nazwa i cena - wyrownane do prawej
             nfont = pygame.font.SysFont("arial", 14, bold=True)
             pfont = pygame.font.SysFont("arial", 15, bold=True)
-            names = ["Drewniana", "Metalowa", "Zlota", "Ognista", "Blaze"]
+            names = ["Wooden", "Metal", "Golden", "Fire", "Blaze"]
             nm = nfont.render(names[idx] if idx < len(names) else item.name, True, (230, 235, 240))
             win.blit(nm, (bx + 60, by + 8))
             # Cena z moneta - zawsze w tej samej pozycji

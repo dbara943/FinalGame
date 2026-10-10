@@ -82,29 +82,49 @@ class StartMenu:
         pygame.display.update()
 
     def draw_help(self):
-        panel = pygame.Rect(self.width // 2 - 330, self.height // 2 - 220, 660, 440)
+        panel = pygame.Rect(self.width // 2 - 360, self.height // 2 - 280, 720, 560)
         pygame.draw.rect(self.win, (12, 24, 44), panel, border_radius=16)
         pygame.draw.rect(self.win, (255, 255, 255), panel, 2, border_radius=16)
         lines = [
-            "HOW TO PLAY",
-            "",
-            "- Click a tower in the right panel, then click",
-            "  on the map to build it.",
-            "- Monster-pirates follow the dirt road.",
-            "  Don't let them reach your base!",
-            "- Click a built tower to upgrade it (max level 3).",
-            "- You earn money for every defeated enemy.",
-            "- Survive all 12 waves to win.",
-            "",
-            "Click anywhere to go back.",
+            ("HOW TO PLAY", "title"),
+            ("", "spacer"),
+            ("Build towers from the right panel, then click", "text"),
+            ("on the map to place them.", "text"),
+            ("Monster-pirates follow the dirt road.", "text"),
+            ("Don't let them reach your base!", "text"),
+            ("", "spacer"),
+            ("CONTROLS", "header"),
+            ("1-5  Buy tower      |  U  Upgrade tower", "text"),
+            ("S  Sell tower      |  Q  Tower ability", "text"),
+            ("T  Target priority |  R  Show all ranges", "text"),
+            ("Space  Pause       |  F  Toggle 1x/3x speed", "text"),
+            ("M  Mute            |  C  Filter towers by type", "text"),
+            ("Shift+Click  Queue build / Quick sell", "text"),
+            ("Ctrl+Z  Undo last build or upgrade", "text"),
+            ("F5 / F9  Save / Load game", "text"),
+            ("", "spacer"),
+            ("TIPS", "header"),
+            ("Same-type towers next to each other: +15% damage.", "text"),
+            ("Gold elites give 5x gold. Watch for rain: +15% gold!", "text"),
+            ("", "spacer"),
+            ("Click anywhere to go back.", "dim"),
         ]
-        y = panel.y + 30
-        for i, line in enumerate(lines):
-            f = self.btn_font if i == 0 else self.small_font
-            c = (255, 210, 63) if i == 0 else (225, 232, 240)
+        y = panel.y + 25
+        for line, style in lines:
+            if style == "spacer":
+                y += 12
+                continue
+            if style == "title":
+                f, c, step = self.btn_font, (255, 210, 63), 40
+            elif style == "header":
+                f, c, step = self.small_font, (255, 210, 63), 30
+            elif style == "dim":
+                f, c, step = self.small_font, (140, 150, 160), 30
+            else:
+                f, c, step = self.small_font, (225, 232, 240), 26
             t = f.render(line, True, c)
             self.win.blit(t, (panel.centerx - t.get_width() // 2, y))
-            y += 40 if i == 0 else 30
+            y += step
 
     def run(self):
         """Petla menu. Zwraca slownik z ustawieniami albo None przy wyjsciu."""

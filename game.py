@@ -115,7 +115,7 @@ class Game:
         self.tower_filter = None  # Q15: filtr wiez
         self.display_money = 200  # Niespodzianka 4: animowany licznik zlota
         if not sound:
-            pygame.mixer.music.set_volume(0)
+            pygame.mixer.music.pause()
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
                       tower_sound_1, tower_sound_2, tower_sound_3,
                       tower_sound_4, tower_sound_5, sound_win, sound_lose, sound_roar,
@@ -186,7 +186,7 @@ class Game:
             # MVP: wieza z najwieksza liczba zabojstw
             mvp = max(self.towers, key=lambda t: t.kills, default=None)
             mvp_text = f"{mvp.name} ({mvp.kills})" if mvp else "-"
-            report = f"Fala {self.wave + 1}: {kills} zabitych, -{lives_lost} zyc, +{gold}$ | MVP: {mvp_text}"
+            report = f"Wave {self.wave + 1}: {kills} kills, -{lives_lost} lives, +{gold}$ | MVP: {mvp_text}"
             self.wave_report = [report, 240]
         self._wave_kills_start = self.stats_kills
         self._wave_gold_start = self.stats_gold
@@ -201,7 +201,7 @@ class Game:
             ]
             gold = 200
             self.money += gold
-            self.gold_notifications.append([f"+{gold} zlota (fala endless)", 150])
+            self.gold_notifications.append([f"+{gold} gold (endless wave)", 150])
             if self.endless_wave % 4 == 0:
                 self.pending_boss = Boss()
         elif self.wave + 1 >= len(waves):
@@ -216,16 +216,16 @@ class Game:
             total = base_gold + bonus + interest
             self.money += total
             # Widoczne powiadomienie o zlocie
-            parts = [f"+{base_gold} za fale"]
+            parts = [f"+{base_gold} for wave"]
             if bonus > 0:
-                parts.append(f"+{bonus} czysta fala")
+                parts.append(f"+{bonus} clean wave")
             if interest > 0:
-                parts.append(f"+{interest} odsetki")
+                parts.append(f"+{interest} interest")
             self.gold_notifications.append([" | ".join(parts), 180])
             self.wave += 1
             self.current_wave = waves[self.wave][:]
             self._wave_start_lives = self.lives
-            self.wave_banner_text = f"FALA {self.wave + 1}"  # V3
+            self.wave_banner_text = f"WAVE {self.wave + 1}"  # V3
             self.wave_banner_timer = 120  # 2 sekundy
             # U8: modyfikator co 3 fale (nie na bossach)
             self.wave_modifier = None
@@ -255,7 +255,7 @@ class Game:
             # Boss spawnuje sie dopiero gdy statek zadokuje (pending_boss).
             if (self.wave + 1) % 4 == 0 and self.wave + 1 < 10:
                 self.pending_boss = Boss()
-                self.wave_banner_text = f"FALA {self.wave + 1} - BOSS!"
+                self.wave_banner_text = f"WAVE {self.wave + 1} - BOSS!"
             elif self.wave + 1 == 10:
                 self.pending_boss = Boss(final=True)
                 self.wave_banner_text = "FINALNA FALA - BOSS!"
@@ -346,11 +346,14 @@ class Game:
                     # Q10: F - przelacz 1x/3x
                     if event.key == pygame.K_f:
                         self.speed = 3 if self.speed == 1 else 1
-                    # Q16: M - wyciszenie
+                    # Q16: M - wyciszenie (pauza muzyki, nie restart)
                     if event.key == pygame.K_m:
                         self.muted = not self.muted
+                        if self.muted:
+                            pygame.mixer.music.pause()
+                        else:
+                            pygame.mixer.music.unpause()
                         vol = 0 if self.muted else 1
-                        pygame.mixer.music.set_volume(0.5 * vol)
                         for s in (sound_1, sound_2, sound_3, sound_4, sound_5, sound_win, sound_lose, sound_roar,
                                   sound_levelup, sound_horn):
                             s.set_volume(vol)
@@ -390,7 +393,7 @@ class Game:
                     if self.early_wave_rect and self.early_wave_rect.collidepoint(pos):
                         bonus = len(self.enemies) * 5
                         self.money += bonus
-                        self.gold_notifications.append([f"+{bonus}$ bonus za pospiech!", 150])
+                        self.gold_notifications.append([f"+{bonus}$ rush bonus!", 150])
                         self.advance_wave()
                         if not self.last_wave_done and not self.won:
                             self.ship.sail_in()
@@ -588,7 +591,7 @@ class Game:
             # Boss finalny: ryk przy enrage
             if isinstance(en, Boss) and en.get_roar_request():
                 sound_roar.play()
-                self.wave_banner_text = "BOSS WSCIEKLY!"
+                self.wave_banner_text = "BOSS ENRAGED!"
                 self.wave_banner_timer = 90
             # Boss finalny przywoluje miniony
             if isinstance(en, Boss) and en.get_summon_request():
@@ -612,7 +615,7 @@ class Game:
                 # Q6: auto-pauza przy 3 zyciach
                 if self.lives == 3 and not self.paused:
                     self.paused = True
-                    self.gold_notifications.append(["UWAGA: 3 zycia! Pauza.", 180])
+                    self.gold_notifications.append(["WARNING: 3 lives! Paused.", 180])
             else:
                 # Wrog zabity pociskiem - kasa za niego.
                 # Golden Touch: podwojna kasa (oznaczeni lub globalny buff)
@@ -961,7 +964,7 @@ class Game:
                 boss_font = pygame.font.SysFont("arial", 16, bold=True)
                 skull = "☠ BOSS" if not getattr(en, 'final', False) else "☠ FINAL BOSS"
                 if getattr(en, 'enraged', False):
-                    skull += " (WSCIEKLY!)"
+                    skull += " (ENRAGED!)"
                     scol = (255, 100, 100)
                 else:
                     scol = (255, 220, 220)
@@ -988,7 +991,7 @@ class Game:
             pygame.draw.rect(btn_bg, (100, 255, 150, 180), btn_bg.get_rect(), 2, border_radius=12)
             self.win.blit(btn_bg, (bx, by))
             btn_font = pygame.font.SysFont("arial", 18, bold=True)
-            label = btn_font.render(f"NASTEPNA FALA +{bonus}$", True, (200, 255, 210))
+            label = btn_font.render(f"NEXT WAVE +{bonus}$", True, (200, 255, 210))
             self.win.blit(label, (bx + btn_w//2 - label.get_width()//2, by + btn_h//2 - label.get_height()//2))
         else:
             self.early_wave_rect = None
@@ -1011,7 +1014,7 @@ class Game:
                     avg = sum(t.damage for t in self.towers) / max(1, len(self.towers))
                     diff = tw.damage - avg
                     cfont = pygame.font.SysFont("arial", 13, bold=True)
-                    ctxt = f"DPS {tw.damage} ({'+' if diff >= 0 else ''}{diff:.0f} vs srednia)"
+                    ctxt = f"DPS {tw.damage} ({'+' if diff >= 0 else ''}{diff:.0f} vs avg)"
                     ccol = (100, 255, 100) if diff >= 0 else (255, 150, 150)
                     clabel = cfont.render(ctxt, True, ccol)
                     self.win.blit(clabel, (pos[0] + 15, pos[1] - 25))
@@ -1082,9 +1085,9 @@ class Game:
         # 8: wskaznik pauzy z informacja o budowaniu
         if self.paused:
             pfont = pygame.font.SysFont("arial", 36, bold=True)
-            plabel = pfont.render("PAUZA", True, (255, 255, 255))
+            plabel = pfont.render("PAUSED", True, (255, 255, 255))
             sfont = pygame.font.SysFont("arial", 16)
-            slabel = sfont.render("mozesz stawiac i ulepszac wieze", True, (200, 200, 200))
+            slabel = sfont.render("you can build and upgrade towers", True, (200, 200, 200))
             px = self.width // 2 - plabel.get_width() // 2
             py = 60
             # Polprzezroczyste tlo
@@ -1105,7 +1108,7 @@ class Game:
         next_is_boss = (self.wave + 2) % 4 == 0 or self.wave + 2 == 10
         if next_is_boss and self.waiting_for_clear and not hasattr(self, '_boss_warned'):
             self._boss_warned = True
-            self.wave_banner_text = "UWAGA: BOSS NADCHODZI!"
+            self.wave_banner_text = "WARNING: BOSS INCOMING!"
             self.wave_banner_timer = 150
             sound_horn.play()  # Niespodzianka 5: rog ostrzegawczy
         if not self.waiting_for_clear:
@@ -1195,7 +1198,7 @@ class Game:
         }
         with open('savegame.dat', 'wb') as f:
             pickle.dump(data, f)
-        self.gold_notifications.append(["Gra zapisana (F5)", 120])
+        self.gold_notifications.append(["Game saved (F5)", 120])
 
     def load_game(self):
         """Q11: Wczytaj gre z pliku."""
@@ -1220,7 +1223,7 @@ class Game:
             self.towers.append(tw)
         self.enemies = []
         self.current_wave = waves[self.wave][:]
-        self.gold_notifications.append(["Gra wczytana (F9)", 120])
+        self.gold_notifications.append(["Game loaded (F9)", 120])
 
     def draw_ability_dock(self):
         """Pasek 5 umiejetnosci (po jednej na typ wiezy). Kliknij aby aktywowac."""
@@ -1268,12 +1271,12 @@ class Game:
             t1 = f1.render(aname, True, (255, 255, 255))
             self.win.blit(t1, (x + slot_w//2 - t1.get_width()//2, y + 6))
             if ready_tower:
-                t2 = f2.render("GOTOWA - kliknij", True, (255, 255, 200))
+                t2 = f2.render("READY - click", True, (255, 255, 200))
             elif cooling:
                 secs = cooling.ability_cooldown // 60
                 t2 = f2.render(f"{secs}s", True, (180, 180, 180))
             else:
-                t2 = f2.render("brak wiezy", True, (120, 120, 120))
+                t2 = f2.render("no tower", True, (120, 120, 120))
             self.win.blit(t2, (x + slot_w//2 - t2.get_width()//2, y + 28))
             t3 = f2.render(tname, True, (200, 200, 200))
             self.win.blit(t3, (x + slot_w//2 - t3.get_width()//2, y + 44))
@@ -1374,7 +1377,7 @@ class Game:
                 pygame.draw.rect(fg, (100, 200, 100), fg.get_rect(), border_radius=7)
                 self.win.blit(fg, (px, py))
             qfont = pygame.font.SysFont("arial", 12)
-            qlabel = qfont.render(f"Wrogowie: {remaining}", True, (220, 220, 220))
+            qlabel = qfont.render(f"Enemies: {remaining}", True, (220, 220, 220))
             self.win.blit(qlabel, (px + pw + 8, py - 1))
         else:
             self._wave_enemy_total = 0
@@ -1430,7 +1433,7 @@ class Game:
             wave_gold = (self.wave + 2) * 100
             interest = int(self.money * 0.05)
             efont = pygame.font.SysFont("arial", 12)
-            elabel = efont.render(f"fala {wave_gold}$ + odsetki {interest}$", True, (180, 180, 180))
+            elabel = efont.render(f"wave {wave_gold}$ + interest {interest}$", True, (180, 180, 180))
             self.win.blit(elabel, (preview_x + 8, preview_y + 60))
         # Priorytet celowania wybranej wiezy
         if self.selected_tower:

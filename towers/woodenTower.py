@@ -34,7 +34,7 @@ archer_imgs1.append(pygame.transform.scale(
 class WoodenTower(Tower):
     buy_price = 100
     ability_name = "Rapid Fire"
-    ability_desc = "2x szybkosc ataku przez 5s"
+    ability_desc = "2x attack speed for 5s"
     def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs1[:]
@@ -207,7 +207,7 @@ archer_imgs2.append(pygame.transform.scale(
 class MetalTower(WoodenTower):
     buy_price = 200
     ability_name = "Frost Nova"
-    ability_desc = "Spowalnia wszystkich wrogow w zasiegu"
+    ability_desc = "Slows all enemies in range"
     def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs2[:]
@@ -260,7 +260,7 @@ archer_imgs3.append(pygame.transform.scale(
 class GoldenTower(WoodenTower):
     buy_price = 300
     ability_name = "Golden Touch"
-    ability_desc = "Podwojna kasa za zabojstwa przez 10s"
+    ability_desc = "Double gold for kills for 10s"
     def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs3[:]
@@ -312,7 +312,7 @@ archer_imgs4.append(pygame.transform.scale(
 class FireTower(WoodenTower):
     buy_price = 400
     ability_name = "Meteor"
-    ability_desc = "Potężny pocisk 3x obrażenia, duży splash"
+    ability_desc = "Powerful 3x damage projectile, big splash"
     damage_type = "fire"
     def __init__(self, x, y):
         super().__init__(x, y)
@@ -370,7 +370,7 @@ archer_imgs5.append(pygame.transform.scale(
 class BlazeTower(WoodenTower):
     buy_price = 500
     ability_name = "Armageddon"
-    ability_desc = "Obrażenia dla WSZYSTKICH wrogów na mapie"
+    ability_desc = "Damage to ALL enemies on map"
     damage_type = "fire"
     def __init__(self, x, y):
         super().__init__(x, y)
