@@ -24,6 +24,11 @@ class Tower:
         self.tower_imgs = []
         self.damage = 1
         self._img_cache = {}
+        self.target_priority = "first"  # first, strong, weak, last
+        # Umiejetnosc aktywna
+        self.ability_cooldown = 0  # klatki do gotowosci
+        self.ability_max_cooldown = 1800  # 30s przy 60 FPS
+        self.ability_active = 0  # klatki pozostalego czasu dzialania
 
     def _setup_menu(self):
         self.menu = Menu(self, self.x, self.y, menu_bg, [250, 500, "MAX"])

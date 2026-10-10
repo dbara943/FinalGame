@@ -18,6 +18,7 @@ class Forkman(Enemy):
         self.name = "forkman"
         self.money = 1
         self.max_health = 2
+        self.velocity = 4.5
         self.health = self.max_health
         self.imgs = imgs
         self.die_imgs = die_imgs

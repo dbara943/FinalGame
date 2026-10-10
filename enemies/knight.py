@@ -18,6 +18,7 @@ class Knight(Enemy):
         self.name = "knight"
         self.money = 5
         self.max_health = 8
+        self.velocity = 3.0
         self.health = self.max_health
         self.imgs = imgs
         self.die_imgs = die_imgs

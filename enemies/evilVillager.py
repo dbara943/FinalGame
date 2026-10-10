@@ -18,6 +18,7 @@ class EvilVillager(Enemy):
         self.name = "evilVillager"
         self.money = 80
         self.max_health = 120
+        self.velocity = 1.8
         self.health = self.max_health
         self.imgs = imgs
         self.die_imgs = die_imgs

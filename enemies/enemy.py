@@ -44,6 +44,8 @@ class Enemy:
         self.dead = False
         self.die_count = 0
         self.hurt_timer = 0
+        self.slow_timer = 0
+        self.base_velocity = 3
     def draw(self, win):
         if self.dying:
             if self.die_count < len(self.die_imgs):
@@ -123,7 +125,12 @@ class Enemy:
 
        # Predkosc wroga (kiedys atrybut velocity byl ignorowany).
        # Dzielimy przez 3, zeby zachowac dotychczasowe tempo gry.
-       step_len = self.velocity / 3.0
+       # Spowolnienie (slow) zmniejsza predkosc o polowe.
+       current_vel = self.velocity
+       if self.slow_timer > 0:
+           current_vel = self.velocity * 0.5
+           self.slow_timer -= 1
+       step_len = current_vel / 3.0
        dist_to_target = math.sqrt((x2 - self.x)**2 + (y2 - self.y)**2)
        step_len = min(step_len, dist_to_target)
        self.x += dirn[0] * step_len
@@ -147,4 +154,9 @@ class Enemy:
             self.die_count = 0
             return True
         return False
+
+    def apply_slow(self, duration=60):
+        """Naklada spowolnienie na wroga (duration w klatkach)."""
+        if not self.dying and not self.dead:
+            self.slow_timer = duration
     

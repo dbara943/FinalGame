@@ -18,6 +18,7 @@ class Ogre(Enemy):
         self.enemy = "ogre"
         self.money = 50
         self.max_health = 75
+        self.velocity = 2.0
         self.health = self.max_health
         self.imgs = imgs
         self.die_imgs = die_imgs

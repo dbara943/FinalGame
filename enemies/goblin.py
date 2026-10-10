@@ -18,6 +18,7 @@ class Goblin(Enemy):
         self.name = "goblin"
         self.money = 6
         self.max_health = 9
+        self.velocity = 4.0
         self.health = self.max_health
         self.imgs = imgs
         self.die_imgs = die_imgs

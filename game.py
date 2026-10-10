@@ -1,5 +1,6 @@
 import pygame
 import os
+import math
 from enemies.forkman import Forkman
 from enemies.swordman import Swordman
 from enemies.knight import Knight
@@ -8,6 +9,7 @@ from enemies.cyclop import Cyclop
 from enemies.impostor import Impostor
 from enemies.ogre import Ogre
 from enemies.evilVillager import EvilVillager
+from enemies.boss import Boss
 from towers.woodenTower import (WoodenTower, MetalTower, GoldenTower, FireTower, BlazeTower,
                                 sound_1 as tower_sound_1, sound_2 as tower_sound_2,
                                 sound_3 as tower_sound_3, sound_4 as tower_sound_4,
@@ -63,6 +65,12 @@ class Game:
         self.lives = lives
         self.money = money
         self.sound = sound
+        self.paused = False
+        self.speed = 1  # 1x, 2x, 3x
+        self.pause_btn_rect = pygame.Rect(self.width - 120, 10, 50, 44)
+        self.speed_btn_rect = pygame.Rect(self.width - 60, 10, 50, 44)
+        self._wave_start_lives = lives
+        self.damage_numbers = []  # Latajace liczby obrazen [(x, y, tekst, timer)]
         if not sound:
             pygame.mixer.music.set_volume(0)
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
@@ -99,9 +107,19 @@ class Game:
             if self.wave + 1 >= len(waves):
                 self.last_wave_done = True
             else:
+                # Bonus za czysta fale (bez utraty zycia) + odsetki 5% od oszczednosci
+                if hasattr(self, '_wave_start_lives') and self.lives == self._wave_start_lives:
+                    bonus = 50 + self.wave * 10
+                    self.money += bonus
+                interest = int(self.money * 0.05)
+                self.money += interest
                 self.wave += 1
                 self.money += self.wave * 100
                 self.current_wave = waves[self.wave][:]
+                self._wave_start_lives = self.lives
+                # Boss co 4 fale (fale 4, 8, 12) - pojawia sie na poczatku fali.
+                if (self.wave + 1) % 4 == 0:
+                    self.enemies.append(Boss())
         else:
             for i in range(len(self.current_wave)):
                 if self.current_wave[i] != 0:
@@ -132,8 +150,24 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     run = False
+                if event.type == pygame.KEYDOWN:
+                    # T: zmiana priorytetu celowania wybranej wiezy
+                    if event.key == pygame.K_t and self.selected_tower:
+                        priorities = ["first", "strong", "weak", "last"]
+                        idx = priorities.index(self.selected_tower.target_priority)
+                        self.selected_tower.target_priority = priorities[(idx + 1) % 4]
+                    # Q: aktywacja umiejetnosci wybranej wiezy
+                    if event.key == pygame.K_q and self.selected_tower:
+                        self.selected_tower.activate_ability(self.enemies, self.projectiles)
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    
+                    pos = pygame.mouse.get_pos()
+                    # Przyciski pauzy i predkosci
+                    if self.pause_btn_rect.collidepoint(pos):
+                        self.paused = not self.paused
+                        continue
+                    if self.speed_btn_rect.collidepoint(pos):
+                        self.speed = self.speed % 3 + 1  # 1->2->3->1
+                        continue
                     if self.moving_object:
                         if self.moving_object.name in towers_names:
                             self.towers.append(self.moving_object)
@@ -168,33 +202,12 @@ class Game:
                                 self.selected_tower = tw
                             else:
                                 tw.selected = False     
-            to_del = []
-            for en in self.enemies:
-                if en.reached_end:
-                    to_del.append(en)
-                elif en.dead:
-                    to_del.append(en)
-
-            for d in to_del:
-                if d.reached_end:
-                    sound_1.play()
-                    self.lives -= 1
-                else:
-                    # Wrog zabity pociskiem - kasa za niego.
-                    self.money += d.money
-                self.enemies.remove(d)
-
-            for tw in self.towers:
-                tw.attack(self.enemies, self.projectiles)
-
-            # Pociski leca do celow; trafienie zadaje obrazenia.
-            for proj in self.projectiles[:]:
-                hit_enemy = proj.move()
-                if hit_enemy is not None:
-                    if hit_enemy.hit(proj.damage):
-                        tower_sound_3.play()
-                if proj.done:
-                    self.projectiles.remove(proj)
+            # Logika gry (pauza pomija, predkosc powtarza)
+            if not self.paused:
+                for _ in range(self.speed):
+                    self.update_game_logic()
+                    if self.lives <= 0 or self.won:
+                        break
 
             if self.lives <= 0:
                 self.show_end_screen(False)
@@ -205,6 +218,72 @@ class Game:
 
             self.draw()
         pygame.quit()
+
+    def update_game_logic(self):
+        """Jedna iteracja logiki gry (ruch wrogow, ataki, pociski)."""
+        # Aktualizacja cooldownow umiejetnosci
+        for tw in self.towers:
+            if tw.ability_cooldown > 0:
+                tw.ability_cooldown -= 1
+            if tw.ability_active > 0:
+                tw.ability_active -= 1
+                if tw.ability_active == 0:
+                    tw._rapid_fire = False
+                    tw._gold_rush = False
+        to_del = []
+        for en in self.enemies:
+            if en.reached_end:
+                to_del.append(en)
+            elif en.dead:
+                to_del.append(en)
+
+        for d in to_del:
+            if d.reached_end:
+                sound_1.play()
+                self.lives -= 1
+            else:
+                # Wrog zabity pociskiem - kasa za niego.
+                # Golden Touch: podwojna kasa
+                reward = d.money
+                for tw in self.towers:
+                    if getattr(tw, '_gold_rush', False) and tw.ability_active > 0:
+                        reward = d.money * 2
+                        break
+                self.money += reward
+            self.enemies.remove(d)
+
+        for tw in self.towers:
+            tw.attack(self.enemies, self.projectiles)
+
+        # Pociski leca do celow; trafienie zadaje obrazenia.
+        for proj in self.projectiles[:]:
+            hit_enemy = proj.move()
+            if hit_enemy is not None:
+                # Splash damage: obrazenia obszarowe dla Fire/Blaze.
+                if proj.splash_radius > 0:
+                    for en in self.enemies:
+                        if en.dying or en.dead or en.reached_end:
+                            continue
+                        dist = math.sqrt((en.x - hit_enemy.x)**2 + (en.y - hit_enemy.y)**2)
+                        if dist < proj.splash_radius:
+                            if en.hit(proj.damage):
+                                tower_sound_3.play()
+                            self.damage_numbers.append([en.x, en.y - 40, str(proj.damage), 30])
+                else:
+                    if hit_enemy.hit(proj.damage):
+                        tower_sound_3.play()
+                    self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 40, str(proj.damage), 30])
+                # Slow: MetalTower spowalnia trafionych.
+                if proj.slow_on_hit:
+                    hit_enemy.apply_slow(90)  # 1.5 sekundy przy 60 FPS
+            if proj.done:
+                self.projectiles.remove(proj)
+        # Aktualizacja latajacych liczb obrazen
+        for dn in self.damage_numbers[:]:
+            dn[1] -= 1  # w gore
+            dn[3] -= 1  # timer
+            if dn[3] <= 0:
+                self.damage_numbers.remove(dn)
 
     def show_end_screen(self, won):
         big_font = pygame.font.SysFont("arial", 70)
@@ -239,6 +318,12 @@ class Game:
             en.draw(self.win)
         for proj in self.projectiles:
             proj.draw(self.win)
+        # Latajace liczby obrazen
+        font_dmg = pygame.font.SysFont("arial", 18, bold=True)
+        for x, y, text, timer in self.damage_numbers:
+            alpha = min(255, timer * 8)
+            label = font_dmg.render(text, True, (255, 100, 100))
+            self.win.blit(label, (x - label.get_width()//2, y))
         
         self.menu.draw(self.win)
         self.draw_hud()
@@ -269,6 +354,65 @@ class Game:
                 gx = x + w // 2 - group_w // 2
                 self.win.blit(ic, (gx, y + pill_h // 2 - ic.get_height() // 2))
                 self.win.blit(label, (gx + ic.get_width() + 8, cy))
+        # Przyciski pauzy i predkosci (prawy gorny rog)
+        for rect, text in [(self.pause_btn_rect, "II" if not self.paused else "▶"),
+                           (self.speed_btn_rect, f"{self.speed}x")]:
+            s = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+            pygame.draw.rect(s, (8, 18, 38, 190), s.get_rect(), border_radius=10)
+            pygame.draw.rect(s, (255, 255, 255, 70), s.get_rect(), 2, border_radius=10)
+            self.win.blit(s, rect)
+            label = self.hud_font.render(text, True, (255, 255, 255))
+            self.win.blit(label, (rect.x + rect.width//2 - label.get_width()//2,
+                                  rect.y + rect.height//2 - label.get_height()//2))
+        # Podglad nastepnej fali (ikony wrogow)
+        if self.wave + 1 < len(waves):
+            next_wave = waves[self.wave + 1]
+            preview_x = 10
+            preview_y = 65
+            # Tlo podgladu
+            s = pygame.Surface((300, 50), pygame.SRCALPHA)
+            pygame.draw.rect(s, (8, 18, 38, 150), s.get_rect(), border_radius=10)
+            self.win.blit(s, (preview_x, preview_y))
+            font_small = pygame.font.SysFont("arial", 16)
+            label = font_small.render("Next:", True, (255, 255, 255))
+            self.win.blit(label, (preview_x + 8, preview_y + 15))
+            # Ikony wrogow (po jednej na typ, z liczba)
+            x_off = preview_x + 60
+            for i, count in enumerate(next_wave):
+                if count > 0 and x_off < preview_x + 280:
+                    # Uzyj pierwszej klatki animacji jako ikony
+                    try:
+                        enemy_cls = self.enemy_classes[i]
+                        temp = enemy_cls()
+                        icon = pygame.transform.scale(temp.imgs[0], (30, 30))
+                        self.win.blit(icon, (x_off, preview_y + 10))
+                        cnt_label = font_small.render(str(count), True, (255, 255, 0))
+                        self.win.blit(cnt_label, (x_off + 32, preview_y + 15))
+                        x_off += 60
+                    except:
+                        pass
+            # Boss w nastepnej fali?
+            if (self.wave + 2) % 4 == 0:
+                boss_label = font_small.render("BOSS!", True, (255, 50, 50))
+                self.win.blit(boss_label, (x_off, preview_y + 15))
+        # Priorytet celowania wybranej wiezy
+        if self.selected_tower:
+            font_small = pygame.font.SysFont("arial", 16)
+            prio_text = f"Target: {self.selected_tower.target_priority} (T)"
+            label = font_small.render(prio_text, True, (255, 255, 0))
+            self.win.blit(label, (10, 125))
+            # Umiejetnosc aktywna
+            tw = self.selected_tower
+            if hasattr(tw, 'ability_name'):
+                if tw.ability_cooldown > 0:
+                    cd_sec = tw.ability_cooldown // 60
+                    ab_text = f"{tw.ability_name}: {cd_sec}s (Q)"
+                    color = (150, 150, 150)
+                else:
+                    ab_text = f"{tw.ability_name}: GOTOWE (Q)"
+                    color = (100, 255, 100)
+                label = font_small.render(ab_text, True, color)
+                self.win.blit(label, (10, 145))
     def add_tower(self, name):
         x, y = pygame.mouse.get_pos()
         name_list = ["t1", "t2", "t3", "t4", "t5"]

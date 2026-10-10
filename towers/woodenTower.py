@@ -33,6 +33,8 @@ archer_imgs1.append(pygame.transform.scale(
 
 class WoodenTower(Tower):
     buy_price = 100
+    ability_name = "Rapid Fire"
+    ability_desc = "2x szybkosc ataku przez 5s"
     def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs1[:]
@@ -47,6 +49,15 @@ class WoodenTower(Tower):
         self._setup_menu()
         self.moving = False
         self.name = "woodenTower"
+
+    def activate_ability(self, enemies, projectiles):
+        """Rapid Fire: 2x szybkosc ataku przez 5 sekund."""
+        if self.ability_cooldown > 0:
+            return False
+        self.ability_cooldown = self.ability_max_cooldown
+        self.ability_active = 300  # 5s przy 60 FPS
+        self._rapid_fire = True
+        return True
         
     def get_upgrade_cost(self):
         return self.menu.get_item_cost()
@@ -83,17 +94,37 @@ class WoodenTower(Tower):
             if dis < self.range:
                 self.inRange = True
                 enemy_closest.append(enemy)
-        enemy_closest.sort(key= lambda x: x.x)
+        # Sortowanie wedlug priorytetu celowania
+        if self.target_priority == "first":
+            enemy_closest.sort(key=lambda x: (x.path_pos, x.dis), reverse=True)
+        elif self.target_priority == "last":
+            enemy_closest.sort(key=lambda x: (x.path_pos, x.dis))
+        elif self.target_priority == "strong":
+            enemy_closest.sort(key=lambda x: x.max_health, reverse=True)
+        elif self.target_priority == "weak":
+            enemy_closest.sort(key=lambda x: x.max_health)
+        # Celuj we wroga najbliżej bazy (najdalszy na ścieżce).
         
         if len(enemy_closest) > 0:            
             first_enemy = enemy_closest[0]
-            if time.time() - self.timer >= 1:
+            # Rapid Fire: 2x szybkosc ataku
+            cooldown = 0.5 if getattr(self, '_rapid_fire', False) and self.ability_active > 0 else 1.0
+            if time.time() - self.timer >= cooldown:
                 self.timer = time.time()
                 sound_2.play()
+                # Meteor: 3x obrazen, duzy splash
+                dmg = self.damage
+                splash = getattr(self, 'splash_radius', 0)
+                if getattr(self, '_meteor_ready', False):
+                    dmg = self.damage * 3
+                    splash = 120
+                    self._meteor_ready = False
                 # Pocisk leci do wroga zamiast natychmiastowego hita.
                 projectiles.append(Projectile(
                     self.x, self.y - 30,
-                    self.archer_imgs[0], first_enemy, self.damage))
+                    self.archer_imgs[0], first_enemy, dmg,
+                    splash_radius=splash,
+                    slow_on_hit=getattr(self, 'slow_on_hit', False)))
                   
             # Lucznik zwraca sie w strone wroga (wczesniej byl odwrocony).
             if first_enemy.x < self.x and not self.facing_left:
@@ -122,6 +153,8 @@ archer_imgs2.append(pygame.transform.scale(
 
 class MetalTower(WoodenTower):
     buy_price = 200
+    ability_name = "Frost Nova"
+    ability_desc = "Spowalnia wszystkich wrogow w zasiegu"
     def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs2[:]
@@ -132,8 +165,23 @@ class MetalTower(WoodenTower):
         self.facing_left = False
         self.timer = time.time()      
         self.damage = 3
+        self.slow_on_hit = True  # Spowalnia trafionych wrogow
         self._setup_menu()
         self.name = "metalTower"
+
+    def activate_ability(self, enemies, projectiles):
+        """Frost Nova: spowalnia wszystkich wrogow w zasiegu na 4s."""
+        if self.ability_cooldown > 0:
+            return False
+        self.ability_cooldown = self.ability_max_cooldown
+        import math
+        for en in enemies:
+            if en.dying or en.dead or en.reached_end:
+                continue
+            dist = math.sqrt((en.x - self.x)**2 + (en.y - self.y)**2)
+            if dist < self.range * 1.5:
+                en.apply_slow(240)  # 4s
+        return True
 """
 GOLDEN TOWER 
 """
@@ -152,6 +200,8 @@ archer_imgs3.append(pygame.transform.scale(
 
 class GoldenTower(WoodenTower):
     buy_price = 300
+    ability_name = "Golden Touch"
+    ability_desc = "Podwojna kasa za zabojstwa przez 10s"
     def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs3[:]
@@ -163,7 +213,17 @@ class GoldenTower(WoodenTower):
         self.timer = time.time()      
         self.damage = 5
         self._setup_menu()
-        self.name = "goldenTower"  
+        self.name = "goldenTower"
+
+    def activate_ability(self, enemies, projectiles):
+        """Golden Touch: podwojna kasa za zabojstwa przez 10s (globalnie)."""
+        if self.ability_cooldown > 0:
+            return False
+        self.ability_cooldown = self.ability_max_cooldown
+        # Ustaw flage globalna w grze - obsluga w game.py
+        self._gold_rush = True
+        self.ability_active = 600  # 10s
+        return True  
 """
 FIRE TOWER 
 """
@@ -182,6 +242,8 @@ archer_imgs4.append(pygame.transform.scale(
 
 class FireTower(WoodenTower):
     buy_price = 400
+    ability_name = "Meteor"
+    ability_desc = "Potężny pocisk 3x obrażenia, duży splash"
     def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs4[:]
@@ -192,8 +254,17 @@ class FireTower(WoodenTower):
         self.facing_left = False
         self.timer = time.time()      
         self.damage = 8
+        self.splash_radius = 60  # Obrazenia obszarowe
         self._setup_menu()
         self.name = "fireTower"
+
+    def activate_ability(self, enemies, projectiles):
+        """Meteor: nastepny pocisk zadaje 3x obrazen z duzym splash."""
+        if self.ability_cooldown > 0:
+            return False
+        self.ability_cooldown = self.ability_max_cooldown
+        self._meteor_ready = True
+        return True
 """
 BLAZE TOWER 
 """
@@ -212,6 +283,8 @@ archer_imgs5.append(pygame.transform.scale(
 
 class BlazeTower(WoodenTower):
     buy_price = 500
+    ability_name = "Armageddon"
+    ability_desc = "Obrażenia dla WSZYSTKICH wrogów na mapie"
     def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs5[:]
@@ -221,6 +294,17 @@ class BlazeTower(WoodenTower):
         self.inRange = False
         self.facing_left = False
         self.timer = time.time()      
-        self.damage = 10       
+        self.damage = 10
+        self.splash_radius = 80  # Wieksze obrazenia obszarowe
         self._setup_menu()
         self.name = "blazeTower"
+
+    def activate_ability(self, enemies, projectiles):
+        """Armageddon: 30 obrazen dla wszystkich wrogow na mapie."""
+        if self.ability_cooldown > 0:
+            return False
+        self.ability_cooldown = self.ability_max_cooldown
+        for en in enemies:
+            if not en.dying and not en.dead and not en.reached_end:
+                en.hit(30)
+        return True

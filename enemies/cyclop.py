@@ -18,6 +18,7 @@ class Cyclop(Enemy):
         self.enemy = "cyclop"
         self.money = 10
         self.max_health = 15
+        self.velocity = 2.5
         self.health = self.max_health
         self.imgs = imgs
         self.die_imgs = die_imgs

@@ -18,6 +18,7 @@ class Swordman(Enemy):
         self.enemy = "swordman"
         self.money = 3
         self.max_health = 5
+        self.velocity = 3.5
         self.health = self.max_health
         self.imgs = imgs
         self.die_imgs = die_imgs
