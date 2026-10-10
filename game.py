@@ -53,6 +53,7 @@ sound_4 = pygame.mixer.Sound("sounds/4.wav")
 sound_5 = pygame.mixer.Sound("sounds/5.wav")
 sound_win = pygame.mixer.Sound("sounds/win.wav")
 sound_lose = pygame.mixer.Sound("sounds/lose.wav")
+sound_roar = pygame.mixer.Sound("sounds/roar.wav")
 
 class Game:
     def __init__(self, lives=20, money=200, sound=True):
@@ -88,11 +89,12 @@ class Game:
         self.early_wave_rect = None  # R2: prostokat przycisku "Nastepna fala"
         self.wave_modifier = None  # U8: modyfikator fali (swift/rich/swarm)
         self.show_all_ranges = False  # U10: pokaz wszystkie zasiegi
+        self.pending_boss = None  # Boss czeka na zadokowanie statku
         if not sound:
             pygame.mixer.music.set_volume(0)
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
                       tower_sound_1, tower_sound_2, tower_sound_3,
-                      tower_sound_4, tower_sound_5, sound_win, sound_lose):
+                      tower_sound_4, tower_sound_5, sound_win, sound_lose, sound_roar):
                 s.set_volume(0)
         self.bg = pygame.image.load(os.path.join("images", "bg_noship.png"))
         self.bg = pygame.transform.scale(self.bg, (self.width, self.height))
@@ -119,6 +121,10 @@ class Game:
         # Wrogowie desantuja sie tylko gdy statek jest w porcie.
         if self.won or self.ship.state != Ship.DOCKED:
             return
+        # Boss czeka na zadokowanie - spawnuj gdy statek w porcie
+        if self.pending_boss:
+            self.enemies.append(self.pending_boss)
+            self.pending_boss = None
         if sum(self.current_wave) == 0:
             # Rozladunek zakonczony - statek wyplywa, czekamy na wyczyszczenie planszy.
             # Nastepna fala zacznie sie dopiero gdy nie bedzie wrogow na mapie.
@@ -152,7 +158,7 @@ class Game:
             self.money += gold
             self.gold_notifications.append([f"+{gold} zlota (fala endless)", 150])
             if self.endless_wave % 4 == 0:
-                self.enemies.append(Boss())
+                self.pending_boss = Boss()
         elif self.wave + 1 >= len(waves):
             self.last_wave_done = True
         else:
@@ -190,11 +196,12 @@ class Game:
                     self.current_wave = [int(c * 1.5) for c in self.current_wave]
                     self.wave_banner_text += " [SWARM!]"
             # Boss na falach 4 i 8; fala 10 (ostatnia) to sam boss FINALNY.
+            # Boss spawnuje sie dopiero gdy statek zadokuje (pending_boss).
             if (self.wave + 1) % 4 == 0 and self.wave + 1 < 10:
-                self.enemies.append(Boss())
+                self.pending_boss = Boss()
                 self.wave_banner_text = f"FALA {self.wave + 1} - BOSS!"
             elif self.wave + 1 == 10:
-                self.enemies.append(Boss(final=True))
+                self.pending_boss = Boss(final=True)
                 self.wave_banner_text = "FINALNA FALA - BOSS!"
         self.waiting_for_clear = False
     def run(self):
@@ -418,17 +425,17 @@ class Game:
         for tw in self.towers:
             if tw.ability_cooldown > 0:
                 tw.ability_cooldown -= 1
-            if tw.ability_active > 0:
-                tw.ability_active -= 1
-                if tw.ability_active == 0:
-                    tw._rapid_fire = False
-                    tw._gold_rush = False
             # Cooldown ataku wiezy (tick-based, zeby speed dzialal)
             if tw.attack_cooldown > 0:
                 tw.attack_cooldown -= 1
         # Update wrogow (animacje, ruch, timery) - TU, nie w draw()!
         for en in self.enemies:
             en.update()
+            # Boss finalny: ryk przy enrage
+            if isinstance(en, Boss) and en.get_roar_request():
+                sound_roar.play()
+                self.wave_banner_text = "BOSS WSCIEKLY!"
+                self.wave_banner_timer = 90
             # Boss finalny przywoluje miniony
             if isinstance(en, Boss) and en.get_summon_request():
                 for _ in range(2):
@@ -450,15 +457,13 @@ class Game:
                 self.lives -= 1
             else:
                 # Wrog zabity pociskiem - kasa za niego.
-                # Golden Touch: podwojna kasa
+                # Golden Touch: podwojna kasa (oznaczeni lub globalny buff)
                 reward = d.money
+                if getattr(d, '_gold_marked', False):
+                    reward *= 2
                 # U8: RICH - +50% zlota
                 if self.wave_modifier == "rich":
                     reward = int(reward * 1.5)
-                for tw in self.towers:
-                    if getattr(tw, '_gold_rush', False) and tw.ability_active > 0:
-                        reward = d.money * 2
-                        break
                 self.money += reward
                 # Trup zostaje na ziemi (ostatnia klatka animacji smierci)
                 if d.die_imgs:
@@ -486,8 +491,43 @@ class Game:
                 # U6: Critical hit - 15% szansy na 2x obrazen
                 is_crit = random.random() < 0.15
                 crit_mult = 2.0 if is_crit else 1.0
+                # Efekty specjalne pociskow umiejetnosci
+                if proj.special == "frost_nova":
+                    # Frost Nova: spowolnienie wszystkich w duzym promieniu
+                    for en in self.enemies:
+                        if en.dying or en.dead or en.reached_end:
+                            continue
+                        dist = math.sqrt((en.x - hit_enemy.x)**2 + (en.y - hit_enemy.y)**2)
+                        if dist < 150:
+                            en.apply_slow(240)
+                            en.hit(5)
+                    self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 50, "FROST NOVA!", 40, (150, 220, 255)])
+                elif proj.special == "meteor":
+                    # Meteor: 3x obrazen, duzy splash
+                    for en in self.enemies:
+                        if en.dying or en.dead or en.reached_end:
+                            continue
+                        dist = math.sqrt((en.x - hit_enemy.x)**2 + (en.y - hit_enemy.y)**2)
+                        if dist < 120:
+                            dmg = proj.damage * 3 * en.get_damage_mult("fire")
+                            if en.hit(dmg):
+                                tower_sound_3.play()
+                            self.damage_numbers.append([en.x, en.y - 40, str(int(dmg)), 30])
+                    self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 60, "METEOR!", 40, (255, 150, 50)])
+                elif proj.special == "armageddon":
+                    # Armageddon: obrazenia dla wszystkich
+                    for en in self.enemies:
+                        if not en.dying and not en.dead and not en.reached_end:
+                            en.hit(30)
+                    self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 60, "ARMAGEDDON!", 50, (220, 100, 255)])
+                elif proj.special == "golden":
+                    # Golden: oznaczenie podwojnej kasy
+                    hit_enemy._gold_marked = True
+                    dmg = proj.damage * hit_enemy.get_damage_mult(proj.damage_type)
+                    hit_enemy.hit(dmg)
+                    self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 40, str(int(dmg)), 30, (255, 215, 0)])
                 # Splash damage: obrazenia obszarowe dla Fire/Blaze.
-                if proj.splash_radius > 0:
+                elif proj.splash_radius > 0:
                     for en in self.enemies:
                         if en.dying or en.dead or en.reached_end:
                             continue

@@ -168,16 +168,57 @@ class VerticalMenu(Menu):
         return -1
 
     def draw(self, win):
-        win.blit(self.bg, (self.x - self.bg.get_width()/2, self.y-120))
-        coin = pygame.transform.scale(money_img, (22, 22))
-        for item in self.buttons:
-            item.draw(win)
-            # Moneta i cena jako jedna wycentrowana grupa pod przyciskiem
-            text = self.font.render(str(item.cost), 1, (255,255,255))
-            group_w = coin.get_width() + 6 + text.get_width()
-            gx = item.x + item.width/2 - group_w/2
-            gy = item.y + item.height + 8
-            win.blit(coin, (gx, gy))
-            win.blit(text, (gx + coin.get_width() + 6, gy - 2))
+        # Nowoczesny sklep: ciemny panel, wyrownane ceny, bez niebieskiego tła
+        panel_w = 170
+        panel_h = len(self.buttons) * 78 + 50
+        px = self.x - panel_w // 2
+        py = self.y - 140
+        
+        bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        pygame.draw.rect(bg, (10, 16, 28, 240), bg.get_rect(), border_radius=16)
+        pygame.draw.rect(bg, (80, 120, 180, 100), bg.get_rect(), 2, border_radius=16)
+        win.blit(bg, (px, py))
+        
+        # Naglowek SKLEP
+        hfont = pygame.font.SysFont("arial", 18, bold=True)
+        ht = hfont.render("SKLEP", True, (200, 220, 240))
+        win.blit(ht, (px + panel_w//2 - ht.get_width()//2, py + 10))
+        
+        for idx, item in enumerate(self.buttons):
+            bx = px + 15
+            by = py + 42 + idx * 78
+            # Tlo przycisku
+            btn_bg = pygame.Surface((panel_w - 30, 68), pygame.SRCALPHA)
+            # Hover efekt
+            mx, my = pygame.mouse.get_pos()
+            hovering = bx <= mx <= bx + panel_w - 30 and by <= my <= by + 68
+            if hovering:
+                pygame.draw.rect(btn_bg, (35, 50, 75, 255), btn_bg.get_rect(), border_radius=10)
+            else:
+                pygame.draw.rect(btn_bg, (22, 32, 50, 255), btn_bg.get_rect(), border_radius=10)
+            win.blit(btn_bg, (bx, by))
+            # Ikona wiezy
+            icon = pygame.transform.scale(item.img, (44, 44))
+            win.blit(icon, (bx + 8, by + 12))
+            # Nazwa i cena - wyrownane do prawej
+            nfont = pygame.font.SysFont("arial", 14, bold=True)
+            pfont = pygame.font.SysFont("arial", 15, bold=True)
+            names = ["Drewniana", "Metalowa", "Zlota", "Ognista", "Blaze"]
+            nm = nfont.render(names[idx] if idx < len(names) else item.name, True, (230, 235, 240))
+            win.blit(nm, (bx + 60, by + 8))
+            # Cena z moneta - zawsze w tej samej pozycji
+            price_text = str(item.cost)
+            pt = pfont.render(price_text, True, (255, 215, 0))
+            # Moneta + cena wyrownane
+            coin_x = bx + panel_w - 30 - 70
+            win.blit(pygame.transform.scale(money_img, (18, 18)), (coin_x, by + 36))
+            win.blit(pt, (coin_x + 24, by + 34))
+            # Hotkey
+            kfont = pygame.font.SysFont("arial", 12)
+            kh = kfont.render(f"[{idx+1}]", True, (130, 150, 170))
+            win.blit(kh, (bx + 60, by + 44))
+            # Aktualizuj pozycje klikalna
+            item.x, item.y = bx, by
+            item.width, item.height = panel_w - 30, 68
     
     

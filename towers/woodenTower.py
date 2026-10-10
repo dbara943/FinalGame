@@ -51,12 +51,26 @@ class WoodenTower(Tower):
         self.name = "woodenTower"
 
     def activate_ability(self, enemies, projectiles):
-        """Rapid Fire: 2x szybkosc ataku przez 5 sekund."""
+        """Rapid Fire: wystrzeliwuje serie 3 pociskow naraz."""
         if self.ability_cooldown > 0:
             return False
         self.ability_cooldown = self.ability_max_cooldown
-        self.ability_active = 300  # 5s przy 60 FPS
-        self._rapid_fire = True
+        # Znajdz cel
+        target = self.current_target
+        if target is None or target.dying or target.dead:
+            # Szukaj dowolnego wroga w zasiegu
+            for en in enemies:
+                if not en.dying and not en.dead and not en.reached_end:
+                    if math.hypot(en.x - self.x, en.y - self.y) < self.range:
+                        target = en
+                        break
+        if target:
+            for i in range(3):
+                img = Projectile.make_special_img((255, 220, 80), 20)
+                projectiles.append(Projectile(
+                    self.x + (i-1)*10, self.y - 30,
+                    img, target, self.damage,
+                    speed=14, source_tower=self, special="rapid"))
         return True
         
     def get_upgrade_cost(self):
@@ -145,18 +159,12 @@ class WoodenTower(Tower):
         if len(enemy_closest) > 0:            
             first_enemy = enemy_closest[0]
             self.current_target = first_enemy  # R3: zapamietaj cel
-            # Rapid Fire: 2x szybkosc ataku. Cooldown tick-based (60 = 1s).
-            cooldown_ticks = 30 if getattr(self, '_rapid_fire', False) and self.ability_active > 0 else 60
+            cooldown_ticks = 60  # 1s
             if self.attack_cooldown <= 0:
                 self.attack_cooldown = cooldown_ticks
                 sound_2.play()
-                # Meteor: 3x obrazen, duzy splash
                 dmg = self.damage
                 splash = getattr(self, 'splash_radius', 0)
-                if getattr(self, '_meteor_ready', False):
-                    dmg = self.damage * 3
-                    splash = 120
-                    self._meteor_ready = False
                 # Pocisk leci do wroga zamiast natychmiastowego hita.
                 projectiles.append(Projectile(
                     self.x, self.y - 30,
@@ -212,18 +220,24 @@ class MetalTower(WoodenTower):
         self.name = "metalTower"
 
     def activate_ability(self, enemies, projectiles):
-        """Frost Nova: spowalnia wszystkich wrogow w zasiegu na 4s."""
+        """Frost Nova: wystrzeliwuje lodowy pocisk - spowalnia wszystkich w zasiegu."""
         if self.ability_cooldown > 0:
             return False
         self.ability_cooldown = self.ability_max_cooldown
-        import math
-        for en in enemies:
-            if en.dying or en.dead or en.reached_end:
-                continue
-            dist = math.sqrt((en.x - self.x)**2 + (en.y - self.y)**2)
-            if dist < self.range * 1.5:
-                en.apply_slow(240)  # 4s
-        return True
+        target = self.current_target
+        if target is None or target.dying or target.dead:
+            for en in enemies:
+                if not en.dying and not en.dead and not en.reached_end:
+                    if math.hypot(en.x - self.x, en.y - self.y) < self.range:
+                        target = en
+                        break
+        if target:
+            img = Projectile.make_special_img((120, 200, 255), 40)
+            projectiles.append(Projectile(
+                self.x, self.y - 30, img, target, 5,
+                speed=10, source_tower=self, special="frost_nova"))
+            return True
+        return False
 """
 GOLDEN TOWER 
 """
@@ -258,14 +272,24 @@ class GoldenTower(WoodenTower):
         self.name = "goldenTower"
 
     def activate_ability(self, enemies, projectiles):
-        """Golden Touch: podwojna kasa za zabojstwa przez 10s (globalnie)."""
+        """Golden Touch: wystrzeliwuje zlote pociski - oznaczaja wrogow (2x kasa)."""
         if self.ability_cooldown > 0:
             return False
         self.ability_cooldown = self.ability_max_cooldown
-        # Ustaw flage globalna w grze - obsluga w game.py
-        self._gold_rush = True
-        self.ability_active = 600  # 10s
-        return True  
+        # Oznacza do 5 wrogow w zasiegu zlotymi pociskami
+        marked = 0
+        for en in enemies:
+            if marked >= 5:
+                break
+            if en.dying or en.dead or en.reached_end:
+                continue
+            if math.hypot(en.x - self.x, en.y - self.y) < self.range * 1.5:
+                img = Projectile.make_special_img((255, 215, 0), 24)
+                projectiles.append(Projectile(
+                    self.x, self.y - 30, img, en, self.damage,
+                    speed=12, source_tower=self, special="golden"))
+                marked += 1
+        return marked > 0  
 """
 FIRE TOWER 
 """
@@ -302,12 +326,28 @@ class FireTower(WoodenTower):
         self.name = "fireTower"
 
     def activate_ability(self, enemies, projectiles):
-        """Meteor: nastepny pocisk zadaje 3x obrazen z duzym splash."""
+        """Meteor: wystrzeliwuje ogromny meteor (3x obrazen, duzy splash)."""
         if self.ability_cooldown > 0:
             return False
         self.ability_cooldown = self.ability_max_cooldown
-        self._meteor_ready = True
-        return True
+        target = self.current_target
+        if target is None or target.dying or target.dead:
+            # Najsilniejszy wrog
+            best = None
+            best_hp = 0
+            for en in enemies:
+                if not en.dying and not en.dead and not en.reached_end:
+                    if en.max_health > best_hp:
+                        best_hp = en.max_health
+                        best = en
+            target = best
+        if target:
+            img = Projectile.make_special_img((255, 120, 40), 48)
+            projectiles.append(Projectile(
+                self.x, self.y - 30, img, target, self.damage,
+                speed=8, source_tower=self, special="meteor"))
+            return True
+        return False
 """
 BLAZE TOWER 
 """
@@ -344,11 +384,21 @@ class BlazeTower(WoodenTower):
         self.name = "blazeTower"
 
     def activate_ability(self, enemies, projectiles):
-        """Armageddon: 30 obrazen dla wszystkich wrogow na mapie."""
+        """Armageddon: wystrzeliwuje pocisk zaglady - rani wszystkich wrogow."""
         if self.ability_cooldown > 0:
             return False
         self.ability_cooldown = self.ability_max_cooldown
-        for en in enemies:
-            if not en.dying and not en.dead and not en.reached_end:
-                en.hit(30)
-        return True
+        # Cel: srodek mapy (pocisk eksploduje i rani wszystkich)
+        target = self.current_target
+        if target is None or target.dying or target.dead:
+            for en in enemies:
+                if not en.dying and not en.dead and not en.reached_end:
+                    target = en
+                    break
+        if target:
+            img = Projectile.make_special_img((200, 80, 255), 56)
+            projectiles.append(Projectile(
+                self.x, self.y - 30, img, target, 30,
+                speed=7, source_tower=self, special="armageddon"))
+            return True
+        return False
