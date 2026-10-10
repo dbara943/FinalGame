@@ -1,6 +1,7 @@
 import pygame
 import math
 import os
+import random
 
 def load_anim(folder_num, anim_name, size=(64, 64)):
     """Laduje klatki animacji wroga (np. 'die', 'hurt').
@@ -140,6 +141,9 @@ class Enemy:
                 self.img = self.imgs[self.animation_count]
         if not self.dying:
             self.move()
+            # A7: kurz za szybkimi wrogami (flaga do game.py)
+            if self.velocity >= 4.0 and random.random() < 0.3:
+                self._dust = True
         
     def draw_health_bar(self, win):
         # Nowoczesny pasek: zaokraglone tlo, elegancka zielen/czerwien

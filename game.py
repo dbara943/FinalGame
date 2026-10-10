@@ -16,6 +16,7 @@ from towers.woodenTower import (WoodenTower, MetalTower, GoldenTower, FireTower,
                                 sound_5 as tower_sound_5)
 from ships.ship import Ship
 from menu.menu import VerticalMenu
+from effects.particles import ParticleSystem, FloatingCoin, Shockwave
 import time
 import random
 pygame.font.init()
@@ -54,6 +55,9 @@ sound_5 = pygame.mixer.Sound("sounds/5.wav")
 sound_win = pygame.mixer.Sound("sounds/win.wav")
 sound_lose = pygame.mixer.Sound("sounds/lose.wav")
 sound_roar = pygame.mixer.Sound("sounds/roar.wav")
+sound_coin = pygame.mixer.Sound("sounds/coin.wav")
+sound_levelup = pygame.mixer.Sound("sounds/levelup.wav")
+sound_horn = pygame.mixer.Sound("sounds/horn.wav")
 
 class Game:
     def __init__(self, lives=20, money=200, sound=True):
@@ -96,11 +100,27 @@ class Game:
         self._wave_kills_start = 0
         self._wave_gold_start = 0
         self.last_placed = None  # Q7: ostatnio postawiona wieza (Ctrl+Z)
+        self.last_upgrade = None  # Q13: ostatni upgrade (Ctrl+Z)
+        # Efekty wizualne
+        self.particles = ParticleSystem()
+        self.coins = []  # Latajace monety
+        self.shockwaves = []  # Kregi uderzeniowe
+        self.screen_shake = 0  # Wstrzas ekranu
+        self.scorch_marks = []  # Spalenizna [(x, y, timer)]
+        self.clouds = [(random.randint(0, 1124), random.randint(20, 200), random.randint(20, 40)) for _ in range(3)]
+        self.leaves = [(random.randint(0, 1124), random.randint(0, 720)) for _ in range(15)]
+        self.seagulls = [(random.randint(200, 900), random.randint(50, 150), random.random()*6) for _ in range(2)]
+        self.game_time = 0  # Q17: zegar sesji (ticki)
+        self.muted = False  # Q16
+        self.build_queue = []  # Q14: kolejka budowy
+        self.tower_filter = None  # Q15: filtr wiez
+        self.display_money = 200  # Niespodzianka 4: animowany licznik zlota
         if not sound:
             pygame.mixer.music.set_volume(0)
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
                       tower_sound_1, tower_sound_2, tower_sound_3,
-                      tower_sound_4, tower_sound_5, sound_win, sound_lose, sound_roar):
+                      tower_sound_4, tower_sound_5, sound_win, sound_lose, sound_roar,
+                      sound_coin, sound_levelup, sound_horn):
                 s.set_volume(0)
         self.bg = pygame.image.load(os.path.join("images", "bg_noship.png"))
         self.bg = pygame.transform.scale(self.bg, (self.width, self.height))
@@ -130,6 +150,11 @@ class Game:
         # Boss czeka na zadokowanie - spawnuj gdy statek w porcie
         if self.pending_boss:
             self.enemies.append(self.pending_boss)
+            # A10: intro bossa
+            self.wave_banner_text = "⚠ BOSS ⚠"
+            self.wave_banner_timer = 150
+            self.screen_shake = 10
+            sound_roar.play()
             self.pending_boss = None
         if sum(self.current_wave) == 0:
             # Rozladunek zakonczony - statek wyplywa, czekamy na wyczyszczenie planszy.
@@ -217,12 +242,16 @@ class Game:
                     self.current_wave = [int(c * 1.5) for c in self.current_wave]
                     self.wave_banner_text += " [SWARM!]"
             # 7: deszcz na losowych falach (20% szansy, nie na bossach)
+            was_raining = self.raining
             self.raining = False
             if wave_num % 4 != 0 and wave_num != 10 and random.random() < 0.2:
                 self.raining = True
                 self.wave_banner_text += " [DESZCZ]"
                 self.raindrops = [(random.randint(0, self.width), random.randint(0, self.height),
                                    random.randint(8, 14)) for _ in range(100)]
+            elif was_raining:
+                # B4: tecza po deszczu
+                self._rainbow_timer = 600  # 10s
             # Boss na falach 4 i 8; fala 10 (ostatnia) to sam boss FINALNY.
             # Boss spawnuje sie dopiero gdy statek zadokuje (pending_boss).
             if (self.wave + 1) % 4 == 0 and self.wave + 1 < 10:
@@ -291,12 +320,23 @@ class Game:
                         if cost != "MAX" and self.money >= cost:
                             self.money -= cost
                             self.selected_tower.upgrade(cost)
+                            # Q13: zapamietaj do Ctrl+Z
+                            self.last_upgrade = (self.selected_tower, cost)
                     # U10: R - pokaz/ukryj wszystkie zasiegi
                     if event.key == pygame.K_r:
                         self.show_all_ranges = not self.show_all_ranges
-                    # Q7: Ctrl+Z - cofnij postawienie wiezy
+                    # Q7: Ctrl+Z - cofnij postawienie wiezy / upgrade
                     if event.key == pygame.K_z and (pygame.key.get_mods() & pygame.KMOD_CTRL):
-                        if self.last_placed:
+                        if self.last_upgrade:
+                            tw, cost = self.last_upgrade
+                            if tw.level > 1:
+                                tw.level -= 1
+                                tw.damage -= 2
+                                tw.range -= 12
+                                tw.total_spent -= cost
+                                self.money += cost
+                            self.last_upgrade = None
+                        elif self.last_placed:
                             tw, cost = self.last_placed
                             if tw in self.towers:
                                 self.towers.remove(tw)
@@ -307,6 +347,23 @@ class Game:
                     # Q10: F - przelacz 1x/3x
                     if event.key == pygame.K_f:
                         self.speed = 3 if self.speed == 1 else 1
+                    # Q16: M - wyciszenie
+                    if event.key == pygame.K_m:
+                        self.muted = not self.muted
+                        vol = 0 if self.muted else 1
+                        pygame.mixer.music.set_volume(0.5 * vol)
+                        for s in (sound_1, sound_2, sound_3, sound_4, sound_5, sound_win, sound_lose, sound_roar):
+                            s.set_volume(vol)
+                    # Q11: F5 - zapis, F9 - wczytaj
+                    if event.key == pygame.K_F5:
+                        self.save_game()
+                    if event.key == pygame.K_F9:
+                        self.load_game()
+                    # Q15: C - filtr wiez (cykl po typach)
+                    if event.key == pygame.K_c:
+                        types = [None, "Wooden", "Metal", "Golden", "Fire", "Blaze"]
+                        idx = types.index(self.tower_filter) if self.tower_filter in types else 0
+                        self.tower_filter = types[(idx + 1) % len(types)]
                     if event.key == pygame.K_s and self.selected_tower:
                         self.money += self.selected_tower.sell_value()
                         self.towers.remove(self.selected_tower)
@@ -354,7 +411,12 @@ class Game:
                                 self.moving_object.x, self.moving_object.y = gx, gy
                                 self.moving_object.menu.x, self.moving_object.menu.y = gx, gy
                                 self.moving_object.menu.update()
-                                self.towers.append(self.moving_object)
+                                # Q14: Shift = kolejka budowy
+                                if pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                                    self.build_queue.append((self.moving_object.name, gx, gy))
+                                    self.money += self.menu.get_item_cost(self.moving_object.name)  # zwrot, pobierze przy budowie
+                                else:
+                                    self.towers.append(self.moving_object)
                                 # Q7: zapamietaj do Ctrl+Z
                                 self.last_placed = (self.moving_object, self.menu.get_item_cost(self.moving_object.name))
                             # else: niepoprawne - wieza znika (pieniadze przepadaja? nie - zwroc)
@@ -471,6 +533,40 @@ class Game:
             self.wave_report[1] -= 1
             if self.wave_report[1] <= 0:
                 self.wave_report = None
+        # Efekty: czasteczki, monety, fale uderzeniowe
+        self.particles.update()
+        for c in self.coins[:]:
+            if c.update():
+                self.coins.remove(c)
+                sound_coin.play()  # Niespodzianka 1: dzwiek monety
+        for s in self.shockwaves[:]:
+            if s.update():
+                self.shockwaves.remove(s)
+        if self.screen_shake > 0:
+            self.screen_shake -= 1
+        for sc in self.scorch_marks[:]:
+            sc[2] -= 1
+            if sc[2] <= 0:
+                self.scorch_marks.remove(sc)
+        self.game_time += 1
+        # Q14: kolejka budowy - stawiaj po kolei
+        if self.build_queue and not self.moving_object:
+            name, gx, gy = self.build_queue[0]
+            cost = self.menu.get_item_cost(name)
+            if self.money >= cost and self.is_valid_placement(gx, gy):
+                self.money -= cost
+                tower_map = {"t1": WoodenTower, "t2": MetalTower, "t3": GoldenTower,
+                             "t4": FireTower, "t5": BlazeTower}
+                tw = tower_map[name](gx, gy)
+                self.towers.append(tw)
+                self.build_queue.pop(0)
+            else:
+                self.build_queue.pop(0)  # nie da sie - usun z kolejki
+        # Niespodzianka 4: animowany licznik zlota (dogania prawdziwa wartosc)
+        if self.display_money < self.money:
+            self.display_money = min(self.money, self.display_money + max(1, (self.money - self.display_money) // 10))
+        elif self.display_money > self.money:
+            self.display_money = self.money
         # V4: muzzle flashes
         for mf in self.muzzle_flashes[:]:
             mf[2] -= 1
@@ -486,6 +582,10 @@ class Game:
         # Update wrogow (animacje, ruch, timery) - TU, nie w draw()!
         for en in self.enemies:
             en.update()
+            # A7: kurz
+            if getattr(en, '_dust', False):
+                en._dust = False
+                self.particles.burst(en.x, en.y + 15, (180, 160, 140), count=2, speed=1, life=20, size=3, gravity=-0.05)
             # Boss finalny: ryk przy enrage
             if isinstance(en, Boss) and en.get_roar_request():
                 sound_roar.play()
@@ -531,6 +631,14 @@ class Game:
                 if d.die_imgs:
                     corpse_img = d.die_imgs[-1]
                     self.corpses.append([corpse_img, d.x, d.y, 240])  # 4 sekundy
+                # A1: eksplozja czasteczek
+                self.particles.burst(d.x, d.y - 30, (200, 200, 200), count=10, speed=3)
+                if isinstance(d, Boss):
+                    self.particles.burst(d.x, d.y - 30, (255, 100, 100), count=30, speed=5, size=6)
+                    self.shockwaves.append(Shockwave(d.x, d.y - 30, max_r=120))
+                    self.screen_shake = 15  # A6: wstrzas przy bossie
+                # A2: latajaca moneta
+                self.coins.append(FloatingCoin(d.x, d.y - 40, 415, 32, reward))
                 # R5: licznik zabojstw wiezy
                 if d.last_hit_by:
                     d.last_hit_by.kills += 1
@@ -543,6 +651,12 @@ class Game:
             tw._synergy = tw.get_synergy_bonus(self.towers)
             # 7: deszcz -10% zasiegu
             tw._rain_mod = 0.9 if self.raining else 1.0
+            # A5: efekt ulepszenia
+            if getattr(tw, '_upgrade_fx', False):
+                tw._upgrade_fx = False
+                self.particles.burst(tw.x, tw.y - 40, (255, 215, 0), count=20, speed=4, size=5)
+                self.shockwaves.append(Shockwave(tw.x, tw.y - 20, max_r=60, color=(255, 215, 0)))
+                sound_levelup.play()  # Niespodzianka 2: dzwiek level up
             if tw.attack(self.enemies, self.projectiles):
                 # V4: muzzle flash przy strzale
                 self.muzzle_flashes.append([tw.x, tw.y - 30, 6])
@@ -580,12 +694,17 @@ class Game:
                                 tower_sound_3.play()
                             self.damage_numbers.append([en.x, en.y - 40, str(int(dmg)), 30])
                     self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 60, "METEOR!", 40, (255, 150, 50)])
+                    self.scorch_marks.append([hit_enemy.x, hit_enemy.y, 600])
+                    self.shockwaves.append(Shockwave(hit_enemy.x, hit_enemy.y, max_r=100, color=(255, 150, 50)))
+                    self.screen_shake = 8
                 elif proj.special == "armageddon":
                     # Armageddon: obrazenia dla wszystkich
                     for en in self.enemies:
                         if not en.dying and not en.dead and not en.reached_end:
                             en.hit(30)
                     self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 60, "ARMAGEDDON!", 50, (220, 100, 255)])
+                    self.shockwaves.append(Shockwave(hit_enemy.x, hit_enemy.y, max_r=150, color=(200, 100, 255)))
+                    self.screen_shake = 12
                 elif proj.special == "golden":
                     # Golden: oznaczenie podwojnej kasy
                     hit_enemy._gold_marked = True
@@ -660,6 +779,8 @@ class Game:
         for i, s in enumerate(stats):
             label = stats_font.render(s, True, (200, 200, 200))
             self.win.blit(label, (self.width // 2 - label.get_width() // 2, self.height // 2 + 55 + i * 30))
+        # Q20: eksport wyniku
+        export_rect = pygame.Rect(self.width//2 - 100, self.height//2 + 160 - 70, 200, 40)
         pygame.display.update()
         # Petla czeka na klikniecie przycisku (bez przerysowywania tla - brak migotania)
         waiting = True
@@ -675,6 +796,14 @@ class Game:
                         return "quit"
                     if continue_rect and continue_rect.collidepoint(pos):
                         return "continue"
+                    # Q20: kopiuj wynik do schowka
+                    if export_rect.collidepoint(pos):
+                        try:
+                            import pyperclip
+                            text = f"Island Defenders: {'WIN' if won else 'LOSE'}, fala {self.wave+1}, {self.stats_kills} kills, {self.stats_gold}$ gold"
+                            pyperclip.copy(text)
+                        except:
+                            pass
             # Rysuj przyciski (tylko przyciski sie odswiezaja)
             buttons = [
                 (restart_rect, "RESTART", (60, 180, 80)),
@@ -688,15 +817,30 @@ class Game:
                 label = small_font.render(label_text, True, (255, 255, 255))
                 self.win.blit(label, (rect.x + rect.width//2 - label.get_width()//2,
                                       rect.y + rect.height//2 - label.get_height()//2))
+            # Q20: przycisk eksportu
+            pygame.draw.rect(self.win, (80, 80, 120), export_rect, border_radius=8)
+            elabel = pygame.font.SysFont("arial", 18).render("KOPIUJ WYNIK", True, (255, 255, 255))
+            self.win.blit(elabel, (export_rect.x + export_rect.width//2 - elabel.get_width()//2,
+                                   export_rect.y + export_rect.height//2 - elabel.get_height()//2))
             pygame.display.update()
         return "quit"
         
     def draw(self):
-        self.win.blit(self.bg, (0,0))
+        # A6: wstrzas ekranu
+        ox, oy = 0, 0
+        if self.screen_shake > 0:
+            ox = random.randint(-4, 4)
+            oy = random.randint(-4, 4)
+        self.win.blit(self.bg, (ox, oy))
+        # B1: cykl dnia/nocy - przyciemnienie
+        self.draw_day_night()
         self.ship.draw(self.win)
         # 5: linia synergii miedzy wiezami tego samego typu
         drawn_links = set()
         for tw in self.towers:
+            # Q15: filtr - przyciemnij niepasujace
+            if self.tower_filter and not type(tw).__name__.startswith(self.tower_filter):
+                continue
             if getattr(tw, '_synergy', 1.0) > 1.0:
                 for tw2 in self.towers:
                     if tw2 is not tw and type(tw2).__name__ == type(tw).__name__:
@@ -709,6 +853,14 @@ class Game:
         for tw in self.towers:
             tw.draw(self.win)
             tw.draw_radius(self.win)
+        # Q15: przyciemnij odfiltrowane
+        if self.tower_filter:
+            dim = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            dim.fill((0, 0, 0, 100))
+            self.win.blit(dim, (0, 0))
+            for tw in self.towers:
+                if type(tw).__name__.startswith(self.tower_filter):
+                    tw.draw(self.win)
         if self.moving_object:
             self.moving_object.draw(self.win)
             self.moving_object.draw_radius(self.win)
@@ -861,16 +1013,24 @@ class Game:
         self.draw_ability_dock()
         
         # U9: podglad zasiegu wiezy ze sklepu (hover)
+        # Q12: porownanie DPS
         if not self.moving_object:
             pos = pygame.mouse.get_pos()
             hovered = self.menu.get_hovered(pos[0], pos[1])
             if hovered:
-                # Tymczasowa wieza do pokazania zasiegu
                 tmp = {"t1": WoodenTower, "t2": MetalTower, "t3": GoldenTower,
                        "t4": FireTower, "t5": BlazeTower}.get(hovered)
                 if tmp:
                     tw = tmp(pos[0], pos[1])
                     tw.draw_radius(self.win)
+                    # Q12: DPS vs srednia
+                    avg = sum(t.damage for t in self.towers) / max(1, len(self.towers))
+                    diff = tw.damage - avg
+                    cfont = pygame.font.SysFont("arial", 13, bold=True)
+                    ctxt = f"DPS {tw.damage} ({'+' if diff >= 0 else ''}{diff:.0f} vs srednia)"
+                    ccol = (100, 255, 100) if diff >= 0 else (255, 150, 150)
+                    clabel = cfont.render(ctxt, True, ccol)
+                    self.win.blit(clabel, (pos[0] + 15, pos[1] - 25))
         # U10: pokaz wszystkie zasiegi (R)
         if self.show_all_ranges:
             for tw in self.towers:
@@ -893,6 +1053,50 @@ class Game:
             by = self.height - 120
             self.win.blit(bg, (bx, by))
             self.win.blit(label, (bx + 15, by + 18 - label.get_height() // 2))
+        
+        # Spalenizna
+        for x, y, timer in self.scorch_marks:
+            s = pygame.Surface((50, 30), pygame.SRCALPHA)
+            pygame.draw.ellipse(s, (30, 30, 30, min(150, timer)), s.get_rect())
+            self.win.blit(s, (x - 25, y - 15))
+        # Czasteczki i efekty
+        self.particles.draw(self.win)
+        for s in self.shockwaves:
+            s.draw(self.win)
+        for c in self.coins:
+            c.draw(self.win)
+        # A4: chmury
+        t = pygame.time.get_ticks() / 1000.0
+        for i, (cx, cy, size) in enumerate(self.clouds):
+            cx = (cx + t * 5) % (self.width + 200) - 100
+            self.clouds[i] = (cx, cy, size)
+            for ox in [-20, 0, 20]:
+                pygame.draw.circle(self.win, (255, 255, 255, 90), (int(cx + ox), int(cy)), size // 2)
+        # A9: mewy
+        for i, (gx, gy, phase) in enumerate(self.seagulls):
+            gx = (gx + t * 15) % (self.width + 100) - 50
+            self.seagulls[i] = (gx, gy, phase)
+            wing = math.sin(t * 6 + phase) * 8
+            pygame.draw.line(self.win, (80, 80, 80), (gx - 12, gy + wing), (gx, gy), 2)
+            pygame.draw.line(self.win, (80, 80, 80), (gx, gy), (gx + 12, gy + wing), 2)
+        # B5: liscie
+        for i, (lx, ly) in enumerate(self.leaves):
+            lx = (lx + t * 8) % (self.width + 40) - 20
+            ly += math.sin(t * 2 + i) * 0.5
+            self.leaves[i] = (lx, ly)
+            pygame.draw.circle(self.win, (120, 180, 80, 150), (int(lx), int(ly)), 3)
+        # A9: dym z namiotu (pozycja przyblizona)
+        for i in range(2):
+            sx = 850 + i * 10
+            sy = 550 - ((t * 20 + i * 30) % 60)
+            alpha = int(80 * (1 - ((t * 20 + i * 30) % 60) / 60))
+            pygame.draw.circle(self.win, (150, 150, 150, alpha), (int(sx), int(sy)), 8)
+        # Q17: zegar sesji
+        mins = self.game_time // 3600
+        secs = (self.game_time // 60) % 60
+        qfont = pygame.font.SysFont("arial", 14)
+        tlabel = qfont.render(f"{mins:02d}:{secs:02d}", True, (200, 200, 200))
+        self.win.blit(tlabel, (self.width - 70, self.height - 30))
         
         # 8: wskaznik pauzy z informacja o budowaniu
         if self.paused:
@@ -922,6 +1126,7 @@ class Game:
             self._boss_warned = True
             self.wave_banner_text = "UWAGA: BOSS NADCHODZI!"
             self.wave_banner_timer = 150
+            sound_horn.play()  # Niespodzianka 5: rog ostrzegawczy
         if not self.waiting_for_clear:
             self._boss_warned = False
         
@@ -989,6 +1194,71 @@ class Game:
                 hlabel = efont.render(f"HP: {int(en.health)}/{en.max_health}", True, (255, 180, 180))
                 self.win.blit(hlabel, (en.x - hlabel.get_width()//2, en.y - 115))
                 break
+
+    def draw_day_night(self):
+        """B1: Cykl dnia/nocy - przyciemnienie co 2 fale."""
+        phase = (self.wave // 2) % 4  # 0=dzien, 1=zachod, 2=noc, 3=swit
+        if phase == 1:
+            overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            overlay.fill((255, 150, 50, 40))
+            self.win.blit(overlay, (0, 0))
+        elif phase == 2:
+            overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            overlay.fill((10, 10, 40, 100))
+            self.win.blit(overlay, (0, 0))
+            # B10: latarnie w nocy
+            for x, y in [(400, 500), (600, 480), (800, 460), (500, 420)]:
+                pygame.draw.circle(self.win, (255, 220, 120, 80), (x, y), 25)
+                pygame.draw.circle(self.win, (255, 240, 180), (x, y), 6)
+        elif phase == 3:
+            overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            overlay.fill((255, 200, 150, 30))
+            self.win.blit(overlay, (0, 0))
+        # B4: tecza po deszczu (10s po koncu deszczu)
+        if hasattr(self, '_rainbow_timer') and self._rainbow_timer > 0:
+            self._rainbow_timer -= 1
+            colors = [(255, 0, 0), (255, 165, 0), (255, 255, 0), (0, 255, 0), (0, 0, 255)]
+            for i, c in enumerate(colors):
+                pygame.draw.arc(self.win, (*c, 100), 
+                              (self.width//2 - 200, 100, 400, 200), 
+                              math.pi, 2 * math.pi, 8 - i)
+
+    def save_game(self):
+        """Q11: Zapis gry do pliku."""
+        import pickle
+        data = {
+            'wave': self.wave, 'money': self.money, 'lives': self.lives,
+            'towers': [(type(t).__name__, t.x, t.y, t.level) for t in self.towers],
+            'stats_kills': self.stats_kills, 'stats_gold': self.stats_gold,
+        }
+        with open('savegame.dat', 'wb') as f:
+            pickle.dump(data, f)
+        self.gold_notifications.append(["Gra zapisana (F5)", 120])
+
+    def load_game(self):
+        """Q11: Wczytaj gre z pliku."""
+        import pickle, os
+        if not os.path.exists('savegame.dat'):
+            return
+        with open('savegame.dat', 'rb') as f:
+            data = pickle.load(f)
+        self.wave = data['wave']
+        self.money = data['money']
+        self.lives = data['lives']
+        self.stats_kills = data['stats_kills']
+        self.stats_gold = data['stats_gold']
+        self.towers = []
+        tower_map = {"WoodenTower": WoodenTower, "MetalTower": MetalTower,
+                     "GoldenTower": GoldenTower, "FireTower": FireTower,
+                     "BlazeTower": BlazeTower}
+        for name, x, y, level in data['towers']:
+            tw = tower_map[name](x, y)
+            for _ in range(level - 1):
+                tw.upgrade(0)
+            self.towers.append(tw)
+        self.enemies = []
+        self.current_wave = waves[self.wave][:]
+        self.gold_notifications.append(["Gra wczytana (F9)", 120])
 
     def draw_ability_dock(self):
         """Pasek 5 umiejetnosci (po jednej na typ wiezy). Kliknij aby aktywowac."""
@@ -1106,7 +1376,7 @@ class Game:
         items = [
             (10, 180, None, "Wave #" + str(self.wave + 1)),
             (200, 130, lives_img, str(self.lives)),
-            (340, 150, money_img, str(self.money)),
+            (340, 150, money_img, str(int(self.display_money))),
         ]
         for x, w, icon, text in items:
             s = pygame.Surface((w, pill_h), pygame.SRCALPHA)
@@ -1195,6 +1465,12 @@ class Game:
                 gold_forecast += 150
             glabel = font_small.render(f"~{gold_forecast}$", True, (255, 215, 0))
             self.win.blit(glabel, (preview_x + 8, preview_y + 42))
+            # Q19: rozbicie ekonomii
+            wave_gold = (self.wave + 2) * 100
+            interest = int(self.money * 0.05)
+            efont = pygame.font.SysFont("arial", 12)
+            elabel = efont.render(f"fala {wave_gold}$ + odsetki {interest}$", True, (180, 180, 180))
+            self.win.blit(elabel, (preview_x + 8, preview_y + 60))
         # Priorytet celowania wybranej wiezy
         if self.selected_tower:
             font_small = pygame.font.SysFont("arial", 16)

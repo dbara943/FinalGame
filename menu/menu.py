@@ -218,10 +218,6 @@ class VerticalMenu(Menu):
             coin_x = bx + panel_w - 30 - 70
             win.blit(pygame.transform.scale(money_img, (18, 18)), (coin_x, by + 36))
             win.blit(pt, (coin_x + 24, by + 34))
-            # Hotkey
-            kfont = pygame.font.SysFont("arial", 12)
-            kh = kfont.render(f"[{idx+1}]", True, (130, 150, 170))
-            win.blit(kh, (bx + 60, by + 44))
             # Aktualizuj pozycje klikalna
             item.x, item.y = bx, by
             item.width, item.height = panel_w - 30, 68
