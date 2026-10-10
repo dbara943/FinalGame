@@ -29,6 +29,7 @@ class Tower:
         self.ability_cooldown = 0  # klatki do gotowosci
         self.ability_max_cooldown = 1800  # 30s przy 60 FPS
         self.ability_active = 0  # klatki pozostalego czasu dzialania
+        self.attack_cooldown = 0  # tick-based cooldown ataku (dziala z speed)
 
     def _setup_menu(self):
         self.menu = Menu(self, self.x, self.y, menu_bg, [250, 500, "MAX"])
@@ -49,6 +50,10 @@ class Tower:
 
     def draw(self, win):
         img = self.get_level_img()
+        # V5: miekki cien pod wieza
+        shadow = pygame.Surface((80, 20), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow, (0, 0, 0, 80), shadow.get_rect())
+        win.blit(shadow, (self.x - 40, self.y + 28))
         win.blit(img, (self.x-img.get_width()//2, self.y-img.get_height()//2))
 
         if self.selected:

@@ -84,6 +84,7 @@ class WoodenTower(Tower):
     def attack(self, enemies, projectiles):
         self.inRange = False
         enemy_closest = []
+        shot_fired = False
 
         for enemy in enemies:
             if enemy.dying or enemy.dead or enemy.reached_end:
@@ -107,10 +108,10 @@ class WoodenTower(Tower):
         
         if len(enemy_closest) > 0:            
             first_enemy = enemy_closest[0]
-            # Rapid Fire: 2x szybkosc ataku
-            cooldown = 0.5 if getattr(self, '_rapid_fire', False) and self.ability_active > 0 else 1.0
-            if time.time() - self.timer >= cooldown:
-                self.timer = time.time()
+            # Rapid Fire: 2x szybkosc ataku. Cooldown tick-based (60 = 1s).
+            cooldown_ticks = 30 if getattr(self, '_rapid_fire', False) and self.ability_active > 0 else 60
+            if self.attack_cooldown <= 0:
+                self.attack_cooldown = cooldown_ticks
                 sound_2.play()
                 # Meteor: 3x obrazen, duzy splash
                 dmg = self.damage
@@ -126,6 +127,7 @@ class WoodenTower(Tower):
                     splash_radius=splash,
                     slow_on_hit=getattr(self, 'slow_on_hit', False),
                     damage_type=getattr(self, 'damage_type', 'physical')))
+                shot_fired = True
                   
             # Lucznik zwraca sie w strone wroga (wczesniej byl odwrocony).
             if first_enemy.x < self.x and not self.facing_left:
@@ -136,6 +138,7 @@ class WoodenTower(Tower):
                 self.facing_left = False
                 for x, img in enumerate(self.archer_imgs):
                     self.archer_imgs[x] = pygame.transform.flip(img, True, False)
+        return shot_fired
 """
 METAL TOWER 
 """

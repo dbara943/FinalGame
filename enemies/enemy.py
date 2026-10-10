@@ -46,35 +46,80 @@ class Enemy:
         self.hurt_timer = 0
         self.slow_timer = 0
         self.base_velocity = 3
+        self.flash_timer = 0  # V1: bialy blysk przy trafieniu
+
     def draw(self, win):
+        # Czyste rysowanie - bez zmiany stanu (stan zmienia update()).
+        if self.img is None:
+            return
+        # V5: miekki cien pod wrogiem
+        shadow = pygame.Surface((50, 16), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow, (0, 0, 0, 80), shadow.get_rect())
+        win.blit(shadow, (self.x - 25, self.y + 18))
+        img_to_draw = self.img
+        # V1: hit flash - bialy blysk
+        if self.flash_timer > 0:
+            flash = self.img.copy()
+            flash.fill((255, 255, 255, 180), special_flags=pygame.BLEND_RGBA_ADD)
+            img_to_draw = flash
+        # V2: wskaznik spowolnienia - niebieska poswiata
+        if self.slow_timer > 0:
+            slowed = img_to_draw.copy()
+            slowed.fill((100, 180, 255, 120), special_flags=pygame.BLEND_RGBA_ADD)
+            img_to_draw = slowed
+        win.blit(img_to_draw, (self.x - img_to_draw.get_width()/2, self.y - img_to_draw.get_height()/2 - 35))
+        if not self.dying:
+            self.draw_health_bar(win)
+
+    def update(self):
+        """Logika wroga: animacje, ruch, timery. Wywolywane z Game.update_game_logic()."""
+        if self.flash_timer > 0:
+            self.flash_timer -= 1
         if self.dying:
             if self.die_count < len(self.die_imgs):
                 self.img = self.die_imgs[self.die_count]
                 self.die_count += 1
             else:
                 self.dead = True
-                return
-        elif self.hurt_timer > 0 and self.hurt_imgs:
+            return
+        if self.hurt_timer > 0 and self.hurt_imgs:
             self.img = self.hurt_imgs[(6 - self.hurt_timer) % len(self.hurt_imgs)]
             self.hurt_timer -= 1
         else:
-            self.img = self.imgs[self.animation_count]
-            self.animation_count += 1
-            if self.animation_count >= len(self.imgs):
-                self.animation_count = 0
-                 
-        win.blit(self.img, (self.x - self.img.get_width()/2, self.y - self.img.get_height()/2 - 35))
+            # Animacja co 4 ticki (nie co klatke - wczesniej bylo za szybko)
+            self._anim_tick = getattr(self, '_anim_tick', 0) + 1
+            if self._anim_tick >= 4:
+                self._anim_tick = 0
+                self.animation_count += 1
+                if self.animation_count >= len(self.imgs):
+                    self.animation_count = 0
+            if self.imgs:
+                self.img = self.imgs[self.animation_count]
         if not self.dying:
-            self.draw_health_bar(win)
             self.move()
         
     def draw_health_bar(self, win):
-        length = 50
-        move_by = round(length / self.max_health)
-        health_bar = move_by * self.health
-        
-        pygame.draw.rect(win, (255,0,0), (self.x - 30, self.y-70, length, 10), 0)
-        pygame.draw.rect(win, (0,255,0), (self.x - 30, self.y-70, health_bar, 10), 0)
+        # Nowoczesny pasek: zaokraglone tlo, elegancka zielen/czerwien
+        bar_w, bar_h = 50, 8
+        x = self.x - bar_w / 2
+        y = self.y - 70
+        ratio = max(0.0, min(1.0, self.health / self.max_health)) if self.max_health > 0 else 0
+        # Tlo (ciemne, zaokraglone)
+        bg = pygame.Surface((bar_w, bar_h), pygame.SRCALPHA)
+        pygame.draw.rect(bg, (20, 20, 20, 200), bg.get_rect(), border_radius=4)
+        win.blit(bg, (x, y))
+        # Wypelnienie: zielen -> zolc -> czerwien w zaleznosci od HP
+        fill_w = int(bar_w * ratio)
+        if fill_w > 0:
+            if ratio > 0.6:
+                color = (76, 175, 80)      # elegancka zielen
+            elif ratio > 0.3:
+                color = (255, 193, 7)     # bursztyn
+            else:
+                color = (244, 67, 54)     # nowoczesna czerwien
+            fg = pygame.Surface((fill_w, bar_h), pygame.SRCALPHA)
+            pygame.draw.rect(fg, color, fg.get_rect(), border_radius=4)
+            win.blit(fg, (x, y))
 
     def collide(self, X, Y):
         if X <= self.x + self.width and X >= self.x:
@@ -149,6 +194,7 @@ class Enemy:
             return False
         self.health -= damage
         self.hurt_timer = 6
+        self.flash_timer = 4  # V1: blysk przy trafieniu
         if self.health <= 0:
             self.dying = True
             self.die_count = 0

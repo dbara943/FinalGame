@@ -77,6 +77,9 @@ class Game:
         self.stats_damage = 0
         self.endless = False  # Tryb endless po wygranej
         self.endless_wave = 0
+        self.wave_banner_text = ""  # V3: banner fali
+        self.wave_banner_timer = 0
+        self.muzzle_flashes = []  # V4: blyski przy strzale [(x, y, timer)]
         if not sound:
             pygame.mixer.music.set_volume(0)
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
@@ -135,11 +138,15 @@ class Game:
                 self.money += self.wave * 100
                 self.current_wave = waves[self.wave][:]
                 self._wave_start_lives = self.lives
+                self.wave_banner_text = f"FALA {self.wave + 1}"  # V3
+                self.wave_banner_timer = 120  # 2 sekundy
                 # Boss na falach 4 i 8; fala 10 (ostatnia) to sam boss.
                 if (self.wave + 1) % 4 == 0 and self.wave + 1 < 10:
                     self.enemies.append(Boss())
+                    self.wave_banner_text = f"FALA {self.wave + 1} - BOSS!"
                 elif self.wave + 1 == 10:
                     self.enemies.append(Boss())
+                    self.wave_banner_text = "FINALNA FALA - BOSS!"
         else:
             for i in range(len(self.current_wave)):
                 if self.current_wave[i] != 0:
@@ -302,6 +309,14 @@ class Game:
 
     def update_game_logic(self):
         """Jedna iteracja logiki gry (ruch wrogow, ataki, pociski)."""
+        # V3: banner fali
+        if self.wave_banner_timer > 0:
+            self.wave_banner_timer -= 1
+        # V4: muzzle flashes
+        for mf in self.muzzle_flashes[:]:
+            mf[2] -= 1
+            if mf[2] <= 0:
+                self.muzzle_flashes.remove(mf)
         # Aktualizacja cooldownow umiejetnosci
         for tw in self.towers:
             if tw.ability_cooldown > 0:
@@ -311,6 +326,12 @@ class Game:
                 if tw.ability_active == 0:
                     tw._rapid_fire = False
                     tw._gold_rush = False
+            # Cooldown ataku wiezy (tick-based, zeby speed dzialal)
+            if tw.attack_cooldown > 0:
+                tw.attack_cooldown -= 1
+        # Update wrogow (animacje, ruch, timery) - TU, nie w draw()!
+        for en in self.enemies:
+            en.update()
         to_del = []
         for en in self.enemies:
             if en.reached_end:
@@ -336,7 +357,9 @@ class Game:
             self.enemies.remove(d)
 
         for tw in self.towers:
-            tw.attack(self.enemies, self.projectiles)
+            if tw.attack(self.enemies, self.projectiles):
+                # V4: muzzle flash przy strzale
+                self.muzzle_flashes.append([tw.x, tw.y - 30, 6])
 
         # Pociski leca do celow; trafienie zadaje obrazenia.
         for proj in self.projectiles[:]:
@@ -456,6 +479,24 @@ class Game:
             alpha = min(255, timer * 8)
             label = font_dmg.render(text, True, (255, 100, 100))
             self.win.blit(label, (x - label.get_width()//2, y))
+        # V3: banner fali
+        if self.wave_banner_timer > 0:
+            alpha = min(255, self.wave_banner_timer * 3)
+            banner_font = pygame.font.SysFont("arial", 64, bold=True)
+            label = banner_font.render(self.wave_banner_text, True, (255, 255, 255))
+            # Cien pod napisem
+            shadow = banner_font.render(self.wave_banner_text, True, (0, 0, 0))
+            cx = self.width // 2
+            cy = self.height // 3
+            self.win.blit(shadow, (cx - label.get_width()//2 + 3, cy + 3))
+            self.win.blit(label, (cx - label.get_width()//2, cy))
+        # V4: muzzle flashes
+        for x, y, timer in self.muzzle_flashes:
+            if timer > 0:
+                radius = 12 + (6 - timer) * 2
+                flash = pygame.Surface((radius*2, radius*2), pygame.SRCALPHA)
+                pygame.draw.circle(flash, (255, 220, 100, timer * 40), (radius, radius), radius)
+                self.win.blit(flash, (x - radius, y - radius))
         
         self.menu.draw(self.win)
         self.draw_hud()
