@@ -37,6 +37,9 @@ class Enemy:
         self.imgs = []
         self.die_imgs = []
         self.hurt_imgs = []
+        self.attack_imgs = []  # Animacja ataku na baze
+        self.attacking = False
+        self.attack_count = 0
         self.flipped = False
         self.reached_end = False
         self._imgs_copied = False
@@ -52,29 +55,54 @@ class Enemy:
         # Czyste rysowanie - bez zmiany stanu (stan zmienia update()).
         if self.img is None:
             return
-        # V5: miekki cien pod wrogiem
-        shadow = pygame.Surface((50, 16), pygame.SRCALPHA)
-        pygame.draw.ellipse(shadow, (0, 0, 0, 80), shadow.get_rect())
-        win.blit(shadow, (self.x - 25, self.y + 18))
+        # V5: miekki cien pod wrogiem (gradientowy, nie twarda elipsa)
+        self._draw_soft_shadow(win, self.x, self.y + 18, 50, 14)
         img_to_draw = self.img
-        # V1: hit flash - bialy blysk
+        # V1: hit flash - biala sylwetka (maska, nie prostokat)
         if self.flash_timer > 0:
-            flash = self.img.copy()
-            flash.fill((255, 255, 255, 180), special_flags=pygame.BLEND_RGBA_ADD)
-            img_to_draw = flash
-        # V2: wskaznik spowolnienia - niebieska poswiata
+            if not hasattr(self, '_flash_cache') or self._flash_cache.get('img') is not self.img:
+                mask = pygame.mask.from_surface(self.img)
+                flash_surf = mask.to_surface(setcolor=(255, 255, 255, 200),
+                                             unsetcolor=(0, 0, 0, 0))
+                self._flash_cache = {'img': self.img, 'surf': flash_surf}
+            img_to_draw = self._flash_cache['surf']
+        # V2: wskaznik spowolnienia - niebieska poswiata (sylwetka)
         if self.slow_timer > 0:
-            slowed = img_to_draw.copy()
-            slowed.fill((100, 180, 255, 120), special_flags=pygame.BLEND_RGBA_ADD)
-            img_to_draw = slowed
+            if not hasattr(self, '_slow_cache') or self._slow_cache.get('img') is not img_to_draw:
+                mask = pygame.mask.from_surface(img_to_draw)
+                slow_surf = mask.to_surface(setcolor=(120, 190, 255, 130),
+                                            unsetcolor=(0, 0, 0, 0))
+                self._slow_cache = {'img': img_to_draw, 'surf': slow_surf}
+            img_to_draw = self._slow_cache['surf']
         win.blit(img_to_draw, (self.x - img_to_draw.get_width()/2, self.y - img_to_draw.get_height()/2 - 35))
         if not self.dying:
             self.draw_health_bar(win)
+
+    def _draw_soft_shadow(self, win, cx, cy, w, h):
+        """Miekki cien z gradientem (3 warstwy)."""
+        for i, (alpha, scale) in enumerate([(30, 1.0), (25, 0.8), (20, 0.6)]):
+            sw, sh = int(w * scale), int(h * scale)
+            shadow = pygame.Surface((sw, sh), pygame.SRCALPHA)
+            pygame.draw.ellipse(shadow, (0, 0, 0, alpha), shadow.get_rect())
+            win.blit(shadow, (cx - sw // 2, cy - sh // 2))
 
     def update(self):
         """Logika wroga: animacje, ruch, timery. Wywolywane z Game.update_game_logic()."""
         if self.flash_timer > 0:
             self.flash_timer -= 1
+        # Atak na baze - animacja ataku zamiast natychmiastowego znikniecia
+        if self.attacking:
+            if self.attack_imgs:
+                self.attack_count += 1
+                idx = min(self.attack_count // 4, len(self.attack_imgs) - 1)
+                self.img = self.attack_imgs[idx]
+                if self.attack_count >= len(self.attack_imgs) * 4:
+                    self.reached_end = True
+                    self.attacking = False
+            else:
+                self.reached_end = True
+                self.attacking = False
+            return
         if self.dying:
             if self.die_count < len(self.die_imgs):
                 self.img = self.die_imgs[self.die_count]
@@ -185,7 +213,10 @@ class Enemy:
        # Dotarl do punktu docelowego?
        if dist_to_target <= self.velocity / 3.0 + 1:
            if self.path_pos + 1 >= len(self.path):
-               self.reached_end = True
+               # Koniec sciezki - atak na baze (animacja), nie natychmiastowe znikniecie
+               if not self.attacking and not self.reached_end:
+                   self.attacking = True
+                   self.attack_count = 0
            else:
                self.path_pos += 1
        

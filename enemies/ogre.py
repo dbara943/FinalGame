@@ -11,6 +11,7 @@ for x in range(20):
     00
 die_imgs = load_anim(7, 'die', (96, 96))
 hurt_imgs = load_anim(7, 'hurt', (96, 96))
+attack_imgs = load_anim(7, 'attack', (96, 96))
 
 class Ogre(Enemy):
     def __init__(self):
@@ -24,3 +25,4 @@ class Ogre(Enemy):
         self.imgs = imgs
         self.die_imgs = die_imgs
         self.hurt_imgs = hurt_imgs
+        self.attack_imgs = attack_imgs

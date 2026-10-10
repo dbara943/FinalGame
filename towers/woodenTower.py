@@ -66,6 +66,13 @@ class WoodenTower(Tower):
         super().draw_radius(win)
         super().draw(win)  
         
+        # Widoczny reload (proca): po strzale wieza jest "pusta",
+        # pocisk pojawia sie z powrotem gdy reload sie konczy.
+        # attack_cooldown > 0 = przeladowanie, == 0 = gotowa do strzalu.
+        reloading = self.attack_cooldown > 0
+        if reloading:
+            return  # nie rysuj lucznika - wieza pusta
+        
         if self.inRange and not self.moving:     
             self.archer_count+= 1
             if self.archer_count >= len(self.archer_imgs) * 10:

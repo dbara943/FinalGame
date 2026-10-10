@@ -11,6 +11,7 @@ for x in range(20):
 
 die_imgs = load_anim(8, 'die', (160, 160))
 hurt_imgs = load_anim(8, 'hurt', (160, 160))
+attack_imgs = load_anim(8, 'attack', (160, 160))
 
 class Boss(Enemy):
     """Boss pojawiajacy sie co 4 fale. Bardzo wytrzymaly, wolny, wysoka nagroda."""
@@ -24,3 +25,4 @@ class Boss(Enemy):
         self.imgs = imgs
         self.die_imgs = die_imgs
         self.hurt_imgs = hurt_imgs
+        self.attack_imgs = attack_imgs

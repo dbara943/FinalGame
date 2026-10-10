@@ -50,7 +50,15 @@ class Ship:
             else:
                 self.x += step
         elif self.state == Ship.OUT:
-            step = -self.speed if self.from_left else self.speed
+            # Statek plynie przodem w kierunku ruchu (wczesniej plynal tylem)
+            if self.from_left:
+                # Plynie w lewo - sprite bazowy patrzy w lewo
+                self.img = self.base_img
+                step = -self.speed
+            else:
+                # Plynie w prawo - odwrocony sprite
+                self.img = pygame.transform.flip(self.base_img, True, False)
+                step = self.speed
             self.x += step
             w = self.base_img.get_width()
             if self.x < -w or self.x > self.screen_w + w:

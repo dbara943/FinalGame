@@ -11,6 +11,7 @@ for x in range(20):
 
 die_imgs = load_anim(5, 'die', (64, 64))
 hurt_imgs = load_anim(5, 'hurt', (64, 64))
+attack_imgs = load_anim(5, 'attack', (64, 64))
 
 class Cyclop(Enemy):
     def __init__(self):
@@ -23,3 +24,4 @@ class Cyclop(Enemy):
         self.imgs = imgs
         self.die_imgs = die_imgs
         self.hurt_imgs = hurt_imgs
+        self.attack_imgs = attack_imgs

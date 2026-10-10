@@ -51,6 +51,8 @@ sound_2 = pygame.mixer.Sound("sounds/2.wav")
 sound_3 = pygame.mixer.Sound("sounds/3.wav")
 sound_4 = pygame.mixer.Sound("sounds/4.wav")
 sound_5 = pygame.mixer.Sound("sounds/5.wav")
+sound_win = pygame.mixer.Sound("sounds/win.wav")
+sound_lose = pygame.mixer.Sound("sounds/lose.wav")
 
 class Game:
     def __init__(self, lives=20, money=200, sound=True):
@@ -82,11 +84,12 @@ class Game:
         self.muzzle_flashes = []  # V4: blyski przy strzale [(x, y, timer)]
         self.waiting_for_clear = False  # Czekamy na wyczyszczenie planszy przed nastepna fala
         self.gold_notifications = []  # Widoczne powiadomienia o zlocie [(tekst, timer)]
+        self.corpses = []  # Trupy wrogow: [img, x, y, timer]
         if not sound:
             pygame.mixer.music.set_volume(0)
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
                       tower_sound_1, tower_sound_2, tower_sound_3,
-                      tower_sound_4, tower_sound_5):
+                      tower_sound_4, tower_sound_5, sound_win, sound_lose):
                 s.set_volume(0)
         self.bg = pygame.image.load(os.path.join("images", "bg_noship.png"))
         self.bg = pygame.transform.scale(self.bg, (self.width, self.height))
@@ -288,12 +291,14 @@ class Game:
                         break
 
             if self.lives <= 0:
+                sound_lose.play()
                 result = self.show_end_screen(False)
                 if result == "restart":
                     self.reset_game()
                 else:
                     run = False
             elif self.won:
+                sound_win.play()
                 result = self.show_end_screen(True)
                 if result == "restart":
                     self.reset_game()
@@ -346,6 +351,11 @@ class Game:
             gn[1] -= 1
             if gn[1] <= 0:
                 self.gold_notifications.remove(gn)
+        # Trupy - znikaja po 4 sekundach
+        for c in self.corpses[:]:
+            c[3] -= 1
+            if c[3] <= 0:
+                self.corpses.remove(c)
         # V4: muzzle flashes
         for mf in self.muzzle_flashes[:]:
             mf[2] -= 1
@@ -386,6 +396,12 @@ class Game:
                         reward = d.money * 2
                         break
                 self.money += reward
+                # Trup zostaje na ziemi (ostatnia klatka animacji smierci)
+                if d.die_imgs:
+                    corpse_img = d.die_imgs[-1]
+                    self.corpses.append([corpse_img, d.x, d.y, 240])  # 4 sekundy
+                # Statystyki
+                self.total_kills += 1
                 self.stats_kills += 1
                 self.stats_gold += reward
             self.enemies.remove(d)
@@ -503,6 +519,12 @@ class Game:
         if self.moving_object:
             self.moving_object.draw(self.win)
             self.moving_object.draw_radius(self.win)
+        # Trupy pod wrogami (znikaja stopniowo)
+        for img, x, y, timer in self.corpses:
+            alpha = min(255, timer * 2)
+            corpse = img.copy()
+            corpse.set_alpha(alpha)
+            self.win.blit(corpse, (x - corpse.get_width()/2, y - corpse.get_height()/2 - 35))
         for en in self.enemies:
             en.draw(self.win)
         for proj in self.projectiles:

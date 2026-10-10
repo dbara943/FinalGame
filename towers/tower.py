@@ -1,4 +1,5 @@
 import pygame
+import math
 from menu.menu import Menu
 import os
 
@@ -50,10 +51,12 @@ class Tower:
 
     def draw(self, win):
         img = self.get_level_img()
-        # V5: miekki cien pod wieza
-        shadow = pygame.Surface((80, 20), pygame.SRCALPHA)
-        pygame.draw.ellipse(shadow, (0, 0, 0, 80), shadow.get_rect())
-        win.blit(shadow, (self.x - 40, self.y + 28))
+        # Miekki cien z gradientem
+        for alpha, scale in [(30, 1.0), (25, 0.75), (20, 0.5)]:
+            sw, sh = int(80 * scale), int(20 * scale)
+            shadow = pygame.Surface((sw, sh), pygame.SRCALPHA)
+            pygame.draw.ellipse(shadow, (0, 0, 0, alpha), shadow.get_rect())
+            win.blit(shadow, (self.x - sw // 2, self.y + 28 - sh // 2))
         win.blit(img, (self.x-img.get_width()//2, self.y-img.get_height()//2))
 
         if self.selected:
@@ -61,10 +64,22 @@ class Tower:
 
     def draw_radius(self, win):
         if self.selected or getattr(self, 'moving', False):
-            # Powierzchnia 2x zasieg wystarczy (wczesniej byla 4x za duza).
-            surface = pygame.Surface((self.range*2, self.range*2), pygame.SRCALPHA, 32)
-            pygame.draw.circle(surface, (128,128,128, 128), (self.range, self.range), self.range, 0)
-            win.blit(surface, (self.x - self.range, self.y - self.range))
+            # Nowoczesny okrag: subtelne wypelnienie + jasna obwiednia
+            r = self.range
+            surface = pygame.Surface((r*2, r*2), pygame.SRCALPHA, 32)
+            # Wypelnienie - bardzo delikatne
+            pygame.draw.circle(surface, (100, 200, 255, 35), (r, r), r, 0)
+            # Obwiednia - jasna, cienka
+            pygame.draw.circle(surface, (150, 220, 255, 160), (r, r), r, 2)
+            # Wewnetrzna linia przerywana dla stylu
+            for angle in range(0, 360, 15):
+                rad = math.radians(angle)
+                x1 = r + int((r - 8) * math.cos(rad))
+                y1 = r + int((r - 8) * math.sin(rad))
+                x2 = r + int((r - 2) * math.cos(rad))
+                y2 = r + int((r - 2) * math.sin(rad))
+                pygame.draw.line(surface, (150, 220, 255, 90), (x1, y1), (x2, y2), 2)
+            win.blit(surface, (self.x - r, self.y - r))
 
     def click(self, X, Y):
         # Caly sprite jest klikalny (wczesniej tylko prawa polowa).

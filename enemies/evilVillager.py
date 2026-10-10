@@ -11,6 +11,7 @@ for x in range(20):
 
 die_imgs = load_anim(8, 'die', (128, 128))
 hurt_imgs = load_anim(8, 'hurt', (128, 128))
+attack_imgs = load_anim(8, 'attack', (128, 128))
 
 class EvilVillager(Enemy):
     def __init__(self):
@@ -23,3 +24,4 @@ class EvilVillager(Enemy):
         self.imgs = imgs
         self.die_imgs = die_imgs
         self.hurt_imgs = hurt_imgs
+        self.attack_imgs = attack_imgs
