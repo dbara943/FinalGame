@@ -55,7 +55,6 @@ sound_5 = pygame.mixer.Sound("sounds/5.wav")
 sound_win = pygame.mixer.Sound("sounds/win.wav")
 sound_lose = pygame.mixer.Sound("sounds/lose.wav")
 sound_roar = pygame.mixer.Sound("sounds/roar.wav")
-sound_coin = pygame.mixer.Sound("sounds/coin.wav")
 sound_levelup = pygame.mixer.Sound("sounds/levelup.wav")
 sound_horn = pygame.mixer.Sound("sounds/horn.wav")
 
@@ -120,7 +119,7 @@ class Game:
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
                       tower_sound_1, tower_sound_2, tower_sound_3,
                       tower_sound_4, tower_sound_5, sound_win, sound_lose, sound_roar,
-                      sound_coin, sound_levelup, sound_horn):
+                      sound_levelup, sound_horn):
                 s.set_volume(0)
         self.bg = pygame.image.load(os.path.join("images", "bg_noship.png"))
         self.bg = pygame.transform.scale(self.bg, (self.width, self.height))
@@ -131,7 +130,7 @@ class Game:
         self.timer = time.time()
         self.hud_font = pygame.font.SysFont("arial", 26, bold=True)
         self.selected_tower = None
-        self.menu = VerticalMenu(self.width - side_img.get_width() + 350, 250, side_img)
+        self.menu = VerticalMenu(self.width - side_img.get_width() - 10, 250, side_img)
         self.menu.add_btn(t1_img, "t1", 100)
         self.menu.add_btn(t2_img, "t2", 200)
         self.menu.add_btn(t3_img, "t3", 300)
@@ -352,7 +351,8 @@ class Game:
                         self.muted = not self.muted
                         vol = 0 if self.muted else 1
                         pygame.mixer.music.set_volume(0.5 * vol)
-                        for s in (sound_1, sound_2, sound_3, sound_4, sound_5, sound_win, sound_lose, sound_roar):
+                        for s in (sound_1, sound_2, sound_3, sound_4, sound_5, sound_win, sound_lose, sound_roar,
+                                  sound_levelup, sound_horn):
                             s.set_volume(vol)
                     # Q11: F5 - zapis, F9 - wczytaj
                     if event.key == pygame.K_F5:
@@ -538,7 +538,6 @@ class Game:
         for c in self.coins[:]:
             if c.update():
                 self.coins.remove(c)
-                sound_coin.play()  # Niespodzianka 1: dzwiek monety
         for s in self.shockwaves[:]:
             if s.update():
                 self.shockwaves.remove(s)
@@ -779,8 +778,6 @@ class Game:
         for i, s in enumerate(stats):
             label = stats_font.render(s, True, (200, 200, 200))
             self.win.blit(label, (self.width // 2 - label.get_width() // 2, self.height // 2 + 55 + i * 30))
-        # Q20: eksport wyniku
-        export_rect = pygame.Rect(self.width//2 - 100, self.height//2 + 160 - 70, 200, 40)
         pygame.display.update()
         # Petla czeka na klikniecie przycisku (bez przerysowywania tla - brak migotania)
         waiting = True
@@ -796,14 +793,6 @@ class Game:
                         return "quit"
                     if continue_rect and continue_rect.collidepoint(pos):
                         return "continue"
-                    # Q20: kopiuj wynik do schowka
-                    if export_rect.collidepoint(pos):
-                        try:
-                            import pyperclip
-                            text = f"Island Defenders: {'WIN' if won else 'LOSE'}, fala {self.wave+1}, {self.stats_kills} kills, {self.stats_gold}$ gold"
-                            pyperclip.copy(text)
-                        except:
-                            pass
             # Rysuj przyciski (tylko przyciski sie odswiezaja)
             buttons = [
                 (restart_rect, "RESTART", (60, 180, 80)),
@@ -817,11 +806,6 @@ class Game:
                 label = small_font.render(label_text, True, (255, 255, 255))
                 self.win.blit(label, (rect.x + rect.width//2 - label.get_width()//2,
                                       rect.y + rect.height//2 - label.get_height()//2))
-            # Q20: przycisk eksportu
-            pygame.draw.rect(self.win, (80, 80, 120), export_rect, border_radius=8)
-            elabel = pygame.font.SysFont("arial", 18).render("KOPIUJ WYNIK", True, (255, 255, 255))
-            self.win.blit(elabel, (export_rect.x + export_rect.width//2 - elabel.get_width()//2,
-                                   export_rect.y + export_rect.height//2 - elabel.get_height()//2))
             pygame.display.update()
         return "quit"
         
@@ -1065,25 +1049,22 @@ class Game:
             s.draw(self.win)
         for c in self.coins:
             c.draw(self.win)
-        # A4: chmury
+        # A4: chmury (wolno, pozycja bazowa + przesuniecie czasowe)
         t = pygame.time.get_ticks() / 1000.0
-        for i, (cx, cy, size) in enumerate(self.clouds):
-            cx = (cx + t * 5) % (self.width + 200) - 100
-            self.clouds[i] = (cx, cy, size)
+        for i, (base_x, cy, size) in enumerate(self.clouds):
+            cx = (base_x + t * 8) % (self.width + 200) - 100
             for ox in [-20, 0, 20]:
                 pygame.draw.circle(self.win, (255, 255, 255, 90), (int(cx + ox), int(cy)), size // 2)
         # A9: mewy
-        for i, (gx, gy, phase) in enumerate(self.seagulls):
-            gx = (gx + t * 15) % (self.width + 100) - 50
-            self.seagulls[i] = (gx, gy, phase)
+        for i, (base_x, gy, phase) in enumerate(self.seagulls):
+            gx = (base_x + t * 12) % (self.width + 100) - 50
             wing = math.sin(t * 6 + phase) * 8
             pygame.draw.line(self.win, (80, 80, 80), (gx - 12, gy + wing), (gx, gy), 2)
             pygame.draw.line(self.win, (80, 80, 80), (gx, gy), (gx + 12, gy + wing), 2)
         # B5: liscie
-        for i, (lx, ly) in enumerate(self.leaves):
-            lx = (lx + t * 8) % (self.width + 40) - 20
-            ly += math.sin(t * 2 + i) * 0.5
-            self.leaves[i] = (lx, ly)
+        for i, (base_x, ly) in enumerate(self.leaves):
+            lx = (base_x + t * 6) % (self.width + 40) - 20
+            ly = ly + math.sin(t * 2 + i) * 10
             pygame.draw.circle(self.win, (120, 180, 80, 150), (int(lx), int(ly)), 3)
         # A9: dym z namiotu (pozycja przyblizona)
         for i in range(2):
@@ -1165,34 +1146,15 @@ class Game:
                 pygame.draw.polygon(self.win, (255, 220, 80), pts2)
 
     def draw_enemy_path_preview(self):
-        """10: Po najechaniu na wroga pokazuje jego trase do bazy i ETA.
-        Q4: Dokladne HP wroga."""
+        """Q4: Dokladne HP wroga na hover (bez podgladu trasy)."""
         mx, my = pygame.mouse.get_pos()
         for en in self.enemies:
             if en.dying or en.dead or en.reached_end:
                 continue
             if math.hypot(mx - en.x, my - (en.y - 35)) < 35:
-                # Rysuj pozostala trase
-                pts = [(en.x, en.y)]
-                for i in range(en.path_pos, len(en.path)):
-                    pts.append(en.path[i])
-                if len(pts) > 1:
-                    pygame.draw.lines(self.win, (255, 255, 100, 180), False, pts, 3)
-                # ETA: pozostaly dystans / predkosc
-                remaining = 0
-                px, py = en.x, en.y
-                for i in range(en.path_pos, len(en.path)):
-                    x2, y2 = en.path[i]
-                    remaining += math.hypot(x2 - px, y2 - py)
-                    px, py = x2, y2
-                eff_vel = en.velocity * 0.5 if en.slow_timer > 0 else en.velocity
-                eta = remaining / (eff_vel / 3.0 * 60) if eff_vel > 0 else 0
                 efont = pygame.font.SysFont("arial", 14, bold=True)
-                elabel = efont.render(f"{eta:.1f}s do bazy", True, (255, 255, 150))
-                self.win.blit(elabel, (en.x - elabel.get_width()//2, en.y - 95))
-                # Q4: dokladne HP
                 hlabel = efont.render(f"HP: {int(en.health)}/{en.max_health}", True, (255, 180, 180))
-                self.win.blit(hlabel, (en.x - hlabel.get_width()//2, en.y - 115))
+                self.win.blit(hlabel, (en.x - hlabel.get_width()//2, en.y - 95))
                 break
 
     def draw_day_night(self):
@@ -1345,10 +1307,9 @@ class Game:
         if x < 40 or x > self.width - 200 or y < 40 or y > self.height - 40:
             return False
         # Na drodze (punkty sciezki wroga)
-        path = [(300, 600), (325, 640), (340, 635), (380, 620), (440, 600),
-                (535, 575), (700, 560), (850, 543), (980, 512),
-                (1040, 462), (1000, 415), (800, 412), (600, 414),
-                (400, 410), (300, 375)]
+        path = [(480, 590), (600, 560), (750, 530), (900, 495),
+                (1000, 460), (1050, 430), (1000, 385),
+                (800, 375), (600, 370), (400, 365), (280, 355)]
         for i in range(len(path) - 1):
             x1, y1 = path[i]
             x2, y2 = path[i + 1]
