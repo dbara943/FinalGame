@@ -142,7 +142,9 @@ class WoodenTower(Tower):
             x = enemy.x
             y = enemy.y
             dis = math.sqrt((self.x - x)**2 + (self.y - y)**2)
-            if dis < self.range:
+            # 7: deszcz zmniejsza zasieg
+            eff_range = self.range * getattr(self, '_rain_mod', 1.0)
+            if dis < eff_range:
                 self.inRange = True
                 enemy_closest.append(enemy)
         # Sortowanie wedlug priorytetu celowania
@@ -163,7 +165,8 @@ class WoodenTower(Tower):
             if self.attack_cooldown <= 0:
                 self.attack_cooldown = cooldown_ticks
                 sound_2.play()
-                dmg = self.damage
+                # 5: synergia +15% jesli sasiad tego samego typu
+                dmg = int(self.damage * getattr(self, '_synergy', 1.0))
                 splash = getattr(self, 'splash_radius', 0)
                 # Pocisk leci do wroga zamiast natychmiastowego hita.
                 projectiles.append(Projectile(

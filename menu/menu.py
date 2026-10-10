@@ -64,9 +64,9 @@ class Menu():
     def draw(self, win):
         # Nowoczesny panel: rysowany programowo, bez grafiki tła
         tw = self.tower
-        panel_w, panel_h = 230, 130
+        panel_w, panel_h = 230, 150
         px = self.x - panel_w // 2
-        py = self.y - 110
+        py = self.y - 120
         
         # Tło panelu
         bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
@@ -100,9 +100,14 @@ class Menu():
         
         # Statystyki wieży
         stat_font = pygame.font.SysFont("arial", 15)
-        stats = f"DMG {tw.damage}  |  RNG {tw.range}  |  KILLS {tw.kills}"
+        # Q8: DPS = obrazenia / czas przeladowania
+        dps = tw.damage  # 1 strzal na sekunde
+        stats = f"DMG {tw.damage}  RNG {tw.range}  DPS {dps}"
         slabel = stat_font.render(stats, True, (170, 190, 210))
         win.blit(slabel, (px + panel_w//2 - slabel.get_width()//2, py + 92))
+        kfont = pygame.font.SysFont("arial", 13)
+        klabel = kfont.render(f"KILLS {tw.kills}", True, (255, 215, 0))
+        win.blit(klabel, (px + panel_w//2 - klabel.get_width()//2, py + 110))
         
         # Aktualizuj pozycje klikalne przycisków
         if len(self.buttons) >= 2:

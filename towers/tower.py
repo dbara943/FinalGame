@@ -129,6 +129,16 @@ class Tower:
     def get_upgrade_cost(self):
         return self.price[self.level - 1]
 
+    def get_synergy_bonus(self, towers):
+        """5: +15% obrazen jesli obok stoi wieza tego samego typu (100px)."""
+        for tw in towers:
+            if tw is self:
+                continue
+            if type(tw).__name__ == type(self).__name__:
+                if math.hypot(tw.x - self.x, tw.y - self.y) < 100:
+                    return 1.15
+        return 1.0
+
     def move(self, x, y):
         self.x = x
         self.y = y

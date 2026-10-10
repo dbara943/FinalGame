@@ -90,6 +90,12 @@ class Game:
         self.wave_modifier = None  # U8: modyfikator fali (swift/rich/swarm)
         self.show_all_ranges = False  # U10: pokaz wszystkie zasiegi
         self.pending_boss = None  # Boss czeka na zadokowanie statku
+        self.raining = False  # 7: deszcz
+        self.raindrops = []  # krople deszczu [(x, y, speed)]
+        self.wave_report = None  # 9: raport po fali (tekst, timer)
+        self._wave_kills_start = 0
+        self._wave_gold_start = 0
+        self.last_placed = None  # Q7: ostatnio postawiona wieza (Ctrl+Z)
         if not sound:
             pygame.mixer.music.set_volume(0)
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
@@ -139,12 +145,27 @@ class Game:
                     # U8: SWIFT - +30% predkosci
                     if self.wave_modifier == "swift":
                         en.velocity *= 1.3
+                    # 6: 8% szansy na elitarnego (nie boss)
+                    if not isinstance(en, Boss) and random.random() < 0.08:
+                        en.make_elite()
                     self.enemies.append(en)
                     break
 
     def advance_wave(self):
         """Przechodzi do nastepnej fali: zloto, bonusy, powiadomienie. Wywolywane
         gdy plansza jest wyczyszczona i statek ma wrocic."""
+        # 9: raport po fali
+        if self.wave > 0 or self.endless_wave > 0:
+            kills = self.stats_kills - self._wave_kills_start
+            gold = self.stats_gold - self._wave_gold_start
+            lives_lost = self._wave_start_lives - self.lives
+            # MVP: wieza z najwieksza liczba zabojstw
+            mvp = max(self.towers, key=lambda t: t.kills, default=None)
+            mvp_text = f"{mvp.name} ({mvp.kills})" if mvp else "-"
+            report = f"Fala {self.wave + 1}: {kills} zabitych, -{lives_lost} zyc, +{gold}$ | MVP: {mvp_text}"
+            self.wave_report = [report, 240]
+        self._wave_kills_start = self.stats_kills
+        self._wave_gold_start = self.stats_gold
         if self.endless:
             # Tryb endless: generuj fale proceduralnie z rosnacym HP
             self.endless_wave += 1
@@ -195,6 +216,13 @@ class Game:
                 elif mod == "swarm":
                     self.current_wave = [int(c * 1.5) for c in self.current_wave]
                     self.wave_banner_text += " [SWARM!]"
+            # 7: deszcz na losowych falach (20% szansy, nie na bossach)
+            self.raining = False
+            if wave_num % 4 != 0 and wave_num != 10 and random.random() < 0.2:
+                self.raining = True
+                self.wave_banner_text += " [DESZCZ]"
+                self.raindrops = [(random.randint(0, self.width), random.randint(0, self.height),
+                                   random.randint(8, 14)) for _ in range(100)]
             # Boss na falach 4 i 8; fala 10 (ostatnia) to sam boss FINALNY.
             # Boss spawnuje sie dopiero gdy statek zadokuje (pending_boss).
             if (self.wave + 1) % 4 == 0 and self.wave + 1 < 10:
@@ -266,12 +294,32 @@ class Game:
                     # U10: R - pokaz/ukryj wszystkie zasiegi
                     if event.key == pygame.K_r:
                         self.show_all_ranges = not self.show_all_ranges
+                    # Q7: Ctrl+Z - cofnij postawienie wiezy
+                    if event.key == pygame.K_z and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                        if self.last_placed:
+                            tw, cost = self.last_placed
+                            if tw in self.towers:
+                                self.towers.remove(tw)
+                                self.money += cost
+                                if self.selected_tower is tw:
+                                    self.selected_tower = None
+                            self.last_placed = None
+                    # Q10: F - przelacz 1x/3x
+                    if event.key == pygame.K_f:
+                        self.speed = 3 if self.speed == 1 else 1
                     if event.key == pygame.K_s and self.selected_tower:
                         self.money += self.selected_tower.sell_value()
                         self.towers.remove(self.selected_tower)
                         self.selected_tower = None
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
+                    # Q3: Shift+klik = szybka sprzedaz wiezy
+                    keys = pygame.key.get_mods()
+                    if keys & pygame.KMOD_SHIFT and self.selected_tower:
+                        self.money += self.selected_tower.sell_value()
+                        self.towers.remove(self.selected_tower)
+                        self.selected_tower = None
+                        continue
                     # Ability dock - klikniecie aktywuje umiejetnosc
                     if hasattr(self, 'ability_slots'):
                         for rect, tname in self.ability_slots:
@@ -307,6 +355,8 @@ class Game:
                                 self.moving_object.menu.x, self.moving_object.menu.y = gx, gy
                                 self.moving_object.menu.update()
                                 self.towers.append(self.moving_object)
+                                # Q7: zapamietaj do Ctrl+Z
+                                self.last_placed = (self.moving_object, self.menu.get_item_cost(self.moving_object.name))
                             # else: niepoprawne - wieza znika (pieniadze przepadaja? nie - zwroc)
                             else:
                                 # Zwroc pieniadze za wieze
@@ -416,6 +466,11 @@ class Game:
             c[3] -= 1
             if c[3] <= 0:
                 self.corpses.remove(c)
+        # 9: raport po fali
+        if self.wave_report:
+            self.wave_report[1] -= 1
+            if self.wave_report[1] <= 0:
+                self.wave_report = None
         # V4: muzzle flashes
         for mf in self.muzzle_flashes[:]:
             mf[2] -= 1
@@ -455,6 +510,10 @@ class Game:
             if d.reached_end:
                 sound_1.play()
                 self.lives -= 1
+                # Q6: auto-pauza przy 3 zyciach
+                if self.lives == 3 and not self.paused:
+                    self.paused = True
+                    self.gold_notifications.append(["UWAGA: 3 zycia! Pauza.", 180])
             else:
                 # Wrog zabity pociskiem - kasa za niego.
                 # Golden Touch: podwojna kasa (oznaczeni lub globalny buff)
@@ -464,6 +523,9 @@ class Game:
                 # U8: RICH - +50% zlota
                 if self.wave_modifier == "rich":
                     reward = int(reward * 1.5)
+                # 7: deszcz +15% zlota
+                if self.raining:
+                    reward = int(reward * 1.15)
                 self.money += reward
                 # Trup zostaje na ziemi (ostatnia klatka animacji smierci)
                 if d.die_imgs:
@@ -477,6 +539,10 @@ class Game:
             self.enemies.remove(d)
 
         for tw in self.towers:
+            # 5: synergia - zapamietaj bonus przed atakiem
+            tw._synergy = tw.get_synergy_bonus(self.towers)
+            # 7: deszcz -10% zasiegu
+            tw._rain_mod = 0.9 if self.raining else 1.0
             if tw.attack(self.enemies, self.projectiles):
                 # V4: muzzle flash przy strzale
                 self.muzzle_flashes.append([tw.x, tw.y - 30, 6])
@@ -628,6 +694,18 @@ class Game:
     def draw(self):
         self.win.blit(self.bg, (0,0))
         self.ship.draw(self.win)
+        # 5: linia synergii miedzy wiezami tego samego typu
+        drawn_links = set()
+        for tw in self.towers:
+            if getattr(tw, '_synergy', 1.0) > 1.0:
+                for tw2 in self.towers:
+                    if tw2 is not tw and type(tw2).__name__ == type(tw).__name__:
+                        if math.hypot(tw2.x - tw.x, tw2.y - tw.y) < 100:
+                            key = tuple(sorted([id(tw), id(tw2)]))
+                            if key not in drawn_links:
+                                drawn_links.add(key)
+                                pygame.draw.line(self.win, (255, 215, 0, 120),
+                                               (tw.x, tw.y - 20), (tw2.x, tw2.y - 20), 2)
         for tw in self.towers:
             tw.draw(self.win)
             tw.draw_radius(self.win)
@@ -640,6 +718,31 @@ class Game:
             corpse = img.copy()
             corpse.set_alpha(alpha)
             self.win.blit(corpse, (x - corpse.get_width()/2, y - corpse.get_height()/2 - 35))
+        # 1: Uszkodzenia zamku (baza na koncu sciezki)
+        self.draw_castle_damage()
+        # 10: podglad trasy wroga na hover
+        self.draw_enemy_path_preview()
+        # Q9: podswietl wrogow w zasiegu wybranej wiezy
+        if self.selected_tower:
+            st = self.selected_tower
+            for en in self.enemies:
+                if en.dying or en.dead or en.reached_end:
+                    continue
+                if math.hypot(en.x - st.x, en.y - st.y) < st.range:
+                    pygame.draw.circle(self.win, (255, 255, 100, 100),
+                                     (int(en.x), int(en.y - 35)), 30, 2)
+        # 7: deszcz
+        if self.raining and not self.paused:
+            for i, (x, y, speed) in enumerate(self.raindrops):
+                y += speed
+                if y > self.height:
+                    y = -10
+                    x = random.randint(0, self.width)
+                self.raindrops[i] = (x, y, speed)
+                pygame.draw.line(self.win, (150, 180, 220, 120), (x, y), (x - 3, y + 12), 2)
+        elif self.raining:
+            for x, y, speed in self.raindrops:
+                pygame.draw.line(self.win, (150, 180, 220, 120), (x, y), (x - 3, y + 12), 2)
         for en in self.enemies:
             en.draw(self.win)
         for proj in self.projectiles:
@@ -777,10 +880,115 @@ class Game:
         if self.moving_object:
             self.draw_placement_grid(self.win, self.moving_object.x, self.moving_object.y)
         
+        # 9: raport po fali
+        if self.wave_report:
+            text, timer = self.wave_report
+            rfont = pygame.font.SysFont("arial", 16)
+            label = rfont.render(text, True, (220, 230, 240))
+            bg_w = label.get_width() + 30
+            bg = pygame.Surface((bg_w, 36), pygame.SRCALPHA)
+            pygame.draw.rect(bg, (15, 25, 40, 220), bg.get_rect(), border_radius=18)
+            pygame.draw.rect(bg, (100, 150, 200, 120), bg.get_rect(), 1, border_radius=18)
+            bx = self.width // 2 - bg_w // 2
+            by = self.height - 120
+            self.win.blit(bg, (bx, by))
+            self.win.blit(label, (bx + 15, by + 18 - label.get_height() // 2))
+        
+        # 8: wskaznik pauzy z informacja o budowaniu
+        if self.paused:
+            pfont = pygame.font.SysFont("arial", 36, bold=True)
+            plabel = pfont.render("PAUZA", True, (255, 255, 255))
+            sfont = pygame.font.SysFont("arial", 16)
+            slabel = sfont.render("mozesz stawiac i ulepszac wieze", True, (200, 200, 200))
+            px = self.width // 2 - plabel.get_width() // 2
+            py = 60
+            # Polprzezroczyste tlo
+            bg = pygame.Surface((plabel.get_width() + 40, 70), pygame.SRCALPHA)
+            pygame.draw.rect(bg, (0, 0, 0, 150), bg.get_rect(), border_radius=12)
+            self.win.blit(bg, (px - 20, py - 10))
+            self.win.blit(plabel, (px, py))
+            self.win.blit(slabel, (self.width//2 - slabel.get_width()//2, py + 42))
+        
+        # Q1: pasek postepu fali
+        total_to_spawn = sum(self.current_wave)
+        spawned = getattr(self, '_wave_total', total_to_spawn + len(self.enemies))
+        if not hasattr(self, '_wave_total') or total_to_spawn == 0 and len(self.enemies) == 0:
+            # Reset przy nowej fali
+            pass
+        remaining = total_to_spawn + len(self.enemies)
+        # Q2: ostrzezenie o bossie
+        next_is_boss = (self.wave + 2) % 4 == 0 or self.wave + 2 == 10
+        if next_is_boss and self.waiting_for_clear and not hasattr(self, '_boss_warned'):
+            self._boss_warned = True
+            self.wave_banner_text = "UWAGA: BOSS NADCHODZI!"
+            self.wave_banner_timer = 150
+        if not self.waiting_for_clear:
+            self._boss_warned = False
+        
         self.menu.draw(self.win)
         self.draw_hud()
 
         pygame.display.update()
+
+    def draw_castle_damage(self):
+        """1: Wizualne uszkodzenia zamku zaleza od liczby zyc."""
+        cx, cy = 300, 375  # koniec sciezki (baza)
+        t = pygame.time.get_ticks() / 1000.0
+        if self.lives <= 15:
+            # Pekniecia
+            for x1, y1, x2, y2 in [(cx-20, cy-30, cx-5, cy-10), (cx+15, cy-35, cx+5, cy-15),
+                                    (cx-10, cy+10, cx-25, cy+30)]:
+                pygame.draw.line(self.win, (40, 40, 40), (x1, y1), (x2, y2), 3)
+        if self.lives <= 10:
+            # Dym (3 smugi)
+            for i in range(3):
+                sx = cx - 20 + i * 20
+                sy = cy - 50 - ((t * 30 + i * 20) % 40)
+                alpha = int(120 * (1 - ((t * 30 + i * 20) % 40) / 40))
+                s = pygame.Surface((24, 24), pygame.SRCALPHA)
+                pygame.draw.circle(s, (100, 100, 100, alpha), (12, 12), 10)
+                self.win.blit(s, (sx - 12, sy - 12))
+        if self.lives <= 5:
+            # Ogien (plomienie)
+            for i in range(4):
+                fx = cx - 30 + i * 20
+                fy = cy - 20
+                h = 18 + 8 * math.sin(t * 8 + i * 1.5)
+                pts = [(fx - 8, fy), (fx, fy - h), (fx + 8, fy)]
+                pygame.draw.polygon(self.win, (255, 120, 20), pts)
+                pts2 = [(fx - 4, fy), (fx, fy - h * 0.6), (fx + 4, fy)]
+                pygame.draw.polygon(self.win, (255, 220, 80), pts2)
+
+    def draw_enemy_path_preview(self):
+        """10: Po najechaniu na wroga pokazuje jego trase do bazy i ETA.
+        Q4: Dokladne HP wroga."""
+        mx, my = pygame.mouse.get_pos()
+        for en in self.enemies:
+            if en.dying or en.dead or en.reached_end:
+                continue
+            if math.hypot(mx - en.x, my - (en.y - 35)) < 35:
+                # Rysuj pozostala trase
+                pts = [(en.x, en.y)]
+                for i in range(en.path_pos, len(en.path)):
+                    pts.append(en.path[i])
+                if len(pts) > 1:
+                    pygame.draw.lines(self.win, (255, 255, 100, 180), False, pts, 3)
+                # ETA: pozostaly dystans / predkosc
+                remaining = 0
+                px, py = en.x, en.y
+                for i in range(en.path_pos, len(en.path)):
+                    x2, y2 = en.path[i]
+                    remaining += math.hypot(x2 - px, y2 - py)
+                    px, py = x2, y2
+                eff_vel = en.velocity * 0.5 if en.slow_timer > 0 else en.velocity
+                eta = remaining / (eff_vel / 3.0 * 60) if eff_vel > 0 else 0
+                efont = pygame.font.SysFont("arial", 14, bold=True)
+                elabel = efont.render(f"{eta:.1f}s do bazy", True, (255, 255, 150))
+                self.win.blit(elabel, (en.x - elabel.get_width()//2, en.y - 95))
+                # Q4: dokladne HP
+                hlabel = efont.render(f"HP: {int(en.health)}/{en.max_health}", True, (255, 180, 180))
+                self.win.blit(hlabel, (en.x - hlabel.get_width()//2, en.y - 115))
+                break
 
     def draw_ability_dock(self):
         """Pasek 5 umiejetnosci (po jednej na typ wiezy). Kliknij aby aktywowac."""
@@ -915,6 +1123,30 @@ class Game:
                 gx = x + w // 2 - group_w // 2
                 self.win.blit(ic, (gx, y + pill_h // 2 - ic.get_height() // 2))
                 self.win.blit(label, (gx + ic.get_width() + 8, cy))
+        # Q1: pasek postepu fali (pozostali wrogowie)
+        remaining = sum(self.current_wave) + len(self.enemies)
+        if remaining > 0:
+            pw, ph = 180, 14
+            px, py = 10, 58
+            bg = pygame.Surface((pw, ph), pygame.SRCALPHA)
+            pygame.draw.rect(bg, (0, 0, 0, 150), bg.get_rect(), border_radius=7)
+            self.win.blit(bg, (px, py))
+            # Pasek maleje wraz z postepem
+            total = getattr(self, '_wave_enemy_total', remaining)
+            if remaining > total:
+                total = remaining
+                self._wave_enemy_total = total
+            ratio = 1.0 - (remaining / total) if total > 0 else 1.0
+            fill_w = int(pw * ratio)
+            if fill_w > 0:
+                fg = pygame.Surface((fill_w, ph), pygame.SRCALPHA)
+                pygame.draw.rect(fg, (100, 200, 100), fg.get_rect(), border_radius=7)
+                self.win.blit(fg, (px, py))
+            qfont = pygame.font.SysFont("arial", 12)
+            qlabel = qfont.render(f"Wrogowie: {remaining}", True, (220, 220, 220))
+            self.win.blit(qlabel, (px + pw + 8, py - 1))
+        else:
+            self._wave_enemy_total = 0
         # Przyciski pauzy i predkosci (prawy gorny rog)
         for rect, text in [(self.pause_btn_rect, "II" if not self.paused else "▶"),
                            (self.speed_btn_rect, f"{self.speed}x")]:
@@ -956,6 +1188,13 @@ class Game:
             if (self.wave + 2) % 4 == 0:
                 boss_label = font_small.render("BOSS!", True, (255, 50, 50))
                 self.win.blit(boss_label, (x_off, preview_y + 15))
+            # Q5: prognoza zlota za nastepna fale
+            gold_forecast = sum(c * self.enemy_classes[i]().money 
+                              for i, c in enumerate(next_wave) if c > 0)
+            if (self.wave + 2) % 4 == 0:
+                gold_forecast += 150
+            glabel = font_small.render(f"~{gold_forecast}$", True, (255, 215, 0))
+            self.win.blit(glabel, (preview_x + 8, preview_y + 42))
         # Priorytet celowania wybranej wiezy
         if self.selected_tower:
             font_small = pygame.font.SysFont("arial", 16)

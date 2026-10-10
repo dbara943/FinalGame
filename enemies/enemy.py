@@ -51,11 +51,23 @@ class Enemy:
         self.base_velocity = 3
         self.flash_timer = 0  # V1: bialy blysk przy trafieniu
         self.last_hit_by = None  # R5: wieza ktora zadala ostatni cios
+        self.elite = False  # 6: elitarny wrog (3x HP, 5x zlota)
+
+    def make_elite(self):
+        """6: Zamienia w elitarnego (3x HP, 5x zlota)."""
+        if not self.elite:
+            self.elite = True
+            self.max_health *= 3
+            self.health = self.max_health
+            self.money *= 5
 
     def draw(self, win):
         # Czyste rysowanie - bez zmiany stanu (stan zmienia update()).
         if self.img is None:
             return
+        # 6: zlota obwiednia dla elitarnych
+        if self.elite:
+            pygame.draw.circle(win, (255, 215, 0, 150), (int(self.x), int(self.y - 35)), 34, 3)
         # V5: miekki cien pod wrogiem (gradientowy, nie twarda elipsa)
         self._draw_soft_shadow(win, self.x, self.y + 18, 50, 14)
         img_to_draw = self.img
