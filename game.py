@@ -57,6 +57,16 @@ sound_lose = pygame.mixer.Sound("sounds/lose.wav")
 sound_roar = pygame.mixer.Sound("sounds/roar.wav")
 sound_levelup = pygame.mixer.Sound("sounds/levelup.wav")
 sound_horn = pygame.mixer.Sound("sounds/horn.wav")
+sound_rain = pygame.mixer.Sound("sounds/rain.wav")
+sound_gull = pygame.mixer.Sound("sounds/gull.wav")
+sound_fanfare = pygame.mixer.Sound("sounds/fanfare.wav")
+shoot_sounds = {
+    "WoodenTower": pygame.mixer.Sound("sounds/shoot_wood.wav"),
+    "MetalTower": pygame.mixer.Sound("sounds/shoot_metal.wav"),
+    "GoldenTower": pygame.mixer.Sound("sounds/shoot_gold.wav"),
+    "FireTower": pygame.mixer.Sound("sounds/shoot_fire.wav"),
+    "BlazeTower": pygame.mixer.Sound("sounds/shoot_blaze.wav"),
+}
 
 class Game:
     def __init__(self, lives=20, money=200, sound=True):
@@ -103,6 +113,21 @@ class Game:
         # Efekty wizualne
         self.particles = ParticleSystem()
         self.coins = []  # Latajace monety
+        self.chests = []  # 21: skrzynie skarbow [x, y, timer]
+        self.kill_streak = []  # 37: znaczniki zabojstw
+        self.announcements = []  # 37: ogloszenia [tekst, timer]
+        self.gull_timer = 900  # 39: krakanie mew
+        # Ambient wizualny 11-25
+        self.fishes = []  # 12: skaczace rybki [x, y, vx, vy, t, kolor]
+        self.fish_timer = 200
+        self.balloon = None  # 14: balon [x, y]
+        self.balloon_timer = 1800
+        self.whale_timer = 2400  # 15: wieloryb
+        self.whale = None  # [x, t]
+        self.crabs = [[250 + i * 60, 660, random.random() * 6, 1] for i in range(3)]  # 17: [x, y, faza, kier]
+        self.octo_timer = 3000  # 18: osmiornica
+        self.octo = None  # [x, t]
+        self.chameleon_hue = 0  # 25: kameleon
         self.shockwaves = []  # Kregi uderzeniowe
         self.screen_shake = 0  # Wstrzas ekranu
         self.scorch_marks = []  # Spalenizna [(x, y, timer)]
@@ -129,7 +154,8 @@ class Game:
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
                       tower_sound_1, tower_sound_2, tower_sound_3,
                       tower_sound_4, tower_sound_5, sound_win, sound_lose, sound_roar,
-                      sound_levelup, sound_horn):
+                      sound_levelup, sound_horn, sound_rain, sound_gull, sound_fanfare,
+                      *shoot_sounds.values()):
                 s.set_volume(0)
         self.bg = pygame.image.load(os.path.join("images", "bg_noship.png"))
         self.bg = pygame.transform.scale(self.bg, (self.width, self.height))
@@ -200,6 +226,7 @@ class Game:
             self.wave_report = [report, 240]
         self._wave_kills_start = self.stats_kills
         self._wave_gold_start = self.stats_gold
+        sound_fanfare.play()  # 40: fanfara fali
         if self.endless:
             # Tryb endless: generuj fale proceduralnie z rosnacym HP
             self.endless_wave += 1
@@ -255,10 +282,12 @@ class Game:
             self.raining = False
             if wave_num % 4 != 0 and wave_num != 10 and random.random() < 0.2:
                 self.raining = True
-                self.wave_banner_text += " [DESZCZ]"
+                self.wave_banner_text += " [RAIN]"
                 self.raindrops = [(random.randint(0, self.width), random.randint(0, self.height),
                                    random.randint(8, 14)) for _ in range(100)]
+                sound_rain.play(loops=-1)  # 38: szum deszczu
             elif was_raining:
+                sound_rain.stop()
                 # B4: tecza po deszczu
                 self._rainbow_timer = 600  # 10s
             # Boss na falach 4 i 8; fala 10 (ostatnia) to sam boss FINALNY.
@@ -361,11 +390,15 @@ class Game:
                         self.muted = not self.muted
                         if self.muted:
                             pygame.mixer.music.pause()
+                            sound_rain.stop()
                         else:
                             pygame.mixer.music.unpause()
+                            if self.raining:
+                                sound_rain.play(loops=-1)
                         vol = 0 if self.muted else 1
                         for s in (sound_1, sound_2, sound_3, sound_4, sound_5, sound_win, sound_lose, sound_roar,
-                                  sound_levelup, sound_horn):
+                                  sound_levelup, sound_horn, sound_rain, sound_gull, sound_fanfare,
+                                  *shoot_sounds.values()):
                             s.set_volume(vol)
                     # Q11: F5 - zapis, F9 - wczytaj
                     if event.key == pygame.K_F5:
@@ -561,6 +594,12 @@ class Game:
             if sc[2] <= 0:
                 self.scorch_marks.remove(sc)
         self.game_time += 1
+        # 39: losowe krakanie mew
+        self.gull_timer -= 1
+        if self.gull_timer <= 0:
+            self.gull_timer = random.randint(1200, 2400)
+            if not self.muted:
+                sound_gull.play()
         # Q14: kolejka budowy - stawiaj po kolei
         if self.build_queue and not self.moving_object:
             name, gx, gy = self.build_queue[0]
@@ -664,6 +703,18 @@ class Game:
                     d.last_hit_by.kills += 1
                 self.stats_kills += 1
                 self.stats_gold += reward
+                # 21: skrzynia skarbow po bossie
+                if isinstance(d, Boss):
+                    self.chests.append([d.x, d.y, 0])
+                # 37: spiker serii zabojstw
+                now = pygame.time.get_ticks()
+                self.kill_streak = [t for t in getattr(self, 'kill_streak', []) if now - t < 3000]
+                self.kill_streak.append(now)
+                n = len(self.kill_streak)
+                if n == 2: self.announce("DOUBLE KILL!")
+                elif n == 3: self.announce("TRIPLE KILL!")
+                elif n == 5: self.announce("RAMPAGE!")
+                elif n == 8: self.announce("UNSTOPPABLE!")
             self.enemies.remove(d)
 
         for tw in self.towers:
@@ -853,6 +904,7 @@ class Game:
         # Wizualne: niebo i woda
         self.draw_sky_effects()
         self.draw_water_effects()
+        self.draw_ambient_life()
         # B1: cykl dnia/nocy - przyciemnienie
         self.draw_day_night()
         self.ship.draw(self.win)
@@ -1158,6 +1210,8 @@ class Game:
                                   (fp[0]-15, fp[1]-8, 30, 16))
         # Ognisko z tanczacymi
         self.draw_campfire()
+        self.draw_chests()
+        self.draw_announcements()
         # Q17: zegar sesji
         mins = self.game_time // 3600
         secs = (self.game_time // 60) % 60
@@ -1242,6 +1296,245 @@ class Game:
                 hlabel = efont.render(f"HP: {int(en.health)}/{en.max_health}", True, (255, 180, 180))
                 self.win.blit(hlabel, (en.x - hlabel.get_width()//2, en.y - 95))
                 break
+
+    def announce(self, text):
+        """37: ogloszenie spikera."""
+        self.announcements.append([text, 120])
+
+    def draw_chests(self):
+        """21: skrzynie skarbow po bossie (otwieranie + monety)."""
+        for ch in self.chests[:]:
+            ch[2] += 1
+            t = ch[2]
+            x, y = ch[0], ch[1]
+            # Skrzynia
+            pygame.draw.rect(self.win, (101, 67, 33), (x - 22, y - 16, 44, 28), border_radius=4)
+            pygame.draw.rect(self.win, (70, 45, 20), (x - 22, y - 16, 44, 28), 2, border_radius=4)
+            # Wieko otwiera sie
+            lid_open = min(1.0, t / 60)
+            lid_y = y - 16 - int(18 * lid_open)
+            pygame.draw.rect(self.win, (130, 90, 45), (x - 22, lid_y, 44, 12), border_radius=4)
+            # Blask zlota
+            if t > 40:
+                glow = int(120 + 60 * math.sin(t * 0.2))
+                s = pygame.Surface((70, 50), pygame.SRCALPHA)
+                pygame.draw.ellipse(s, (255, 215, 0, glow), s.get_rect())
+                self.win.blit(s, (x - 35, y - 45))
+                if t == 60:
+                    self.particles.burst(x, y - 20, (255, 215, 0), count=25, speed=4, size=4)
+            if t > 300:
+                self.chests.remove(ch)
+
+    def draw_announcements(self):
+        """37: duze napisy spikera."""
+        for a in self.announcements[:]:
+            a[1] -= 1
+            if a[1] <= 0:
+                self.announcements.remove(a)
+                continue
+            alpha = min(255, a[1] * 4)
+            f = pygame.font.SysFont("arial", 44, bold=True)
+            label = f.render(a[0], True, (255, 210, 60))
+            label.set_alpha(alpha)
+            # Kontur
+            s = pygame.Surface((label.get_width() + 8, label.get_height() + 8), pygame.SRCALPHA)
+            s.blit(label, (4, 4))
+            self.win.blit(s, (self.width // 2 - s.get_width() // 2, 180))
+
+    def draw_ambient_life(self):
+        """11-20, 22-25: zycie na wyspie."""
+        t = pygame.time.get_ticks() / 1000.0
+        phase = (self.wave // 2) % 4
+        night = (phase == 2)
+
+        # 11: wodospad na skale
+        wx, wy = 1085, 250
+        pygame.draw.rect(self.win, (110, 110, 120), (wx - 14, wy - 60, 28, 70), border_radius=6)
+        for i in range(6):
+            fy = wy - 55 + ((t * 120 + i * 22) % 65)
+            pygame.draw.line(self.win, (180, 220, 255, 160), (wx - 8 + i * 3, fy), (wx - 8 + i * 3, fy + 14), 2)
+        # Piana u dolu
+        for i in range(4):
+            px = wx - 12 + i * 8 + 3 * math.sin(t * 3 + i)
+            pygame.draw.circle(self.win, (255, 255, 255, 140), (int(px), wy + 12), 4)
+
+        # 13: wulkan na horyzoncie + dym
+        vx = 620
+        pygame.draw.polygon(self.win, (90, 80, 85), [(vx - 45, 45), (vx, 0), (vx + 45, 45)])
+        pygame.draw.polygon(self.win, (200, 90, 40), [(vx - 10, 12), (vx, 0), (vx + 10, 12)])
+        for i in range(3):
+            sx = vx + 8 * math.sin(t * 0.8 + i * 2)
+            sy = -10 - ((t * 12 + i * 25) % 70)
+            alpha = int(90 * (1 - ((t * 12 + i * 25) % 70) / 70))
+            pygame.draw.circle(self.win, (130, 130, 135, alpha), (int(sx), int(sy)), 10)
+
+        # 14: balon
+        self.balloon_timer -= 1
+        if self.balloon_timer <= 0 and self.balloon is None:
+            self.balloon = [-80, random.randint(60, 160)]
+            self.balloon_timer = random.randint(3000, 5000)
+        if self.balloon:
+            self.balloon[0] += 0.7
+            bx, by = self.balloon
+            # Powłoka w paski
+            for i, col in enumerate([(220, 60, 60), (255, 220, 80), (60, 140, 220)]):
+                pygame.draw.arc(self.win, col, (bx - 26, by - 30, 52, 44), math.pi / 2 + i * 0.5, math.pi / 2 + (i + 1) * 0.5, 9)
+            pygame.draw.circle(self.win, (220, 60, 60), (int(bx), int(by - 8)), 24, 0)
+            pygame.draw.rect(self.win, (101, 67, 33), (bx - 8, by + 16, 16, 12), border_radius=3)
+            pygame.draw.line(self.win, (80, 60, 40), (bx - 14, by + 8), (bx - 8, by + 16), 2)
+            pygame.draw.line(self.win, (80, 60, 40), (bx + 14, by + 8), (bx + 8, by + 16), 2)
+            if bx > self.width + 80:
+                self.balloon = None
+
+        # 12: teczowe rybki
+        self.fish_timer -= 1
+        if self.fish_timer <= 0:
+            self.fish_timer = random.randint(150, 400)
+            self.fishes.append([random.randint(150, 950), 655, random.uniform(-2, 2), -7,
+                                0, random.choice([(255, 120, 150), (120, 200, 255), (255, 220, 100), (150, 255, 180)])])
+        for f in self.fishes[:]:
+            f[4] += 1
+            f[0] += f[2]; f[1] += f[3]; f[3] += 0.35
+            pygame.draw.ellipse(self.win, f[5], (f[0] - 8, f[1] - 4, 16, 8))
+            if f[1] > 670:
+                self.fishes.remove(f)
+
+        # 15: wieloryb
+        self.whale_timer -= 1
+        if self.whale_timer <= 0 and self.whale is None:
+            self.whale = [random.randint(200, 900), 0]
+            self.whale_timer = random.randint(2800, 4500)
+        if self.whale:
+            self.whale[1] += 1
+            wt = self.whale[1]
+            x = self.whale[0]
+            # Wynurzenie: 0-60 w gore, 60-140 na gorze, 140-200 w dol
+            if wt < 200:
+                depth = -30 * math.sin(math.pi * min(1.0, wt / 200))
+                y = 660 + depth
+                pygame.draw.ellipse(self.win, (70, 90, 120), (x - 45, y - 14, 90, 28))
+                pygame.draw.polygon(self.win, (70, 90, 120), [(x + 35, y), (x + 55, y - 18), (x + 42, y)])
+                if 60 < wt < 140 and wt % 20 == 0:
+                    self.particles.burst(x - 10, y - 20, (200, 230, 255), count=4, speed=2, life=25, size=3, gravity=-0.1)
+            else:
+                self.whale = None
+
+        # 16: papugi na palmach
+        for px, py, col in [(205, 400, (220, 60, 60)), (215, 408, (60, 180, 80))]:
+            flap = 6 * math.sin(t * 10 + px)
+            pygame.draw.ellipse(self.win, col, (px - 7, py - 5, 14, 10))
+            pygame.draw.circle(self.win, col, (int(px + 8), int(py - 4)), 5)
+            pygame.draw.polygon(self.win, (255, 200, 60), [(px + 12, py - 4), (px + 17, py - 2), (px + 12, py)])
+            # Skrzydlo
+            pygame.draw.ellipse(self.win, (min(255, col[0]+40), min(255, col[1]+40), col[2]), (px - 9, py - 8 + flap * 0.3, 12, 6))
+
+        # 17: kraby na plazy
+        for cr in self.crabs:
+            cr[2] += 0.05 * cr[3]
+            cr[0] += 0.6 * cr[3]
+            if cr[0] > 1050: cr[3] = -1
+            if cr[0] < 80: cr[3] = 1
+            wob = 3 * math.sin(cr[2] * 8)
+            pygame.draw.ellipse(self.win, (200, 80, 60), (cr[0] - 9, cr[1] - 6 + wob * 0.3, 18, 12))
+            # Szczypce
+            pygame.draw.circle(self.win, (220, 100, 70), (int(cr[0] + 10 * cr[3]), int(cr[1] - 8)), 4)
+            # Nogi
+            for li in range(3):
+                pygame.draw.line(self.win, (170, 60, 45), (cr[0] - 6 + li * 6, cr[1] + 5), (cr[0] - 8 + li * 6, cr[1] + 11), 2)
+
+        # 18: macka osmiornicy
+        self.octo_timer -= 1
+        if self.octo_timer <= 0 and self.octo is None:
+            self.octo = [random.randint(150, 950), 0]
+            self.octo_timer = random.randint(3500, 5500)
+        if self.octo:
+            self.octo[1] += 1
+            ot = self.octo[1]
+            h = 70 * math.sin(math.pi * min(1.0, ot / 180)) if ot < 180 else 0
+            if h > 2:
+                x = self.octo[0]
+                sway = 12 * math.sin(t * 2)
+                pts = [(x, 665)]
+                for s in range(1, 6):
+                    pts.append((x + sway * s / 5, 665 - h * s / 5))
+                pygame.draw.lines(self.win, (150, 60, 120), False, pts, 9)
+                if ot >= 180:
+                    self.octo = None
+
+        # 19: latarnia morska (snop w nocy)
+        lx, ly = 60, 150
+        pygame.draw.polygon(self.win, (240, 240, 245), [(lx - 14, ly + 60), (lx - 8, ly), (lx + 8, ly), (lx + 14, ly + 60)])
+        pygame.draw.rect(self.win, (200, 60, 60), (lx - 10, ly - 14, 20, 14), border_radius=3)
+        if night:
+            glow = 150 + 60 * math.sin(t * 2)
+            pygame.draw.circle(self.win, (255, 240, 180, int(glow)), (lx, ly - 7), 8)
+            ang = t * 0.7
+            beam_len = 260
+            ex = lx + beam_len * math.cos(ang)
+            ey = ly - 7 + beam_len * math.sin(ang) * 0.35
+            s = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            pygame.draw.polygon(s, (255, 245, 200, 45), [(lx, ly - 7), (ex - 18, ey), (ex + 18, ey)])
+            self.win.blit(s, (0, 0))
+
+        # 20: wrak statku na skalach + mewy
+        rx, ry = 150, 610
+        pygame.draw.polygon(self.win, (90, 65, 40), [(rx - 40, ry), (rx + 40, ry), (rx + 25, ry - 28), (rx - 25, ry - 28)])
+        pygame.draw.line(self.win, (70, 50, 30), (rx, ry - 28), (rx + 6, ry - 70), 4)
+        pygame.draw.polygon(self.win, (200, 190, 170, 200), [(rx + 6, ry - 70), (rx + 34, ry - 58), (rx + 6, ry - 52)])
+        pygame.draw.circle(self.win, (110, 110, 115), (rx - 48, ry + 4), 10)
+        pygame.draw.circle(self.win, (110, 110, 115), (rx + 48, ry + 4), 12)
+
+        # 22: dmiace ruiny
+        ux, uy = 950, 360
+        for i, (cxo, h) in enumerate([(-18, 46), (0, 60), (18, 38)]):
+            pygame.draw.rect(self.win, (140, 135, 125), (ux + cxo - 7, uy - h, 14, h), border_radius=3)
+            pygame.draw.rect(self.win, (110, 105, 95), (ux + cxo - 10, uy - h - 8, 20, 8), border_radius=2)
+        for i in range(2):
+            sx = ux + i * 14 - 7 + 6 * math.sin(t + i * 2)
+            sy = uy - 66 - ((t * 14 + i * 40) % 50)
+            alpha = int(70 * (1 - ((t * 14 + i * 40) % 50) / 50))
+            pygame.draw.circle(self.win, (150, 150, 150, alpha), (int(sx), int(sy)), 7)
+
+        # 23: swiecace grzyby (noc)
+        if night:
+            for gx, gy in [(350, 555), (365, 560), (950, 470)]:
+                glow = 90 + 50 * math.sin(t * 3 + gx)
+                pygame.draw.circle(self.win, (120, 220, 255, int(glow)), (gx, gy - 6), 10)
+                pygame.draw.ellipse(self.win, (200, 120, 140), (gx - 6, gy - 10, 12, 10))
+                pygame.draw.rect(self.win, (230, 220, 200), (gx - 2, gy - 2, 4, 8))
+
+        # 24: pajeczyna z pajakiem
+        sx, sy = 1062, 52
+        for a in range(6):
+            ang = a * math.pi / 6
+            pygame.draw.line(self.win, (220, 220, 220, 90), (sx, sy),
+                             (sx + 34 * math.cos(ang), sy + 34 * math.sin(ang)), 1)
+        for r in (12, 22, 32):
+            pygame.draw.circle(self.win, (220, 220, 220, 70), (sx, sy), r, 1)
+        # Pajak czasem sie rusza
+        spx = sx + 10 * math.sin(t * 0.4)
+        spy = sy + 12 + 6 * math.sin(t * 0.9)
+        pygame.draw.line(self.win, (200, 200, 200, 120), (sx, sy), (spx, spy), 1)
+        pygame.draw.circle(self.win, (40, 40, 45), (int(spx), int(spy)), 4)
+        for li in range(4):
+            la = li * math.pi / 4 + math.sin(t * 2) * 0.2
+            pygame.draw.line(self.win, (40, 40, 45), (spx, spy),
+                             (spx + 8 * math.cos(la), spy + 8 * math.sin(la)), 1)
+
+        # 25: kameleon na lisciu
+        self.chameleon_hue = (self.chameleon_hue + 0.4) % 360
+        h = self.chameleon_hue
+        # Prosta konwersja HSV->RGB
+        c1 = abs((h / 60) % 2 - 1)
+        r_ = int(255 * (1 - c1 * 0.6)); g_ = int(200 + 55 * math.sin(math.radians(h))); b_ = int(150 + 80 * math.cos(math.radians(h * 1.3)))
+        kx, ky = 300, 480
+        pygame.draw.ellipse(self.win, (60, 140, 70), (kx - 26, ky - 6, 52, 16))
+        pygame.draw.ellipse(self.win, (r_, max(0,g_), max(0,b_)), (kx - 12, ky - 14, 24, 14))
+        pygame.draw.circle(self.win, (r_, max(0,g_), max(0,b_)), (kx + 14, ky - 12), 7)
+        pygame.draw.circle(self.win, (255, 255, 255), (kx + 16, ky - 13), 3)
+        pygame.draw.circle(self.win, (20, 20, 20), (kx + 17, ky - 13), 1.5)
+        # Ogon zwiniety
+        pygame.draw.arc(self.win, (r_, max(0,g_), max(0,b_)), (kx - 30, ky - 16, 18, 18), 0, math.pi * 1.5, 4)
 
     def draw_campfire(self):
         t = pygame.time.get_ticks() / 1000.0

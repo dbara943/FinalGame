@@ -23,6 +23,17 @@ pygame.mixer.Sound.set_volume(sound_3, 0.5)
 pygame.mixer.Sound.set_volume(sound_4, 0.5)
 pygame.mixer.Sound.set_volume(sound_5, 0.5)
 
+# 36: odglosy walki per typ wiezy
+shoot_snd = {
+    "WoodenTower": pygame.mixer.Sound("sounds/shoot_wood.wav"),
+    "MetalTower": pygame.mixer.Sound("sounds/shoot_metal.wav"),
+    "GoldenTower": pygame.mixer.Sound("sounds/shoot_gold.wav"),
+    "FireTower": pygame.mixer.Sound("sounds/shoot_fire.wav"),
+    "BlazeTower": pygame.mixer.Sound("sounds/shoot_blaze.wav"),
+}
+for _s in shoot_snd.values():
+    pygame.mixer.Sound.set_volume(_s, 0.35)
+
 # load archer tower
 tower_imgs1.append(pygame.transform.scale(
     pygame.image.load(os.path.join("images/turrets/towers", str(1) + ".png" )), (64, 64)))       
@@ -164,7 +175,7 @@ class WoodenTower(Tower):
             cooldown_ticks = 60  # 1s
             if self.attack_cooldown <= 0:
                 self.attack_cooldown = cooldown_ticks
-                sound_2.play()
+                shoot_snd.get(type(self).__name__, sound_2).play()
                 # 5: synergia +15% jesli sasiad tego samego typu
                 dmg = int(self.damage * getattr(self, '_synergy', 1.0))
                 splash = getattr(self, 'splash_radius', 0)
