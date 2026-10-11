@@ -140,7 +140,7 @@ class Game:
         self.timer = time.time()
         self.hud_font = pygame.font.SysFont("arial", 26, bold=True)
         self.selected_tower = None
-        self.menu = VerticalMenu(self.width - side_img.get_width() - 10, 250, side_img)
+        self.menu = VerticalMenu(self.width - 90, 250, side_img)
         self.menu.add_btn(t1_img, "t1", 100)
         self.menu.add_btn(t2_img, "t2", 200)
         self.menu.add_btn(t3_img, "t3", 300)
@@ -1121,11 +1121,7 @@ class Game:
             pygame.draw.polygon(self.win, (255, 220, 100),
                               [(tx-3, ty), (tx, ty-flame_h*0.6), (tx+3, ty)])
             pygame.draw.circle(self.win, (255, 200, 120, 60), (tx, ty-8), 18)
-        # Flaga na zamku
-        wave = math.sin(t * 4) * 5
-        pygame.draw.line(self.win, (100, 70, 40), (280, 280), (280, 250), 3)
-        pygame.draw.polygon(self.win, (200, 50, 50),
-                          [(280, 250), (305, 253 + wave), (280, 260)])
+
         # Motyle (dzien)
         phase = (self.wave // 2) % 4
         if phase in (0, 1):
@@ -1160,6 +1156,8 @@ class Game:
                 alpha = int(100 * fp[2] / 300)
                 pygame.draw.ellipse(self.win, (60, 50, 40, alpha),
                                   (fp[0]-15, fp[1]-8, 30, 16))
+        # Ognisko z tanczacymi
+        self.draw_campfire()
         # Q17: zegar sesji
         mins = self.game_time // 3600
         secs = (self.game_time // 60) % 60
@@ -1244,6 +1242,41 @@ class Game:
                 hlabel = efont.render(f"HP: {int(en.health)}/{en.max_health}", True, (255, 180, 180))
                 self.win.blit(hlabel, (en.x - hlabel.get_width()//2, en.y - 95))
                 break
+
+    def draw_campfire(self):
+        t = pygame.time.get_ticks() / 1000.0
+        cx, cy = 780, 580
+        for i in range(8):
+            ang = i * math.pi / 4
+            pygame.draw.circle(self.win, (120, 120, 120),
+                             (int(cx + 18 * math.cos(ang)), int(cy + 10 * math.sin(ang))), 6)
+        pygame.draw.line(self.win, (101, 67, 33), (cx - 12, cy), (cx + 12, cy - 8), 4)
+        for i, (col, h) in enumerate([((255, 80, 20), 28), ((255, 160, 40), 20), ((255, 230, 120), 12)]):
+            fh = h + 6 * math.sin(t * 12 + i * 2)
+            pygame.draw.polygon(self.win, col, [(cx - 10 + i*2, cy), (cx, cy - fh), (cx + 10 - i*2, cy)])
+        if random.random() < 0.3:
+            self.particles.burst(cx, cy - 20, (255, 180, 80), count=1, speed=1, life=20, size=2, gravity=-0.12)
+        mx = cx - 45 + 8 * math.sin(t * 3)
+        my = cy + 5 - abs(10 * math.sin(t * 6))
+        pygame.draw.circle(self.win, (255, 200, 170), (int(mx), int(my - 28)), 8)
+        pygame.draw.line(self.win, (70, 50, 120), (mx, my - 20), (mx, my), 4)
+        ls = 8 * math.sin(t * 6)
+        pygame.draw.line(self.win, (50, 50, 80), (mx, my), (mx - 8 + ls, my + 14), 3)
+        pygame.draw.line(self.win, (50, 50, 80), (mx, my), (mx + 8 - ls, my + 14), 3)
+        sa = -0.5 + 0.4 * math.sin(t * 6)
+        sx2, sy2 = mx + 25 * math.cos(sa), (my - 20) + 25 * math.sin(sa)
+        pygame.draw.line(self.win, (101, 67, 33), (mx + 5, my - 15), (sx2, sy2), 3)
+        pygame.draw.polygon(self.win, (180, 180, 180), [(sx2, sy2), (sx2 - 8, sy2 + 4), (sx2 - 4, sy2 - 6)])
+        wx = cx + 45 + 8 * math.cos(t * 2.5)
+        wy = cy + 5
+        spin = t * 4
+        pygame.draw.polygon(self.win, (220, 100, 150), [(wx, wy - 20), (wx - 12, wy + 8), (wx + 12, wy + 8)])
+        pygame.draw.circle(self.win, (255, 210, 180), (int(wx), int(wy - 28)), 7)
+        pygame.draw.circle(self.win, (150, 80, 40),
+                         (int(wx + 10 * math.cos(spin)), int(wy - 30 + 6 * math.sin(spin))), 4)
+        panx, pany = wx + 20 * math.cos(spin + 1), (wy - 15) + 12 * math.sin(spin + 1)
+        pygame.draw.line(self.win, (255, 210, 180), (wx, wy - 18), (panx, pany), 3)
+        pygame.draw.circle(self.win, (80, 80, 80), (int(panx), int(pany)), 7)
 
     def draw_day_night(self):
         """B1: Cykl dnia/nocy - przyciemnienie co 2 fale."""
@@ -1501,7 +1534,7 @@ class Game:
             return False
         # Na drodze (punkty sciezki wroga)
         path = [(480, 590), (600, 560), (750, 530), (900, 495),
-                (1000, 460), (1050, 430), (1000, 385),
+                (980, 460), (1020, 430), (980, 385),
                 (800, 375), (600, 370), (400, 365), (280, 355)]
         for i in range(len(path) - 1):
             x1, y1 = path[i]

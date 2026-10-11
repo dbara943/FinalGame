@@ -71,17 +71,7 @@ class Tower:
                 pts.append((sx + r * math.cos(ang), sy + r * math.sin(ang)))
             pygame.draw.polygon(win, (255, 215, 0), pts)
             pygame.draw.polygon(win, (180, 140, 0), pts, 1)
-        # B2: flaga wiezy (powiewa)
-        t = pygame.time.get_ticks() / 1000.0
-        flag_colors = {"woodenTower": (139, 90, 43), "metalTower": (150, 150, 160),
-                       "goldenTower": (255, 215, 0), "fireTower": (255, 80, 40),
-                       "blazeTower": (180, 60, 200)}
-        fc = flag_colors.get(self.name, (200, 200, 200))
-        fx, fy = self.x + 25, self.y - img.get_height() // 2 - 20
-        pygame.draw.line(win, (100, 70, 40), (fx, fy), (fx, fy - 22), 2)
-        wave = math.sin(t * 5) * 4
-        flag_pts = [(fx, fy - 22), (fx + 18, fy - 19 + wave), (fx, fy - 12)]
-        pygame.draw.polygon(win, fc, flag_pts)
+
 
         if self.selected:
             # R3: linia celowania do aktualnego celu
