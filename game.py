@@ -1069,7 +1069,6 @@ class Game:
         self.draw_ambient_life()
         # B1: cykl dnia/nocy - przyciemnienie
         self.draw_day_night()
-        self.ship.draw(self.win)
         # Iskry z komina statku (gdy plynie)
         if self.ship.state in (self.ship.IN, self.ship.OUT) and self._frame % 5 == 0:
             self.particles.burst(self.ship.x, self.ship.y - 30, (255, 150, 50),
@@ -1141,6 +1140,8 @@ class Game:
                 pygame.draw.line(self.win, (150, 180, 220, 120), (x, y), (x - 3, y + 12), 2)
         for en in self.enemies:
             en.draw(self.win)
+        # Statek na wierzchu wrogow (nie wyglada dziwnie przy nachodzeniu)
+        self.ship.draw(self.win)
         for proj in self.projectiles:
             proj.draw(self.win)
         # Latajace liczby obrazen
