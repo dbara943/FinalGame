@@ -92,6 +92,9 @@ class Game:
         # Bufor gry 1124x720 - cala logika bez zmian
         self.win = pygame.Surface((self.width, self.height))
         self._fullscreen = True
+        self.show_menu = False  # menu ESC
+        self._show_help = False  # pod-ekran "How to Play"
+        self._menu_buttons = []  # [rect, action] - budowane w draw_menu
         # Konwersja formatu obrazkow po inicjalizacji display (szybszy blit)
         global lives_img, money_img, side_img, t1_img, t2_img, t3_img, t4_img, t5_img
         lives_img = lives_img.convert_alpha()
@@ -445,6 +448,14 @@ class Game:
                     # Spacja: pauza
                     if event.key == pygame.K_SPACE:
                         self.paused = not self.paused
+                    # ESC: menu pauzy
+                    if event.key == pygame.K_ESCAPE:
+                        if getattr(self, '_show_help', False):
+                            self._show_help = False
+                        else:
+                            self.show_menu = not getattr(self, 'show_menu', False)
+                            if self.show_menu:
+                                self.paused = True
                     # 1-5: wybor wiezy ze sklepu
                     if event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5):
                         idx = event.key - pygame.K_1
@@ -522,6 +533,16 @@ class Game:
                         self.selected_tower = None
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     pos = self._mouse_pos()
+                    # Menu ESC ma pierwszenstwo
+                    if self.show_menu:
+                        if self._show_help:
+                            self._show_help = False
+                        else:
+                            for rect, action in self._menu_buttons:
+                                if rect.collidepoint(pos):
+                                    self._menu_action(action)
+                                    break
+                        continue
                     # Przeciganie sklepu: klik na panel (poza przyciskami) = drag
                     if self.menu.get_rect().collidepoint(pos):
                         if not self.menu.get_clicked(pos[0], pos[1]):
@@ -1408,8 +1429,109 @@ class Game:
         
         self.menu.draw(self.win, self._mouse_pos())
         self.draw_hud()
+        # Menu ESC (na wierzchu)
+        if self.show_menu:
+            self.draw_pause_menu()
 
         self._present()
+
+    def _menu_action(self, action):
+        """Akcje przyciskow menu ESC."""
+        if action == "resume":
+            self.show_menu = False
+            self.paused = False
+        elif action == "restart":
+            self.show_menu = False
+            self.reset_game()
+        elif action == "help":
+            self._show_help = True
+        elif action == "sound":
+            self.muted = not self.muted
+            if self.muted:
+                pygame.mixer.music.pause()
+            else:
+                pygame.mixer.music.unpause()
+        elif action == "fullscreen":
+            self._fullscreen = not self._fullscreen
+            if self._fullscreen:
+                self._screen = pygame.display.set_mode(
+                    (self._native_w, self._native_h), pygame.FULLSCREEN)
+            else:
+                self._screen = pygame.display.set_mode((self._native_w, self._native_h))
+            self._native_w, self._native_h = self._screen.get_size()
+        elif action == "speed":
+            self.speed = {1: 2, 2: 3, 3: 1}[self.speed]
+        elif action == "quit":
+            pygame.quit()
+            raise SystemExit
+
+    def draw_pause_menu(self):
+        """Menu pauzy (ESC): wznow, restart, pomoc, dzwiek, fullscreen, predkosc, wyjscie."""
+        # Przyciemnienie tla
+        dim = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 140))
+        self.win.blit(dim, (0, 0))
+        # Panel
+        pw, ph = 340, 460
+        px, py = (self.width - pw) // 2, (self.height - ph) // 2
+        pygame.draw.rect(self.win, (25, 30, 38), (px, py, pw, ph), border_radius=16)
+        pygame.draw.rect(self.win, (70, 80, 95), (px, py, pw, ph), 2, border_radius=16)
+        title = self.font_p36.render("PAUSED", True, (255, 255, 255))
+        self.win.blit(title, (px + (pw - title.get_width()) // 2, py + 22))
+        # Przyciski
+        self._menu_buttons = []
+        mx, my = self._mouse_pos()
+        items = [
+            ("Resume", "resume"),
+            ("Restart Game", "restart"),
+            ("How to Play", "help"),
+            (f"Sound: {'ON' if not self.muted else 'OFF'}", "sound"),
+            (f"Fullscreen: {'ON' if self._fullscreen else 'OFF'}", "fullscreen"),
+            (f"Speed: {self.speed}x", "speed"),
+            ("Quit to Desktop", "quit"),
+        ]
+        by = py + 70
+        for label, action in items:
+            rect = pygame.Rect(px + 40, by, pw - 80, 44)
+            hover = rect.collidepoint(mx, my)
+            col = (55, 65, 80) if not hover else (75, 90, 110)
+            pygame.draw.rect(self.win, col, rect, border_radius=10)
+            if action == "quit":
+                pygame.draw.rect(self.win, (120, 50, 50), rect, 2, border_radius=10)
+            txt = self.font_btn18.render(label, True, (240, 240, 240))
+            self.win.blit(txt, (rect.x + (rect.w - txt.get_width()) // 2,
+                                rect.y + (rect.h - txt.get_height()) // 2))
+            self._menu_buttons.append((rect, action))
+            by += 54
+        # Pod-ekran pomocy
+        if self._show_help:
+            self.draw_help_overlay()
+
+    def draw_help_overlay(self):
+        hw, hh = 560, 440
+        hx, hy = (self.width - hw) // 2, (self.height - hh) // 2
+        pygame.draw.rect(self.win, (20, 25, 32), (hx, hy, hw, hh), border_radius=16)
+        pygame.draw.rect(self.win, (70, 80, 95), (hx, hy, hw, hh), 2, border_radius=16)
+        title = self.font_p36.render("HOW TO PLAY", True, (255, 215, 100))
+        self.win.blit(title, (hx + (hw - title.get_width()) // 2, hy + 20))
+        lines = [
+            "Build towers on grass to stop enemies.",
+            "Enemies follow the dirt path to your base.",
+            "Earn gold for kills, spend it in the SHOP.",
+            "",
+            "SPACE - pause | 1-5 - select tower | Q - ability",
+            "M - mute | F11 - fullscreen | ESC - menu",
+            "Click a tower to upgrade or sell it.",
+            "Golden enemies give 5x gold - prioritize them!",
+            "Survive all waves to win.",
+            "",
+            "ESC - back",
+        ]
+        y = hy + 70
+        for ln in lines:
+            t = self.font_btn18.render(ln, True, (220, 220, 220))
+            self.win.blit(t, (hx + 30, y))
+            y += 28
 
     def _present(self):
         """Wyswietla bufor 1124x720 w natywnej rozdzielczosci (smoothscale HQ)."""
