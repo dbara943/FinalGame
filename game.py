@@ -1341,23 +1341,29 @@ class Game:
                 self.chests.remove(ch)
 
     def draw_announcements(self):
-        """37: duze napisy spikera."""
-        for a in self.announcements[:]:
+        """37: duze napisy spikera - kazde na wlasnym poziomie, z ciemnym tlem."""
+        y_base, y_step = 150, 72
+        for idx, a in enumerate(self.announcements[:]):
             a[1] -= 1
             if a[1] <= 0:
                 self.announcements.remove(a)
                 continue
             alpha = min(255, a[1] * 4)
             f = pygame.font.SysFont("arial", 44, bold=True)
-            # Czarny kontur dla czytelnosci na jasnym tle
             outline = f.render(a[0], True, (20, 20, 20))
             label = f.render(a[0], True, (255, 210, 60))
-            s = pygame.Surface((label.get_width() + 8, label.get_height() + 8), pygame.SRCALPHA)
-            for ox, oy in [(-2, 0), (2, 0), (0, -2), (0, 2), (-2, -2), (2, 2), (-2, 2), (2, -2)]:
-                s.blit(outline, (4 + ox, 4 + oy))
-            s.blit(label, (4, 4))
+            # Ciemna pigulka za tekstem - kontrast na kazdym tle
+            pad_x, pad_y = 22, 10
+            bg_w = label.get_width() + pad_x * 2
+            bg_h = label.get_height() + pad_y * 2
+            s = pygame.Surface((bg_w, bg_h), pygame.SRCALPHA)
+            pygame.draw.rect(s, (0, 0, 0, 170), s.get_rect(), border_radius=20)
+            for ox, oy in [(-2, 0), (2, 0), (0, -2), (0, 2)]:
+                s.blit(outline, (pad_x + ox, pad_y + oy))
+            s.blit(label, (pad_x, pad_y))
             s.set_alpha(alpha)
-            self.win.blit(s, (self.width // 2 - s.get_width() // 2, 180))
+            y = y_base + idx * y_step
+            self.win.blit(s, (self.width // 2 - bg_w // 2, y))
 
     def draw_ambient_life(self):
         """11-20, 22-25: zycie na wyspie."""
