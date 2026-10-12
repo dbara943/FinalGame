@@ -80,7 +80,16 @@ class Game:
     def __init__(self, lives=20, money=200, sound=True):
         self.width = 1124
         self.height = 720
-        self.win = pygame.display.set_mode((self.width, self.height), pygame.SCALED | pygame.FULLSCREEN)
+        # Natywna rozdzielczosc ekranu (opcja C: render w pelnej rozdzielczosci)
+        if not pygame.display.get_init():
+            pygame.display.init()
+        _info = pygame.display.Info()
+        self._native_w, self._native_h = _info.current_w, _info.current_h
+        # Display w natywnej rozdzielczosci (bez SCALED - reczne smoothscale)
+        self._screen = pygame.display.set_mode((self._native_w, self._native_h), pygame.FULLSCREEN)
+        # Bufor gry 1124x720 - cala logika bez zmian
+        self.win = pygame.Surface((self.width, self.height))
+        self._fullscreen = True
         # Konwersja formatu obrazkow po inicjalizacji display (szybszy blit)
         global lives_img, money_img, side_img, t1_img, t2_img, t3_img, t4_img, t5_img
         lives_img = lives_img.convert_alpha()
@@ -402,7 +411,7 @@ class Game:
                             self.ship.sail_in()
                 else:
                     self.ship.sail_in()
-            pos = pygame.mouse.get_pos()                 
+            pos = self._mouse_pos()                 
             if self.moving_object:
                 self.moving_object.move(pos[0], pos[1])
             
@@ -411,8 +420,9 @@ class Game:
                     run = False
                 # Przeciganie sklepu
                 if event.type == pygame.MOUSEMOTION and self.menu_dragging:
-                    self.menu.x = max(100, min(self.width - 100, event.pos[0] + self.menu_drag_dx))
-                    self.menu.y = max(190, min(self.height - 190, event.pos[1] + self.menu_drag_dy))
+                    _gx, _gy = self._to_game_pos(event.pos)
+                    self.menu.x = max(100, min(self.width - 100, _gx + self.menu_drag_dx))
+                    self.menu.y = max(190, min(self.height - 190, _gy + self.menu_drag_dy))
                 if event.type == pygame.MOUSEBUTTONUP:
                     self.menu_dragging = False
                 if event.type == pygame.KEYDOWN:
@@ -421,12 +431,13 @@ class Game:
                         self.selected_tower.activate_ability(self.enemies, self.projectiles)
                     # F11: przelacz fullscreen / okno 1:1 (ostrzejsze piksele)
                     if event.key == pygame.K_F11:
-                        self._fullscreen = not getattr(self, '_fullscreen', True)
+                        self._fullscreen = not self._fullscreen
                         if self._fullscreen:
-                            self.win = pygame.display.set_mode(
-                                (self.width, self.height), pygame.SCALED | pygame.FULLSCREEN)
+                            self._screen = pygame.display.set_mode(
+                                (self._native_w, self._native_h), pygame.FULLSCREEN)
                         else:
-                            self.win = pygame.display.set_mode((self.width, self.height))
+                            # Okno w natywnej rozdzielczosci (czarne tlo, gra 1:1 na srodku)
+                            self._screen = pygame.display.set_mode((self._native_w, self._native_h))
                     # Spacja: pauza
                     if event.key == pygame.K_SPACE:
                         self.paused = not self.paused
@@ -506,7 +517,7 @@ class Game:
                         self._recalc_synergy()
                         self.selected_tower = None
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    pos = pygame.mouse.get_pos()
+                    pos = self._mouse_pos()
                     # Przeciganie sklepu: klik na panel (poza przyciskami) = drag
                     if self.menu.get_rect().collidepoint(pos):
                         if not self.menu.get_clicked(pos[0], pos[1]):
@@ -985,7 +996,7 @@ class Game:
         for i, s in enumerate(stats):
             label = stats_font.render(s, True, (200, 200, 200))
             self.win.blit(label, (self.width // 2 - label.get_width() // 2, self.height // 2 + 55 + i * 30))
-        pygame.display.update()
+        self._present()
         # Petla czeka na klikniecie przycisku (bez przerysowywania tla - brak migotania)
         waiting = True
         while waiting:
@@ -993,7 +1004,7 @@ class Game:
                 if event.type == pygame.QUIT:
                     return "quit"
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    pos = pygame.mouse.get_pos()
+                    pos = self._mouse_pos()
                     if restart_rect.collidepoint(pos):
                         return "restart"
                     if quit_rect.collidepoint(pos):
@@ -1013,7 +1024,7 @@ class Game:
                 label = small_font.render(label_text, True, (255, 255, 255))
                 self.win.blit(label, (rect.x + rect.width//2 - label.get_width()//2,
                                       rect.y + rect.height//2 - label.get_height()//2))
-            pygame.display.update()
+            self._present()
         return "quit"
         
     def draw(self):
@@ -1078,7 +1089,7 @@ class Game:
         # 10: podglad trasy wroga na hover (co 3. klatke - wydajnosc)
         if self._frame % 3 == 0:
             self._hover_enemy = None
-            mx, my = pygame.mouse.get_pos()
+            mx, my = self._mouse_pos()
             for en in self.enemies:
                 if en.dying or en.dead or en.reached_end:
                     continue
@@ -1232,7 +1243,7 @@ class Game:
         # U9: podglad zasiegu wiezy ze sklepu (hover)
         # Q12: porownanie DPS
         if not self.moving_object:
-            pos = pygame.mouse.get_pos()
+            pos = self._mouse_pos()
             hovered = self.menu.get_hovered(pos[0], pos[1])
             if hovered:
                 tmp = {"t1": WoodenTower, "t2": MetalTower, "t3": GoldenTower,
@@ -1394,7 +1405,34 @@ class Game:
         self.menu.draw(self.win)
         self.draw_hud()
 
-        pygame.display.update()
+        self._present()
+
+    def _present(self):
+        """Wyswietla bufor 1124x720 w natywnej rozdzielczosci (smoothscale HQ)."""
+        if self._fullscreen:
+            pygame.transform.smoothscale(self.win, (self._native_w, self._native_h), self._screen)
+        else:
+            # Okno 1:1 - bez skalowania, wycentrowane
+            self._screen.fill((0, 0, 0))
+            ox = (self._native_w - self.width) // 2
+            oy = (self._native_h - self.height) // 2
+            self._screen.blit(self.win, (ox, oy))
+        pygame.display.flip()
+
+    def _to_game_pos(self, pos):
+        """Przelicza wspolrzedne ekranu (natywne) na wspolrzedne gry (1124x720)."""
+        if self._fullscreen:
+            sx = self._native_w / self.width
+            sy = self._native_h / self.height
+            return (pos[0] / sx, pos[1] / sy)
+        else:
+            ox = (self._native_w - self.width) // 2
+            oy = (self._native_h - self.height) // 2
+            return (pos[0] - ox, pos[1] - oy)
+
+    def _mouse_pos(self):
+        """Pozycja myszy w wspolrzednych gry."""
+        return self._to_game_pos(pygame.mouse.get_pos())
 
     def draw_castle_damage(self):
         """1: Wizualne uszkodzenia zamku zaleza od liczby zyc."""
@@ -2019,7 +2057,7 @@ class Game:
                 boss_label = self._txt_boss
                 self.win.blit(boss_label, (x_off, preview_y + 15))
     def add_tower(self, name):
-        x, y = pygame.mouse.get_pos()
+        x, y = self._mouse_pos()
         name_list = ["t1", "t2", "t3", "t4", "t5"]
         object_list = [WoodenTower(x,y), MetalTower(x,y), GoldenTower(x,y), FireTower(x,y), BlazeTower(x,y)]
         
