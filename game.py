@@ -2477,8 +2477,8 @@ class Game:
             num_items = len(remaining) + (1 if has_boss else 0)
             panel_w = num_items * item_w + 20
             panel_h = 70
-            # Po prawej stronie, wycentrowany tekst
-            preview_x = self.width - panel_w - 20
+            # Z powrotem po lewej, pod wave/lives/cash
+            preview_x = 10
             preview_y = 65
             # Nowoczesne tlo - glassmorphism
             s = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
