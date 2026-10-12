@@ -4,11 +4,16 @@ import math
 
 class ParticleSystem:
     """Prosty system czasteczek do eksplozji, iskier, kurzu itd."""
+    MAX_PARTICLES = 400  # limit chroniacy przed spadkami FPS przy masakrze
     def __init__(self):
         self.particles = []  # [x, y, vx, vy, life, max_life, color, size, gravity]
 
     def burst(self, x, y, color, count=12, speed=3, life=30, size=4, gravity=0.1):
-        for _ in range(count):
+        # Nie przekraczaj limitu - odrzucaj nadwyzke zamiast lagowac
+        allowed = self.MAX_PARTICLES - len(self.particles)
+        if allowed <= 0:
+            return
+        for _ in range(min(count, allowed)):
             ang = random.uniform(0, math.pi * 2)
             sp = random.uniform(speed * 0.3, speed)
             self.particles.append([

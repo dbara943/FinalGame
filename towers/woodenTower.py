@@ -137,21 +137,34 @@ class WoodenTower(Tower):
     def change_range(self, r):
         self.range = r
 
-    def attack(self, enemies, projectiles):
+    def attack(self, enemies, projectiles, grid=None, grid_cell=120):
         self.inRange = False
         self.current_target = None
         enemy_closest = []
         shot_fired = False
 
-        for enemy in enemies:
+        # 7: deszcz zmniejsza zasieg (liczone raz, nie w petli)
+        eff_range = self.range * getattr(self, '_rain_mod', 1.0)
+        eff_range_sq = eff_range * eff_range
+        # Kandydaci: z siatki przestrzennej (tylko pobliskie komorki) lub wszyscy
+        if grid is not None:
+            candidates = []
+            cx0 = int((self.x - eff_range) // grid_cell)
+            cx1 = int((self.x + eff_range) // grid_cell)
+            cy0 = int((self.y - eff_range) // grid_cell)
+            cy1 = int((self.y + eff_range) // grid_cell)
+            for cx in range(cx0, cx1 + 1):
+                for cy in range(cy0, cy1 + 1):
+                    candidates.extend(grid.get((cx, cy), []))
+        else:
+            candidates = enemies
+        for enemy in candidates:
             if enemy.dying or enemy.dead or enemy.reached_end:
                 continue
-            x = enemy.x
-            y = enemy.y
-            dis = math.sqrt((self.x - x)**2 + (self.y - y)**2)
-            # 7: deszcz zmniejsza zasieg
-            eff_range = self.range * getattr(self, '_rain_mod', 1.0)
-            if dis < eff_range:
+            dx = self.x - enemy.x
+            dy = self.y - enemy.y
+            # Kwadrat odleglosci - bez kosztownego sqrt
+            if dx * dx + dy * dy < eff_range_sq:
                 self.inRange = True
                 enemy_closest.append(enemy)
         # Sortowanie wedlug priorytetu celowania
