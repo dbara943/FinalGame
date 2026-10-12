@@ -76,7 +76,7 @@ class Menu():
         holo = colors.get(tname, (0, 255, 204))
         panel_w, panel_h = 240, 160
         px = self.x - panel_w // 2
-        py = self.y - 130
+        py = self.y - 210  # calkowicie nad wieza (wieza w pelni widoczna)
         bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
         pygame.draw.rect(bg, (8, 14, 22, 220), bg.get_rect(), border_radius=8)
         pygame.draw.rect(bg, (*holo, 255), bg.get_rect(), 2, border_radius=8)
