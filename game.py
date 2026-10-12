@@ -282,10 +282,10 @@ class Game:
         self.selected_tower = None
         self.menu = VerticalMenu(self.width - 100, 250, side_img)
         self.menu.add_btn(t1_img, "t1", 100, damage=1)
-        self.menu.add_btn(t2_img, "t2", 200, damage=3)
-        self.menu.add_btn(t3_img, "t3", 300, damage=5)
-        self.menu.add_btn(t4_img, "t4", 400, damage=8)
-        self.menu.add_btn(t5_img, "t5", 500, damage=10)
+        self.menu.add_btn(t2_img, "t2", 500, damage=3)
+        self.menu.add_btn(t3_img, "t3", 750, damage=5)
+        self.menu.add_btn(t4_img, "t4", 1000, damage=8)
+        self.menu.add_btn(t5_img, "t5", 2000, damage=10)
         self.moving_object =  None
         self.menu_dragging = False  # przeciganie sklepu myszka
         self.menu_drag_dx = 0
@@ -837,6 +837,8 @@ class Game:
                     m = Forkman()
                     m.x, m.y = en.x - 30, en.y + 20
                     m.path_pos = en.path_pos
+                    m.update()  # inicjalizuj img zeby byly widoczne
+                    m.x, m.y = en.x - 30, en.y + 20
                     self.enemies.append(m)
                 self.gold_notifications.append(["Boss przywoluje posilki!", 120])
         to_del = []
@@ -2242,9 +2244,27 @@ class Game:
     
 if __name__ == "__main__":
     from menu.start_menu import StartMenu
+    # PRELOAD: tworzymy Game podczas ekranu ladowania, zeby PLAY bylo instant
+    # (ciezkie assety laduja sie teraz, nie po kliknieciu)
+    try:
+        _load_win.fill((20, 25, 35))
+        _lt2 = _lf.render("Loading game assets...", True, (200, 220, 255))
+        _load_win.blit(_lt2, (_lw//2 - _lt2.get_width()//2, _lh//2 + 20))
+        pygame.display.flip()
+    except Exception:
+        pass
+    g = Game(lives=20, money=200, sound=True)  # preload z domyslnymi
     start_menu = StartMenu(1124, 720, pygame.image.load(os.path.join("images", "bg.png")))
     settings = start_menu.run()
     if settings is not None:
-        g = Game(lives=settings["lives"], money=settings["money"], sound=settings["sound"])
+        # Zastosuj wybrane ustawienia do juz zaladowanej gry
+        g.lives = settings["lives"]
+        g.money = settings["money"]
+        g.sound = settings["sound"]
+        # Przywroc display gry (menu moglo go zmienic)
+        try:
+            g._screen = pygame.display.set_mode((g._native_w, g._native_h), pygame.FULLSCREEN)
+        except pygame.error:
+            g._screen = pygame.display.set_mode((g._native_w, g._native_h))
         g.run()
     pygame.quit()
