@@ -132,19 +132,6 @@ class Ship:
                     pygame.draw.ellipse(wake, (255, 255, 255, alpha),
                                       (i * 30, 5 + i * 2, 60 - i * 15, 10 - i * 2))
             win.blit(wake, (wx - 60, self.y + 20 + bob))
-        # Latarnie (swiecace punkty)
-        flicker = 0.7 + 0.3 * math.sin(t * 8)
-        for lx, ly in [(-80, -30), (80, -30)]:
-            # Pozycja wzgledem statku (uwzglednij flip)
-            if self.img is not self.base_img:  # flipniety
-                lx = -lx
-            px, py = int(self.x + lx), int(self.y + ly + bob)
-            # Glow
-            glow = pygame.Surface((24, 24), pygame.SRCALPHA)
-            pygame.draw.circle(glow, (255, 200, 80, int(100 * flicker)), (12, 12), 12)
-            pygame.draw.circle(glow, (255, 220, 120, int(150 * flicker)), (12, 12), 6)
-            win.blit(glow, (px - 12, py - 12))
-            pygame.draw.circle(win, (255, 230, 150), (px, py), 3)
         # Bryzgi przy dziobie gdy plynie
         if self.state in (Ship.IN, Ship.OUT, Ship.BOMBARD_SAIL) and int(t * 3) % 2 == 0:
             bx = self.x + (100 if self.from_left else -100)
