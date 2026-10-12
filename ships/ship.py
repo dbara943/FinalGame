@@ -8,7 +8,7 @@ class Ship:
     """Statek desantowy: przyplywa na kazda fale (losowo z lewej/prawej),
     cumuje w porcie, desantuje wrogow i odplywa."""
 
-    IN, DOCKED, OUT, AWAY = "in", "docked", "out", "away"
+    IN, DOCKED, OUT, AWAY, BOMBARD_SAIL, BOMBARD = "in", "docked", "out", "away", "bombard_sail", "bombard"
 
     def __init__(self, img_path, dock_x, dock_y, screen_w=1124):
         self.base_img = pygame.image.load(img_path)
@@ -45,6 +45,22 @@ class Ship:
         if self.state == Ship.DOCKED:
             self.state = Ship.OUT
 
+    def sail_to_bombard(self, tx, ty):
+        """Plynie na srodek oceanu przed bombardowaniem."""
+        self.bombard_tx = tx
+        self.bombard_ty = ty
+        self.state = Ship.BOMBARD_SAIL
+
+    def sail_out_from_bombard(self):
+        """Odplywa poza mape po bombardowaniu."""
+        # Plynie w strone z ktorej przypłynął
+        self.state = Ship.OUT
+        # Ustaw from_left tak zeby odplynal poza ekran
+        if self.x < self.screen_w // 2:
+            self.from_left = True  # odplynie w lewo
+        else:
+            self.from_left = False  # odplynie w prawo
+
     def update(self):
         if self.state == Ship.IN:
             step = self.speed if self.dock_x > self.x else -self.speed
@@ -53,6 +69,27 @@ class Ship:
                 self.state = Ship.DOCKED
             else:
                 self.x += step
+        elif self.state == Ship.BOMBARD_SAIL:
+            # Plynie do punktu bombardowania (srodek oceanu)
+            dx = self.bombard_tx - self.x
+            dy = self.bombard_ty - self.y
+            dist = max(1, (dx*dx + dy*dy) ** 0.5)
+            step = self.speed * 1.5  # szybciej niz normalnie
+            if dist <= step:
+                self.x = self.bombard_tx
+                self.y = self.bombard_ty
+                self.state = Ship.BOMBARD
+            else:
+                self.x += dx / dist * step
+                self.y += dy / dist * step
+                # Obróc sprite w kierunku ruchu
+                if dx > 0:
+                    self.img = self.base_img  # w prawo
+                else:
+                    self.img = pygame.transform.flip(self.base_img, True, False)  # w lewo
+        elif self.state == Ship.BOMBARD:
+            # Stoi w miejscu, gotowy do strzalu
+            pass
         elif self.state == Ship.OUT:
             # Statek plynie przodem w kierunku ruchu
             if self.from_left:

@@ -163,6 +163,14 @@ class Game:
         self.corpses = []  # Trupy wrogow: [img, x, y, timer]
         self.early_wave_rect = None  # R2: prostokat przycisku "Nastepna fala"
         self.wave_modifier = None  # U8: modyfikator fali (swift/rich/swarm)
+        # Bombardowanie cinematic
+        self.bombard_active = False  # czy cinematic trwa
+        self.bombard_phase = 0  # faza cinematic
+        self.bombard_timer = 0  # timer fazy
+        self.bombard_targets = []  # wieze do ostrzelania
+        self.bombard_index = 0  # ktora wieza aktualnie
+        self.bombard_zoom = 0  # 0=brak, 1=zoom in, 2=zoom out
+        self.bombard_zoom_tower = None  # wieza na ktora zoomujemy
         self.show_all_ranges = False  # U10: pokaz wszystkie zasiegi
         self.pending_boss = None  # Boss czeka na zadokowanie statku
         self.raining = False  # 7: deszcz
@@ -320,17 +328,21 @@ class Game:
             sound_roar.play()
             self.pending_boss = None
         if sum(self.current_wave) == 0:
-            # Rozladunek zakonczony - statek wyplywa, czekamy na wyczyszczenie planszy.
-            # Nastepna fala zacznie sie dopiero gdy nie bedzie wrogow na mapie.
+            # Rozladunek zakonczony - sprawdz bombardowanie lub wyplywamy
             if not self.waiting_for_clear:
                 self.waiting_for_clear = True
                 self._clear_timer = 0
-                try:
-                    with open("wave_debug.log", "a") as f:
-                        f.write(f"sail_out: wave={self.wave}, current_wave_sum={sum(self.current_wave)}\n")
-                except:
-                    pass
-                self.ship.sail_out()
+                # Bombardowanie: fala 4 (index 3) przy max zyciach, fala 8 (index 7) przy >polowy zyc
+                wave_num = self.wave + 1
+                should_bombard = False
+                if wave_num == 4 and self.lives >= self._start_lives:
+                    should_bombard = True
+                elif wave_num == 8 and self.lives > self._start_lives // 2:
+                    should_bombard = True
+                if should_bombard and not self.bombard_active:
+                    self._start_bombardment()
+                else:
+                    self.ship.sail_out()
         else:
             for i in range(len(self.current_wave)):
                 if self.current_wave[i] != 0:
@@ -401,9 +413,6 @@ class Game:
             self._wave_start_lives = self.lives
             self.wave_banner_text = f"WAVE {self.wave + 1}"  # V3
             self.wave_banner_timer = 120  # 2 sekundy
-            # Bombardowanie: fale 4 i 8, jesli gracz nie stracil zyc
-            if self.wave + 1 in (4, 8) and self.lives >= self._start_lives:
-                self._trigger_bombardment()
             # U8: modyfikator co 3 fale (nie na bossach)
             self.wave_modifier = None
             wave_num = self.wave + 1
@@ -439,29 +448,79 @@ class Game:
                 self.pending_boss = Boss(final=True)
                 self.wave_banner_text = "FINALNA FALA - BOSS!"
         self.waiting_for_clear = False
-    def _trigger_bombardment(self):
-        """Statek ostrzeliwuje wieze gracza - fale 4 i 8 przy pelnych zyciach."""
-        if not self.towers:
-            return
+    def _start_bombardment(self):
+        """Rozpoczyna cinematic bombardowania: statek plynie na srodek oceanu."""
+        self.bombard_active = True
+        self.bombard_phase = 0  # 0: statek plynie na srodek
+        self.bombard_timer = 0
+        self.bombard_index = 0
+        # Wybierz do 3 losowych wiez
+        if self.towers:
+            self.bombard_targets = random.sample(self.towers, min(3, len(self.towers)))
+        else:
+            self.bombard_targets = []
         self.wave_banner_text = "CANNON BARRAGE!"
-        self.wave_banner_timer = 150
-        # Wybierz do 3 losowych wiez do ostrzelania
-        targets = random.sample(self.towers, min(3, len(self.towers)))
-        for tw in targets:
-            # Pocisk armatni leci ze statku do wiezy
-            sx, sy = self.ship.x, self.ship.y - 20
-            self.cannonballs.append({
-                "x": sx, "y": sy,
-                "tx": tw.x, "ty": tw.y,
-                "tower": tw,
-                "speed": 8,
-                "trail": [],
-            })
-        self.ship.cannon_flash = 30
-        try:
-            sound_ab_meteor.play()  # dzwiek wystrzalu
-        except:
-            pass
+        self.wave_banner_timer = 180
+        # Statek plynie na srodek oceanu (srodek gornej czesci mapy)
+        self.ship.sail_to_bombard(self.width // 2, 180)
+
+    def _update_bombardment(self):
+        """Cinematic bombardowania - fazy."""
+        if not self.bombard_active:
+            return
+        self.bombard_timer += 1
+        if self.bombard_phase == 0:
+            # Czekamy az statek doplynie na srodek
+            if self.ship.state == Ship.BOMBARD:
+                self.bombard_phase = 1
+                self.bombard_timer = 0
+                self.bombard_index = 0
+        elif self.bombard_phase == 1:
+            # Wybierz nastepny cel lub zakoncz
+            if self.bombard_index >= len(self.bombard_targets):
+                # Koniec - statek odplywa
+                self.bombard_phase = 3
+                self.bombard_timer = 0
+                self.ship.sail_out_from_bombard()
+            else:
+                tw = self.bombard_targets[self.bombard_index]
+                # Sprawdz czy wieza jeszcze istnieje (mogla zostac sprzedana)
+                if tw not in self.towers:
+                    self.bombard_index += 1
+                    return
+                self.bombard_zoom_tower = tw
+                self.bombard_zoom = 1  # zoom in
+                self.bombard_phase = 2
+                self.bombard_timer = 0
+        elif self.bombard_phase == 2:
+            # Zoom in (60 tickow), potem strzal
+            if self.bombard_timer == 60:
+                # Wystrzel!
+                tw = self.bombard_zoom_tower
+                sx, sy = self.ship.x, self.ship.y - 20
+                self.cannonballs.append({
+                    "x": sx, "y": sy,
+                    "tx": tw.x, "ty": tw.y,
+                    "tower": tw,
+                    "speed": 10,
+                    "trail": [],
+                    "bombard": True,  # flaga zeby wiedziec ze to z cinematic
+                })
+                self.ship.cannon_flash = 30
+                try:
+                    sound_ab_meteor.play()
+                except:
+                    pass
+            # Czekamy az pocisk trafi (obslugiwane w _update_cannonballs)
+            # Przejscie do nastepnego celu nastepuje po trafieniu
+        elif self.bombard_phase == 3:
+            # Statek odplywa - czekamy az zniknie
+            if self.ship.state == Ship.AWAY:
+                self.bombard_active = False
+                self.bombard_phase = 0
+                self.bombard_zoom = 0
+                self.bombard_zoom_tower = None
+                # Normalny przeplyw: statek juz odplynal, czekamy na wyczyszczenie
 
     def _update_cannonballs(self):
         """Aktualizacja pociskow armatnich."""
@@ -490,6 +549,12 @@ class Game:
                     self.gold_notifications.append(["Tower destroyed!", 150])
                 else:
                     self.gold_notifications.append(["Tower survived!", 120])
+                # Jesli to byl strzal z cinematic, przejdz do nastepnego celu
+                if cb.get("bombard") and self.bombard_active and self.bombard_phase == 2:
+                    self.bombard_index += 1
+                    self.bombard_zoom = 2  # zoom out
+                    self.bombard_phase = 1
+                    self.bombard_timer = 0
             else:
                 cb["x"] += dx / dist * cb["speed"]
                 cb["y"] += dy / dist * cb["speed"]
@@ -531,6 +596,7 @@ class Game:
                 self.ship.update()
                 ship_acc -= 1.0
             self._update_cannonballs()
+            self._update_bombardment()
             if self.ship.state == Ship.AWAY and not self.won:
                 if self.last_wave_done:
                     self.won = True
@@ -569,14 +635,17 @@ class Game:
                 if event.type == pygame.MOUSEBUTTONUP:
                     self.menu_dragging = False
                 if event.type == pygame.KEYDOWN:
-                    # ESC zawsze dziala (toggle menu)
+                    # ESC zawsze dziala (toggle menu) - ale nie podczas cinematic
                     if event.key == pygame.K_ESCAPE:
                         if getattr(self, '_show_help', False):
                             self._show_help = False
-                        else:
+                        elif not self.bombard_active:
                             self.show_menu = not getattr(self, 'show_menu', False)
                             # ESC toggle: menu+pauza razem
                             self.paused = self.show_menu
+                        continue
+                    # Blokada wszystkich klawiszy podczas cinematic
+                    if self.bombard_active:
                         continue
                     # Gdy menu otwarte: blokuj wszystkie akcje wiez
                     if self.show_menu:
@@ -676,6 +745,9 @@ class Game:
                         self._recalc_synergy()
                         self.selected_tower = None
                 if event.type == pygame.MOUSEBUTTONDOWN:
+                    # Blokada inputu podczas cinematic bombardowania
+                    if self.bombard_active:
+                        continue
                     pos = self._mouse_pos()
                     # Menu ESC ma pierwszenstwo
                     if self.show_menu:
@@ -730,8 +802,11 @@ class Game:
                             bonus = len(self.enemies) * 5
                             self.money += bonus
                             self.gold_notifications.append([f"+{bonus}$ rush bonus!", 150])
+                            self.enemies.clear()
                             self.advance_wave()
-                            if not self.last_wave_done and not self.won:
+                            if self.last_wave_done:
+                                self.won = True
+                            elif not self.won:
                                 self.ship.sail_in()
                         continue
                     # Przycisk predkosci (pauza tylko przez ESC)
@@ -1582,8 +1657,33 @@ class Game:
         # Menu ESC (na wierzchu)
         if self.show_menu:
             self.draw_pause_menu()
+        # Cinematic bombardowania - zoom na wieze
+        self._draw_bombard_zoom()
 
         self._present()
+
+    def _draw_bombard_zoom(self):
+        """Efekt zoomu na wieze podczas bombardowania."""
+        if not self.bombard_active or self.bombard_zoom == 0 or not self.bombard_zoom_tower:
+            return
+        tw = self.bombard_zoom_tower
+        # Przyciemnij ekran
+        dark = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        dark.fill((0, 0, 0, 120))
+        self.win.blit(dark, (0, 0))
+        # Okragly zoom na wieze - powiekszony widok
+        zoom_r = 150
+        # Pobierz fragment ekranu wokol wiezy i powieksz
+        # (uproszczone: rysujemy okrag z celownikiem)
+        pygame.draw.circle(self.win, (255, 50, 50), (int(tw.x), int(tw.y)), zoom_r, 3)
+        pygame.draw.circle(self.win, (255, 50, 50, 100), (int(tw.x), int(tw.y)), zoom_r - 10, 1)
+        # Celownik
+        pygame.draw.line(self.win, (255, 50, 50), (tw.x - 20, tw.y), (tw.x + 20, tw.y), 2)
+        pygame.draw.line(self.win, (255, 50, 50), (tw.x, tw.y - 20), (tw.x, tw.y + 20), 2)
+        # Napis TARGET
+        font = pygame.font.SysFont("arial", 24, bold=True)
+        txt = font.render("TARGET", True, (255, 50, 50))
+        self.win.blit(txt, (tw.x - txt.get_width()//2, tw.y - zoom_r - 30))
 
     def _menu_action(self, action):
         """Akcje przyciskow menu ESC."""
