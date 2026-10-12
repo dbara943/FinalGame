@@ -438,6 +438,7 @@ class Game:
             elif self.wave + 1 == 10:
                 self.pending_boss = Boss(final=True)
                 self.wave_banner_text = "FINALNA FALA - BOSS!"
+        self.waiting_for_clear = False
     def _trigger_bombardment(self):
         """Statek ostrzeliwuje wieze gracza - fale 4 i 8 przy pelnych zyciach."""
         if not self.towers:
