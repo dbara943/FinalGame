@@ -2,6 +2,18 @@ import pygame
 import os
 # Najwyzsza jakosc skalowania GPU (ostrzejszy fullscreen)
 os.environ.setdefault("SDL_HINT_RENDER_SCALE_QUALITY", "2")
+pygame.font.init()
+pygame.display.set_caption('Island Defenders')
+# Ekran ladowania (zanim ciezkie assety)
+try:
+    _load_win = pygame.display.set_mode((400, 200))
+    _load_win.fill((20, 25, 35))
+    _lf = pygame.font.SysFont("arial", 24)
+    _lt = _lf.render("Loading Island Defenders...", True, (255, 255, 255))
+    _load_win.blit(_lt, (200 - _lt.get_width()//2, 90))
+    pygame.display.flip()
+except Exception:
+    pass
 import math
 from enemies.forkman import Forkman
 from enemies.swordman import Swordman
@@ -22,8 +34,6 @@ from menu.menu import VerticalMenu
 from effects.particles import ParticleSystem, FloatingCoin, Shockwave
 import time
 import random
-pygame.font.init()
-pygame.display.set_caption('Island Defenders')
 
 lives_img = pygame.image.load(os.path.join("images", "heart.png"))
 money_img = pygame.image.load(os.path.join("images", "money.png"))
@@ -173,7 +183,9 @@ class Game:
         self.leaves = [(random.randint(0, 1124), random.randint(0, 720)) for _ in range(15)]
         self.seagulls = [(random.randint(200, 900), random.randint(50, 150), random.random()*6) for _ in range(2)]
         self.game_time = 0  # Q17: zegar sesji (ticki)
-        self.muted = False  # Q16
+        self.muted = False  # Q16 (legacy - teraz rozdzielone)
+        self.music_muted = False  # wyciszenie muzyki
+        self.sfx_muted = False  # wyciszenie efektow dzwiekowych
         self.build_queue = []  # Q14: kolejka budowy
         self.tower_filter = None  # Q15: filtr wiez
         self.display_money = 200  # Niespodzianka 4: animowany licznik zlota
@@ -1418,12 +1430,20 @@ class Game:
             self.reset_game()
         elif action == "help":
             self._show_help = True
-        elif action == "sound":
-            self.muted = not self.muted
-            if self.muted:
+        elif action == "music":
+            self.music_muted = not self.music_muted
+            if self.music_muted:
                 pygame.mixer.music.pause()
             else:
                 pygame.mixer.music.unpause()
+        elif action == "sfx":
+            self.sfx_muted = not self.sfx_muted
+            vol = 0 if self.sfx_muted else 1
+            for s in (sound_1, sound_2, sound_3, sound_4, sound_5, sound_win, sound_lose, sound_roar,
+                      sound_levelup, sound_horn, sound_gull, sound_fanfare,
+                      *shoot_sounds.values()):
+                s.set_volume(vol)
+            sound_rain.set_volume(0 if self.sfx_muted else 0.35)
         elif action == "fullscreen":
             self._fullscreen = not self._fullscreen
             if self._fullscreen:
@@ -1458,22 +1478,42 @@ class Game:
             ("Resume", "resume"),
             ("Restart Game", "restart"),
             ("How to Play", "help"),
-            (f"Sound: {'ON' if not self.muted else 'OFF'}", "sound"),
+            ("Music", "music", not self.music_muted),
+            ("Sound Effects", "sfx", not self.sfx_muted),
             (f"Fullscreen: {'ON' if self._fullscreen else 'OFF'}", "fullscreen"),
             (f"Speed: {self.speed}x", "speed"),
             ("Quit to Desktop", "quit"),
         ]
         by = py + 70
-        for label, action in items:
+        for item in items:
+            if len(item) == 3:
+                label, action, checked = item
+                has_check = True
+            else:
+                label, action = item
+                has_check = False
+                checked = False
             rect = pygame.Rect(px + 40, by, pw - 80, 44)
             hover = rect.collidepoint(mx, my)
             col = (55, 65, 80) if not hover else (75, 90, 110)
             pygame.draw.rect(self.win, col, rect, border_radius=10)
             if action == "quit":
                 pygame.draw.rect(self.win, (120, 50, 50), rect, 2, border_radius=10)
-            txt = self.font_btn18.render(label, True, (240, 240, 240))
-            self.win.blit(txt, (rect.x + (rect.w - txt.get_width()) // 2,
-                                rect.y + (rect.h - txt.get_height()) // 2))
+            if has_check:
+                # Checkmark box
+                cb = pygame.Rect(rect.x + 16, rect.y + 12, 20, 20)
+                pygame.draw.rect(self.win, (30, 35, 45), cb, border_radius=4)
+                pygame.draw.rect(self.win, (120, 130, 145), cb, 2, border_radius=4)
+                if checked:
+                    # Zielony ptaszek
+                    pygame.draw.line(self.win, (80, 220, 100), (cb.x + 4, cb.y + 10), (cb.x + 9, cb.y + 15), 3)
+                    pygame.draw.line(self.win, (80, 220, 100), (cb.x + 9, cb.y + 15), (cb.x + 16, cb.y + 5), 3)
+                txt = self.font_btn18.render(label, True, (240, 240, 240))
+                self.win.blit(txt, (cb.x + 28, rect.y + (rect.h - txt.get_height()) // 2))
+            else:
+                txt = self.font_btn18.render(label, True, (240, 240, 240))
+                self.win.blit(txt, (rect.x + (rect.w - txt.get_width()) // 2,
+                                    rect.y + (rect.h - txt.get_height()) // 2))
             self._menu_buttons.append((rect, action))
             by += 54
         # Pod-ekran pomocy
