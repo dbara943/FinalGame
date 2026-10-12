@@ -24,10 +24,12 @@ class Enemy:
         self.velocity = 3
         # Punkty dobrane do namalowanej drogi: dolna droga w prawo,
         # zakret w gore, gorna droga z powrotem do bazy.
-        self.path = [(322, 658), (400, 640), (480, 620), (550, 600), (555, 550), (620, 542), (720, 532),
-                     (820, 515), (880, 495), (920, 475), (980, 470), (1040, 470),
-                     (980, 450), (880, 440), (780, 430), (700, 425),
-                     (600, 418), (500, 412), (400, 405), (300, 392), (250, 388)]
+        self.path = [
+                     (322, 658), (362, 634), (445, 601), (542, 573),
+                     (719, 556), (897, 535), (1011, 511), (1028, 490),
+                     (1011, 478), (975, 473), (878, 459), (782, 444),
+                     (684, 432), (598, 422), (511, 410), (425, 402),
+                     (354, 393), (275, 379)]
         # Precompute kierunkow segmentow (wydajnosc) - bez sqrt co tick
         self._path_dirs = []
         for i in range(len(self.path) - 1):
