@@ -108,10 +108,57 @@ class Ship:
     def draw(self, win):
         if self.state == Ship.AWAY:
             return
-        # Delikatne kolysanie na falach
-        bob = math.sin((time.time() - self._t0) * 2.0) * 4
-        win.blit(self.img, (self.x - self.img.get_width() // 2,
-                            self.y - self.img.get_height() // 2 + bob))
+        # Zywsze kolysanie na falach + rotacja
+        t = time.time() - self._t0
+        bob = math.sin(t * 2.0) * 6
+        rot = math.sin(t * 1.5) * 1.5  # rotacja w stopniach
+        # Obrocony sprite
+        img = pygame.transform.rotate(self.img, rot)
+        ix = self.x - img.get_width() // 2
+        iy = self.y - img.get_height() // 2 + bob
+        win.blit(img, (ix, iy))
+        # Kilwater (smuga piany) gdy plynie
+        if self.state in (Ship.IN, Ship.OUT, Ship.BOMBARD_SAIL):
+            wake_alpha = int(60 + 30 * math.sin(t * 4))
+            wake = pygame.Surface((120, 20), pygame.SRCALPHA)
+            # Kierunek smugi przeciwny do ruchu
+            if self.state == Ship.IN:
+                wx = self.x - (60 if self.from_left else -60)
+            else:
+                wx = self.x + (60 if self.from_left else -60)
+            for i in range(3):
+                alpha = wake_alpha - i * 20
+                if alpha > 0:
+                    pygame.draw.ellipse(wake, (255, 255, 255, alpha),
+                                      (i * 30, 5 + i * 2, 60 - i * 15, 10 - i * 2))
+            win.blit(wake, (wx - 60, self.y + 20 + bob))
+        # Latarnie (swiecace punkty)
+        flicker = 0.7 + 0.3 * math.sin(t * 8)
+        for lx, ly in [(-80, -30), (80, -30)]:
+            # Pozycja wzgledem statku (uwzglednij flip)
+            if self.img is not self.base_img:  # flipniety
+                lx = -lx
+            px, py = int(self.x + lx), int(self.y + ly + bob)
+            # Glow
+            glow = pygame.Surface((24, 24), pygame.SRCALPHA)
+            pygame.draw.circle(glow, (255, 200, 80, int(100 * flicker)), (12, 12), 12)
+            pygame.draw.circle(glow, (255, 220, 120, int(150 * flicker)), (12, 12), 6)
+            win.blit(glow, (px - 12, py - 12))
+            pygame.draw.circle(win, (255, 230, 150), (px, py), 3)
+        # Bryzgi przy dziobie gdy plynie
+        if self.state in (Ship.IN, Ship.OUT, Ship.BOMBARD_SAIL) and int(t * 3) % 2 == 0:
+            bx = self.x + (100 if self.from_left else -100)
+            by = self.y + 30 + bob
+            for i in range(3):
+                sx = bx + random.randint(-15, 15)
+                sy = by + random.randint(-10, 5)
+                pygame.draw.circle(win, (255, 255, 255, 120), (int(sx), int(sy)), 2)
+        # Demoniczna runa (pulsujaca)
+        rune_alpha = int(120 + 80 * math.sin(t * 2.5))
+        rune_font = pygame.font.SysFont("arial", 22, bold=True)
+        rune = rune_font.render("ᚱ", True, (180, 80, 255))
+        rune.set_alpha(rune_alpha)
+        win.blit(rune, (self.x - rune.get_width() // 2, self.y + 10 + bob))
         # Blysk armat przy strzale
         if self.cannon_flash > 0:
             self.cannon_flash -= 1
