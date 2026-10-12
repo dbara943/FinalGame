@@ -170,14 +170,14 @@ class Game:
         self.ship.sail_in()
         self.last_wave_done = False
         self.timer = time.time()
-        self.hud_font = pygame.font.SysFont("arial", 26, bold=True)
+        self.hud_font = pygame.font.SysFont("segoe ui, calibri, arial", 26, bold=True)
         self.selected_tower = None
-        self.menu = VerticalMenu(self.width - 90, 250, side_img)
-        self.menu.add_btn(t1_img, "t1", 100)
-        self.menu.add_btn(t2_img, "t2", 200)
-        self.menu.add_btn(t3_img, "t3", 300)
-        self.menu.add_btn(t4_img, "t4", 400)
-        self.menu.add_btn(t5_img, "t5", 500)
+        self.menu = VerticalMenu(self.width - 100, 250, side_img)
+        self.menu.add_btn(t1_img, "t1", 100, damage=1)
+        self.menu.add_btn(t2_img, "t2", 200, damage=3)
+        self.menu.add_btn(t3_img, "t3", 300, damage=5)
+        self.menu.add_btn(t4_img, "t4", 400, damage=8)
+        self.menu.add_btn(t5_img, "t5", 500, damage=10)
         self.moving_object =  None
         self.menu_dragging = False  # przeciganie sklepu myszka
         self.menu_drag_dx = 0
@@ -339,7 +339,7 @@ class Game:
                     run = False
                 # Przeciganie sklepu
                 if event.type == pygame.MOUSEMOTION and self.menu_dragging:
-                    self.menu.x = max(85, min(self.width - 85, event.pos[0] + self.menu_drag_dx))
+                    self.menu.x = max(100, min(self.width - 100, event.pos[0] + self.menu_drag_dx))
                     self.menu.y = max(190, min(self.height - 190, event.pos[1] + self.menu_drag_dy))
                 if event.type == pygame.MOUSEBUTTONUP:
                     self.menu_dragging = False
@@ -847,8 +847,8 @@ class Game:
 
     def show_end_screen(self, won):
         """Ekran koncowy. Zwraca 'restart', 'continue' (endless), lub 'quit'."""
-        big_font = pygame.font.SysFont("arial", 70)
-        small_font = pygame.font.SysFont("arial", 30)
+        big_font = pygame.font.SysFont("segoe ui, calibri, arial", 70)
+        small_font = pygame.font.SysFont("segoe ui, calibri, arial", 30)
         title = "YOU WIN! The island is saved!" if won else "YOU LOSE! The monsters broke through!"
         color = (60, 200, 90) if won else (220, 60, 60)
         # Przyciski
@@ -870,7 +870,7 @@ class Game:
         sub = small_font.render("Wave reached: " + str(self.wave + 1) + " / " + str(len(waves)), 1, (255, 255, 255))
         self.win.blit(sub, (self.width // 2 - sub.get_width() // 2, self.height // 2 + 20))
         # Statystyki koncowe (R12)
-        stats_font = pygame.font.SysFont("arial", 24)
+        stats_font = pygame.font.SysFont("segoe ui, calibri, arial", 24)
         stats = [
             f"Kills: {self.stats_kills}",
             f"Gold earned: {self.stats_gold}",
@@ -992,8 +992,8 @@ class Game:
         for proj in self.projectiles:
             proj.draw(self.win)
         # Latajace liczby obrazen
-        font_dmg = pygame.font.SysFont("arial", 18, bold=True)
-        font_crit = pygame.font.SysFont("arial", 22, bold=True)
+        font_dmg = pygame.font.SysFont("segoe ui, calibri, arial", 18, bold=True)
+        font_crit = pygame.font.SysFont("segoe ui, calibri, arial", 22, bold=True)
         for item in self.damage_numbers:
             # Obsluga starego formatu (4 elementy) i nowego (5 z kolorem)
             if len(item) == 5:
@@ -1009,7 +1009,7 @@ class Game:
         # V3: banner fali
         if self.wave_banner_timer > 0:
             alpha = min(255, self.wave_banner_timer * 3)
-            banner_font = pygame.font.SysFont("arial", 64, bold=True)
+            banner_font = pygame.font.SysFont("segoe ui, calibri, arial", 64, bold=True)
             label = banner_font.render(self.wave_banner_text, True, (255, 255, 255))
             # Cien pod napisem
             shadow = banner_font.render(self.wave_banner_text, True, (0, 0, 0))
@@ -1025,7 +1025,7 @@ class Game:
                 pygame.draw.circle(flash, (255, 220, 100, timer * 40), (radius, radius), radius)
                 self.win.blit(flash, (x - radius, y - radius))
         # Powiadomienia o zlocie za fale (widoczne, pod HUDem)
-        gold_font = pygame.font.SysFont("arial", 28, bold=True)
+        gold_font = pygame.font.SysFont("segoe ui, calibri, arial", 28, bold=True)
         for i, (text, timer) in enumerate(self.gold_notifications):
             alpha = min(255, timer * 2)
             # Tlo powiadomienia
@@ -1066,7 +1066,7 @@ class Game:
                     fg.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
                     self.win.blit(fg, (bx + 3, by + 3))
                 # Czaszka + nazwa
-                boss_font = pygame.font.SysFont("arial", 16, bold=True)
+                boss_font = pygame.font.SysFont("segoe ui, calibri, arial", 16, bold=True)
                 skull = "☠ BOSS" if not getattr(en, 'final', False) else "☠ FINAL BOSS"
                 if getattr(en, 'enraged', False):
                     skull += " (ENRAGED!)"
@@ -1095,7 +1095,7 @@ class Game:
             pygame.draw.rect(btn_bg, (30, 90, 50, 230), btn_bg.get_rect(), border_radius=12)
             pygame.draw.rect(btn_bg, (100, 255, 150, 180), btn_bg.get_rect(), 2, border_radius=12)
             self.win.blit(btn_bg, (bx, by))
-            btn_font = pygame.font.SysFont("arial", 18, bold=True)
+            btn_font = pygame.font.SysFont("segoe ui, calibri, arial", 18, bold=True)
             label = btn_font.render(f"NEXT WAVE +{bonus}$", True, (200, 255, 210))
             self.win.blit(label, (bx + btn_w//2 - label.get_width()//2, by + btn_h//2 - label.get_height()//2))
         else:
@@ -1118,7 +1118,7 @@ class Game:
                     # Q12: DPS vs srednia
                     avg = sum(t.damage for t in self.towers) / max(1, len(self.towers))
                     diff = tw.damage - avg
-                    cfont = pygame.font.SysFont("arial", 13, bold=True)
+                    cfont = pygame.font.SysFont("segoe ui, calibri, arial", 13, bold=True)
                     ctxt = f"DPS {tw.damage} ({'+' if diff >= 0 else ''}{diff:.0f} vs avg)"
                     ccol = (100, 255, 100) if diff >= 0 else (255, 150, 150)
                     clabel = cfont.render(ctxt, True, ccol)
@@ -1135,7 +1135,7 @@ class Game:
         # 9: raport po fali
         if self.wave_report:
             text, timer = self.wave_report
-            rfont = pygame.font.SysFont("arial", 16)
+            rfont = pygame.font.SysFont("segoe ui, calibri, arial", 16)
             label = rfont.render(text, True, (220, 230, 240))
             bg_w = label.get_width() + 30
             bg = pygame.Surface((bg_w, 36), pygame.SRCALPHA)
@@ -1230,15 +1230,15 @@ class Game:
         # Q17: zegar sesji
         mins = self.game_time // 3600
         secs = (self.game_time // 60) % 60
-        qfont = pygame.font.SysFont("arial", 14)
+        qfont = pygame.font.SysFont("segoe ui, calibri, arial", 14)
         tlabel = qfont.render(f"{mins:02d}:{secs:02d}", True, (200, 200, 200))
         self.win.blit(tlabel, (self.width - 70, self.height - 30))
         
         # 8: wskaznik pauzy z informacja o budowaniu
         if self.paused:
-            pfont = pygame.font.SysFont("arial", 36, bold=True)
+            pfont = pygame.font.SysFont("segoe ui, calibri, arial", 36, bold=True)
             plabel = pfont.render("PAUSED", True, (255, 255, 255))
-            sfont = pygame.font.SysFont("arial", 16)
+            sfont = pygame.font.SysFont("segoe ui, calibri, arial", 16)
             slabel = sfont.render("you can build and upgrade towers", True, (200, 200, 200))
             px = self.width // 2 - plabel.get_width() // 2
             py = 60
@@ -1307,7 +1307,7 @@ class Game:
             if en.dying or en.dead or en.reached_end:
                 continue
             if math.hypot(mx - en.x, my - (en.y - 35)) < 35:
-                efont = pygame.font.SysFont("arial", 14, bold=True)
+                efont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
                 hlabel = efont.render(f"HP: {int(en.health)}/{en.max_health}", True, (255, 180, 180))
                 self.win.blit(hlabel, (en.x - hlabel.get_width()//2, en.y - 95))
                 break
@@ -1350,7 +1350,7 @@ class Game:
             self.announcements.remove(a)
             return
         alpha = min(255, a[1] * 4)
-        f = pygame.font.SysFont("arial", 34, bold=True)
+        f = pygame.font.SysFont("segoe ui, calibri, arial", 34, bold=True)
         outline = f.render(a[0], True, (20, 20, 20))
         label = f.render(a[0], True, (255, 210, 60))
         pad_x, pad_y = 18, 8
@@ -1781,8 +1781,8 @@ class Game:
             else:
                 pygame.draw.rect(bg, (30, 35, 45, 180), bg.get_rect(), border_radius=10)
             self.win.blit(bg, (x, y))
-            f1 = pygame.font.SysFont("arial", 13, bold=True)
-            f2 = pygame.font.SysFont("arial", 11)
+            f1 = pygame.font.SysFont("segoe ui, calibri, arial", 13, bold=True)
+            f2 = pygame.font.SysFont("segoe ui, calibri, arial", 11)
             t1 = f1.render(aname, True, (255, 255, 255))
             self.win.blit(t1, (x + slot_w//2 - t1.get_width()//2, y + 6))
             if ready_tower:
@@ -1907,7 +1907,7 @@ class Game:
             s = pygame.Surface((300, 50), pygame.SRCALPHA)
             pygame.draw.rect(s, (8, 18, 38, 150), s.get_rect(), border_radius=10)
             self.win.blit(s, (preview_x, preview_y))
-            font_small = pygame.font.SysFont("arial", 16)
+            font_small = pygame.font.SysFont("segoe ui, calibri, arial", 16)
             label = font_small.render("Next:", True, (255, 255, 255))
             self.win.blit(label, (preview_x + 8, preview_y + 15))
             # Ikony wrogow (po jednej na typ, z liczba)

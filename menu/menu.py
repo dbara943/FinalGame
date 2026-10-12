@@ -30,7 +30,7 @@ class Button():
         self.y = self.menu.y + self.dy
         
 class VerticalButton(Button):
-    def __init__(self, x, y, img, name, cost):
+    def __init__(self, x, y, img, name, cost, damage=0):
         self.name = name
         self.img = img
         self.x = x
@@ -38,6 +38,7 @@ class VerticalButton(Button):
         self.width = self.img.get_width()
         self.height = self.img.get_height()
         self.cost = cost
+        self.damage = damage
                 
 class Menu():
     def __init__(self, tower, x, y, img, item_cost):
@@ -50,8 +51,8 @@ class Menu():
         self.item_cost = item_cost
         self.items = 0
         self.bg = img
-        self.font = pygame.font.SysFont("arial", 30)
-        self.small_font = pygame.font.SysFont("arial", 20)
+        self.font = pygame.font.SysFont("segoe ui, calibri, arial", 30)
+        self.small_font = pygame.font.SysFont("segoe ui, calibri, arial", 20)
         self.tower = tower
 
     def add_btn(self, img, name, dx=0, dy=0):
@@ -75,7 +76,7 @@ class Menu():
         win.blit(bg, (px, py))
         
         # Nazwa wieży i poziom (kropki)
-        name_font = pygame.font.SysFont("arial", 18, bold=True)
+        name_font = pygame.font.SysFont("segoe ui, calibri, arial", 18, bold=True)
         name_text = tw.name if hasattr(tw, 'name') else "Wieza"
         label = name_font.render(name_text, True, (255, 255, 255))
         win.blit(label, (px + 14, py + 10))
@@ -99,13 +100,13 @@ class Menu():
                               f"+${sell_val}", (46, 160, 90), False)
         
         # Statystyki wieży
-        stat_font = pygame.font.SysFont("arial", 15)
+        stat_font = pygame.font.SysFont("segoe ui, calibri, arial", 15)
         # Q8: DPS = obrazenia / czas przeladowania
         dps = tw.damage  # 1 strzal na sekunde
         stats = f"DMG {tw.damage}  RNG {tw.range}  DPS {dps}"
         slabel = stat_font.render(stats, True, (170, 190, 210))
         win.blit(slabel, (px + panel_w//2 - slabel.get_width()//2, py + 92))
-        kfont = pygame.font.SysFont("arial", 13)
+        kfont = pygame.font.SysFont("segoe ui, calibri, arial", 13)
         klabel = kfont.render(f"KILLS {tw.kills}", True, (255, 215, 0))
         win.blit(klabel, (px + panel_w//2 - klabel.get_width()//2, py + 110))
         
@@ -123,8 +124,8 @@ class Menu():
         if not disabled:
             pygame.draw.rect(btn, (255, 255, 255, 60), btn.get_rect(), 1, border_radius=9)
         win.blit(btn, (x, y))
-        tfont = pygame.font.SysFont("arial", 14, bold=True)
-        sfont = pygame.font.SysFont("arial", 13)
+        tfont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
+        sfont = pygame.font.SysFont("segoe ui, calibri, arial", 13)
         tcol = (140, 150, 165) if disabled else (255, 255, 255)
         scol = (140, 150, 165) if disabled else (255, 255, 200)
         t = tfont.render(title, True, tcol)
@@ -158,13 +159,13 @@ class VerticalMenu(Menu):
         self.buttons = []
         self.items = 0
         self.bg = img
-        self.font = pygame.font.SysFont("comicsans", 25)
+        self.font = pygame.font.SysFont("segoe ui, calibri, arial", 25)
 
-    def add_btn(self, img, name, cost):
+    def add_btn(self, img, name, cost, damage=0):
         self.items += 1
         btn_x = self.x - 20
         btn_y = self.y -60 + (self.items-1)*75
-        self.buttons.append(VerticalButton(btn_x, btn_y, img, name, cost))
+        self.buttons.append(VerticalButton(btn_x, btn_y, img, name, cost, damage))
 
     def get_item_cost(self, name):
         for btn in self.buttons:
@@ -174,13 +175,13 @@ class VerticalMenu(Menu):
 
     def get_rect(self):
         """Prostokat panelu sklepu (do przecigania i hover)."""
-        panel_w = 170
+        panel_w = 200
         panel_h = len(self.buttons) * 78 + 50
         return pygame.Rect(self.x - panel_w // 2, self.y - 140, panel_w, panel_h)
 
     def draw(self, win):
         # Nowoczesny sklep: ciemny panel, wyrownane ceny, bez niebieskiego tła
-        panel_w = 170
+        panel_w = 200
         panel_h = len(self.buttons) * 78 + 50
         px = self.x - panel_w // 2
         py = self.y - 140
@@ -198,7 +199,7 @@ class VerticalMenu(Menu):
         surf.blit(bg, (0, 0))
 
         # Naglowek SKLEP
-        hfont = pygame.font.SysFont("arial", 18, bold=True)
+        hfont = pygame.font.SysFont("segoe ui, calibri, arial", 18, bold=True)
         ht = hfont.render("SHOP", True, (200, 220, 240))
         surf.blit(ht, (panel_w//2 - ht.get_width()//2, 10))
         
@@ -217,19 +218,18 @@ class VerticalMenu(Menu):
             # Ikona wiezy
             icon = pygame.transform.scale(item.img, (44, 44))
             surf.blit(icon, (bx + 8 - px, by + 12 - py))
-            # Nazwa i cena - wyrownane do prawej
-            nfont = pygame.font.SysFont("arial", 14, bold=True)
-            pfont = pygame.font.SysFont("arial", 15, bold=True)
-            names = ["Wooden", "Metal", "Golden", "Fire", "Blaze"]
+            # Schludny layout: nazwa / obrazenia / cena - wszystko wyrownane
+            nfont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
+            dfont = pygame.font.SysFont("segoe ui, calibri, arial", 12)
+            pfont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
+            names = ["Wooden Tower", "Metal Tower", "Golden Tower", "Fire Tower", "Blaze Tower"]
+            tx = bx + 60 - px  # wspolna lewa krawedz tekstu
             nm = nfont.render(names[idx] if idx < len(names) else item.name, True, (230, 235, 240))
-            surf.blit(nm, (bx + 60 - px, by + 8 - py))
-            # Cena z moneta - zawsze w tej samej pozycji
-            price_text = str(item.cost)
-            pt = pfont.render(price_text, True, (255, 215, 0))
-            # Moneta + cena wyrownane
-            coin_x = bx + panel_w - 30 - 70
-            surf.blit(pygame.transform.scale(money_img, (18, 18)), (coin_x - px, by + 36 - py))
-            surf.blit(pt, (coin_x + 24 - px, by + 34 - py))
+            surf.blit(nm, (tx, by + 6 - py))
+            dm = dfont.render(f"DMG {item.damage}", True, (170, 180, 190))
+            surf.blit(dm, (tx, by + 26 - py))
+            pt = pfont.render(f"$ {item.cost}", True, (255, 215, 0))
+            surf.blit(pt, (tx, by + 44 - py))
             # Aktualizuj pozycje klikalna (wspolrzedne ekranu)
             item.x, item.y = bx, by
             item.width, item.height = panel_w - 30, 68
