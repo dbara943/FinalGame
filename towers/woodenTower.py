@@ -97,11 +97,7 @@ class WoodenTower(Tower):
         # - po strzale znika (pusta), wraca podczas reloadu
         tgt = getattr(self, 'current_target', None)
         reloading = self.attack_cooldown > 0
-        
-        if reloading and self.attack_cooldown > 45:
-            # Pierwsze 15 tickow po strzale: pusta wieza
-            return
-        
+        # Wieza zawsze widoczna (bez migotania po strzale)        
         if self.inRange and not self.moving:     
             self.archer_count += 1
             if self.archer_count >= len(self.archer_imgs) * 10:
@@ -267,6 +263,21 @@ tower_imgs3.append(pygame.transform.scale(
 # load projectile shooter
 archer_imgs3.append(pygame.transform.scale(
     pygame.image.load(os.path.join("images/turrets/projectiles", str(3) + ".png" )), (25, 25))) 
+
+def _gold_tint(img):
+    """Zloty odcien na istniejacym modelu: przesuniecie barw w strone zlota."""
+    gold = img.copy()
+    tint = pygame.Surface(img.get_size())
+    tint.fill((255, 200, 70))
+    gold.blit(tint, (0, 0), special_flags=pygame.BLEND_MULT)
+    bright = pygame.Surface(img.get_size())
+    bright.fill((30, 18, 0))
+    gold.blit(bright, (0, 0), special_flags=pygame.BLEND_ADD)
+    return gold
+
+# Golden tower: ten sam model, ale wyraznie zloty (wieza + pociski)
+tower_imgs3 = [_gold_tint(img) for img in tower_imgs3]
+archer_imgs3 = [_gold_tint(img) for img in archer_imgs3]
 
 class GoldenTower(WoodenTower):
     buy_price = 300

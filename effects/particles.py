@@ -35,7 +35,7 @@ class ParticleSystem:
             win.blit(s, (x - size, y - size))
 
 class FloatingCoin:
-    """Moneta lecaca do HUD po zabiciu."""
+    """Banknot dolarowy lecacy do HUD po zabiciu."""
     def __init__(self, x, y, target_x, target_y, amount):
         self.x, self.y = x, y
         self.tx, self.ty = target_x, target_y
@@ -53,8 +53,16 @@ class FloatingCoin:
         # Krzywa: w gore potem do celu
         x = self.sx + (self.tx - self.sx) * p
         y = self.sy + (self.ty - self.sy) * p - math.sin(p * math.pi) * 60
-        pygame.draw.circle(win, (255, 215, 0), (int(x), int(y)), 8)
-        pygame.draw.circle(win, (200, 160, 0), (int(x), int(y)), 8, 2)
+        # Banknot dolarowy (obrocony lekko w locie)
+        w, h = 22, 12
+        bill = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(bill, (85, 160, 85), bill.get_rect(), border_radius=2)
+        pygame.draw.rect(bill, (45, 110, 45), bill.get_rect(), 2, border_radius=2)
+        pygame.draw.circle(bill, (200, 230, 200), (w // 2, h // 2), 4)
+        pygame.draw.circle(bill, (45, 110, 45), (w // 2, h // 2), 4, 1)
+        ang = 25 * math.sin(p * math.pi * 2)
+        bill = pygame.transform.rotate(bill, ang)
+        win.blit(bill, (int(x) - bill.get_width() // 2, int(y) - bill.get_height() // 2))
 
 class Shockwave:
     """Rozchodzacy sie krag."""

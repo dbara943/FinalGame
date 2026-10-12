@@ -33,6 +33,10 @@ t5_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t5.png
 wave_bg = pygame.transform.scale(pygame.image.load(os.path.join("images","wave.png")), (225, 75))
 
 towers_names = ["woodenTower", "metalTower", "goldenTower", "fireTower", "blazeTower"]
+# Mapowanie: nazwa klasy wiezy -> nazwa przycisku w sklepie (t1..t5).
+# get_item_cost() szuka po nazwie przycisku, wiec bez tego zwracal -1.
+tower_shop_names = {"woodenTower": "t1", "metalTower": "t2", "goldenTower": "t3",
+                    "fireTower": "t4", "blazeTower": "t5"}
 waves = [
     [40,0,0,0,0,0,0,0],
     [30,10,0,0,0,0,0,0],
@@ -58,6 +62,7 @@ sound_roar = pygame.mixer.Sound("sounds/roar.wav")
 sound_levelup = pygame.mixer.Sound("sounds/levelup.wav")
 sound_horn = pygame.mixer.Sound("sounds/horn.wav")
 sound_rain = pygame.mixer.Sound("sounds/rain.wav")
+sound_rain.set_volume(0.35)  # deszcz wyraznie ciszej niz reszta
 sound_gull = pygame.mixer.Sound("sounds/gull.wav")
 sound_fanfare = pygame.mixer.Sound("sounds/fanfare.wav")
 shoot_sounds = {
@@ -332,11 +337,6 @@ class Game:
                 if event.type == pygame.QUIT:
                     run = False
                 if event.type == pygame.KEYDOWN:
-                    # T: zmiana priorytetu celowania wybranej wiezy
-                    if event.key == pygame.K_t and self.selected_tower:
-                        priorities = ["first", "strong", "weak", "last"]
-                        idx = priorities.index(self.selected_tower.target_priority)
-                        self.selected_tower.target_priority = priorities[(idx + 1) % 4]
                     # Q: aktywacja umiejetnosci wybranej wiezy
                     if event.key == pygame.K_q and self.selected_tower:
                         self.selected_tower.activate_ability(self.enemies, self.projectiles)
@@ -400,6 +400,8 @@ class Game:
                                   sound_levelup, sound_horn, sound_rain, sound_gull, sound_fanfare,
                                   *shoot_sounds.values()):
                             s.set_volume(vol)
+                        if not self.muted:
+                            sound_rain.set_volume(0.35)  # deszcz zawsze ciszej
                     # Q11: F5 - zapis, F9 - wczytaj
                     if event.key == pygame.K_F5:
                         self.save_game()
@@ -460,15 +462,15 @@ class Game:
                                 # Q14: Shift = kolejka budowy
                                 if pygame.key.get_mods() & pygame.KMOD_SHIFT:
                                     self.build_queue.append((self.moving_object.name, gx, gy))
-                                    self.money += self.menu.get_item_cost(self.moving_object.name)  # zwrot, pobierze przy budowie
+                                    self.money += self.shop_price(self.moving_object.name)  # zwrot, pobierze przy budowie
                                 else:
                                     self.towers.append(self.moving_object)
                                 # Q7: zapamietaj do Ctrl+Z
-                                self.last_placed = (self.moving_object, self.menu.get_item_cost(self.moving_object.name))
+                                self.last_placed = (self.moving_object, self.shop_price(self.moving_object.name))
                             # else: niepoprawne - wieza znika (pieniadze przepadaja? nie - zwroc)
                             else:
                                 # Zwroc pieniadze za wieze
-                                cost = self.menu.get_item_cost(self.moving_object.name)
+                                cost = self.shop_price(self.moving_object.name)
                                 self.money += cost
                         self.moving_object.moving = False
                         self.moving_object = None      
@@ -603,7 +605,7 @@ class Game:
         # Q14: kolejka budowy - stawiaj po kolei
         if self.build_queue and not self.moving_object:
             name, gx, gy = self.build_queue[0]
-            cost = self.menu.get_item_cost(name)
+            cost = self.shop_price(name)
             if self.money >= cost and self.is_valid_placement(gx, gy):
                 self.money -= cost
                 tower_map = {"t1": WoodenTower, "t2": MetalTower, "t3": GoldenTower,
@@ -928,8 +930,7 @@ class Game:
                                 pygame.draw.line(self.win, (255, 215, 0, 120),
                                                (tw.x, tw.y - 20), (tw2.x, tw2.y - 20), 2)
         for tw in self.towers:
-            tw.draw(self.win)
-            tw.draw_radius(self.win)
+            tw.draw(self.win)  # draw() rysuje tez okrag zasiegu (bez duplikatu)
         # Q15: przyciemnij odfiltrowane
         if self.tower_filter:
             dim = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -1358,15 +1359,7 @@ class Game:
             px = wx - 12 + i * 8 + 3 * math.sin(t * 3 + i)
             pygame.draw.circle(self.win, (255, 255, 255, 140), (int(px), wy + 12), 4)
 
-        # 13: wulkan na horyzoncie + dym
-        vx = 620
-        pygame.draw.polygon(self.win, (90, 80, 85), [(vx - 45, 45), (vx, 0), (vx + 45, 45)])
-        pygame.draw.polygon(self.win, (200, 90, 40), [(vx - 10, 12), (vx, 0), (vx + 10, 12)])
-        for i in range(3):
-            sx = vx + 8 * math.sin(t * 0.8 + i * 2)
-            sy = -10 - ((t * 12 + i * 25) % 70)
-            alpha = int(90 * (1 - ((t * 12 + i * 25) % 70) / 70))
-            pygame.draw.circle(self.win, (130, 130, 135, alpha), (int(sx), int(sy)), 10)
+        # 13: usuniety wulkan na horyzoncie (na prosbe gracza)
 
         # 14: balon
         self.balloon_timer -= 1
@@ -1538,7 +1531,7 @@ class Game:
 
     def draw_campfire(self):
         t = pygame.time.get_ticks() / 1000.0
-        cx, cy = 780, 580
+        cx, cy = 835, 355  # przed wejsciem do namiotu (teepee po prawej)
         for i in range(8):
             ang = i * math.pi / 4
             pygame.draw.circle(self.win, (120, 120, 120),
@@ -1820,10 +1813,24 @@ class Game:
             pygame.draw.circle(surf, (150, 220, 255, 60), (r, r), r, 2)
             win.blit(surf, (gx - r, gy - r))
 
+    def shop_price(self, tower_name):
+        """Cena wiezy w sklepie. Mapuje nazwe klasy (woodenTower) na przycisk (t1)."""
+        return self.menu.get_item_cost(tower_shop_names.get(tower_name, tower_name))
+
+    def _is_grass(self, x, y):
+        """Czy punkt (x, y) to trawa - probka koloru z tla."""
+        if 0 <= x < self.width and 0 <= y < self.height:
+            r, g, b, _a = self.bg.get_at((int(x), int(y)))
+            return g > 110 and g > r + 15 and g > b + 15
+        return False
+
     def is_valid_placement(self, x, y):
         """R4: Czy mozna postawic wieze w (x, y)."""
         # Poza mapa / na menu bocznym
         if x < 40 or x > self.width - 200 or y < 40 or y > self.height - 40:
+            return False
+        # Tylko na trawie
+        if not self._is_grass(x, y):
             return False
         # Na drodze (punkty sciezki wroga)
         path = [(480, 590), (600, 560), (750, 530), (900, 495),
@@ -1938,27 +1945,12 @@ class Game:
             if (self.wave + 2) % 4 == 0:
                 boss_label = font_small.render("BOSS!", True, (255, 50, 50))
                 self.win.blit(boss_label, (x_off, preview_y + 15))
-            # Q5: prognoza zlota za nastepna fale
-            gold_forecast = sum(c * self.enemy_classes[i]().money 
-                              for i, c in enumerate(next_wave) if c > 0)
-            if (self.wave + 2) % 4 == 0:
-                gold_forecast += 150
-            glabel = font_small.render(f"~{gold_forecast}$", True, (255, 215, 0))
-            self.win.blit(glabel, (preview_x + 8, preview_y + 42))
             # Q19: rozbicie ekonomii
             wave_gold = (self.wave + 2) * 100
             interest = int(self.money * 0.05)
             efont = pygame.font.SysFont("arial", 12)
             elabel = efont.render(f"wave {wave_gold}$ + interest {interest}$", True, (180, 180, 180))
             self.win.blit(elabel, (preview_x + 8, preview_y + 60))
-        # Priorytet celowania wybranej wiezy
-        if self.selected_tower:
-            font_small = pygame.font.SysFont("arial", 16)
-            prio_text = f"Target: {self.selected_tower.target_priority} (T)"
-            label = font_small.render(prio_text, True, (255, 255, 0))
-            self.win.blit(label, (10, 125))
-            # Umiejetnosc aktywna - STARY tekst zastepuje ability dock na dole
-            pass
     def add_tower(self, name):
         x, y = pygame.mouse.get_pos()
         name_list = ["t1", "t2", "t3", "t4", "t5"]
