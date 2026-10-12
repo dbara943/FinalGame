@@ -461,8 +461,8 @@ class Game:
             self.bombard_targets = []
         self.wave_banner_text = "CANNON BARRAGE!"
         self.wave_banner_timer = 180
-        # Statek plynie na srodek oceanu (srodek gornej czesci mapy)
-        self.ship.sail_to_bombard(self.width // 2, 180)
+        # Statek plynie na pozycje wybrana przez gracza (867, 603)
+        self.ship.sail_to_bombard(867, 603)
 
     def _update_bombardment(self):
         """Cinematic bombardowania - fazy."""
@@ -563,15 +563,22 @@ class Game:
                     cb["trail"].pop(0)
 
     def _draw_cannonballs(self):
-        """Rysowanie pociskow armatnich."""
+        """Rysowanie pociskow armatnich - duze, widoczne, z ogniowa smuga."""
         for cb in self.cannonballs:
-            # Smuga
+            # Ognista smuga
             for i, (tx, ty) in enumerate(cb["trail"]):
-                alpha = int(150 * (i / len(cb["trail"])))
-                pygame.draw.circle(self.win, (200, 200, 200, alpha), (int(tx), int(ty)), 3)
-            # Kula armatnia
-            pygame.draw.circle(self.win, (30, 30, 30), (int(cb["x"]), int(cb["y"])), 8)
-            pygame.draw.circle(self.win, (80, 80, 80), (int(cb["x"]) - 2, int(cb["y"]) - 2), 3)
+                alpha = int(200 * (i / max(1, len(cb["trail"]))))
+                size = int(4 + 6 * (i / max(1, len(cb["trail"]))))
+                # Pomaranczowa smuga
+                pygame.draw.circle(self.win, (255, 150, 50, alpha), (int(tx), int(ty)), size)
+            # Duza kula armatnia z ogniem
+            x, y = int(cb["x"]), int(cb["y"])
+            # Zewnetrzny ogien
+            pygame.draw.circle(self.win, (255, 100, 30, 180), (x, y), 14)
+            pygame.draw.circle(self.win, (255, 180, 60, 220), (x, y), 10)
+            # Rdzen kuli
+            pygame.draw.circle(self.win, (40, 40, 40), (x, y), 7)
+            pygame.draw.circle(self.win, (120, 120, 120), (x - 2, y - 2), 3)
 
     def run(self):
         self._music_intense = False
@@ -1663,29 +1670,9 @@ class Game:
         self._present()
 
     def _draw_bombard_zoom(self):
-        """Efekt podczas bombardowania - przyciemnienie i oznaczenie celu."""
-        if not self.bombard_active or not self.bombard_zoom_tower:
-            return
-        tw = self.bombard_zoom_tower
-        # Lekkie przyciemnienie ekranu
-        dark = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        dark.fill((0, 0, 0, 80))
-        self.win.blit(dark, (0, 0))
-        # Pulsujacy marker nad wieza
-        t = pygame.time.get_ticks() / 300.0
-        pulse = int(5 * math.sin(t * 6))
-        # Strzalka w dol nad wieza
-        ax, ay = int(tw.x), int(tw.y - 60 - pulse)
-        pygame.draw.polygon(self.win, (255, 60, 60), [
-            (ax - 12, ay), (ax + 12, ay), (ax, ay + 18)
-        ])
-        # Napis
-        font = pygame.font.SysFont("arial", 20, bold=True)
-        txt = font.render("INCOMING!", True, (255, 80, 80))
-        shadow = font.render("INCOMING!", True, (0, 0, 0))
-        tx = int(tw.x - txt.get_width() // 2)
-        self.win.blit(shadow, (tx + 1, ay - 28))
-        self.win.blit(txt, (tx, ay - 29))
+        """Subtelne oznaczenie celu podczas bombardowania."""
+        # Wylaczone na prosbe gracza - kule po prostu leca ze statku
+        return
 
     def _menu_action(self, action):
         """Akcje przyciskow menu ESC."""
