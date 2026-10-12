@@ -437,6 +437,18 @@ class Game:
                 if event.type == pygame.MOUSEBUTTONUP:
                     self.menu_dragging = False
                 if event.type == pygame.KEYDOWN:
+                    # ESC zawsze dziala (toggle menu)
+                    if event.key == pygame.K_ESCAPE:
+                        if getattr(self, '_show_help', False):
+                            self._show_help = False
+                        else:
+                            self.show_menu = not getattr(self, 'show_menu', False)
+                            if self.show_menu:
+                                self.paused = True
+                        continue
+                    # Gdy menu otwarte: blokuj wszystkie akcje wiez
+                    if self.show_menu:
+                        continue
                     # Q: aktywacja umiejetnosci wybranej wiezy
                     if event.key == pygame.K_q and self.selected_tower:
                         self.selected_tower.activate_ability(self.enemies, self.projectiles)
@@ -454,14 +466,6 @@ class Game:
                     # Spacja: pauza
                     if event.key == pygame.K_SPACE:
                         self.paused = not self.paused
-                    # ESC: menu pauzy
-                    if event.key == pygame.K_ESCAPE:
-                        if getattr(self, '_show_help', False):
-                            self._show_help = False
-                        else:
-                            self.show_menu = not getattr(self, 'show_menu', False)
-                            if self.show_menu:
-                                self.paused = True
                     # 1-5: wybor wiezy ze sklepu
                     if event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5):
                         idx = event.key - pygame.K_1
@@ -582,10 +586,7 @@ class Game:
                         if not self.last_wave_done and not self.won:
                             self.ship.sail_in()
                         continue
-                    # Przyciski pauzy i predkosci
-                    if self.pause_btn_rect.collidepoint(pos):
-                        self.paused = not self.paused
-                        continue
+                    # Przycisk predkosci (pauza tylko przez ESC)
                     if self.speed_btn_rect.collidepoint(pos):
                         self.speed = self.speed % 3 + 1  # 1->2->3->1
                         continue
@@ -2113,22 +2114,7 @@ class Game:
                 self.win.blit(icon, (gx, y + pill_h // 2 - icon.get_height() // 2))
                 self.win.blit(label, (gx + icon.get_width() + 8, cy))
         # Q1: pasek postepu fali - usuniety na prosbe gracza
-        # Przyciski pauzy i predkosci (prawy gorny rog)
-        # Pauza: ikona graficzna (nie font - pewny render)
-        pr = self.pause_btn_rect
-        s = pygame.Surface((pr.width, pr.height), pygame.SRCALPHA)
-        pygame.draw.rect(s, (8, 18, 38, 190), s.get_rect(), border_radius=10)
-        pygame.draw.rect(s, (255, 255, 255, 70), s.get_rect(), 2, border_radius=10)
-        cx, cy = pr.width // 2, pr.height // 2
-        if not self.paused:
-            # Dwie kreski pauzy
-            pygame.draw.rect(s, (255, 255, 255), (cx - 8, cy - 10, 6, 20), border_radius=2)
-            pygame.draw.rect(s, (255, 255, 255), (cx + 2, cy - 10, 6, 20), border_radius=2)
-        else:
-            # Trojkat play
-            pygame.draw.polygon(s, (255, 255, 255),
-                                [(cx - 7, cy - 11), (cx - 7, cy + 11), (cx + 10, cy)])
-        self.win.blit(s, pr)
+        # Przycisk predkosci (prawy gorny rog) - pauza tylko przez ESC
         # Predkosc
         sr = self.speed_btn_rect
         s2 = pygame.Surface((sr.width, sr.height), pygame.SRCALPHA)

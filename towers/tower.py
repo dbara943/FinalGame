@@ -57,12 +57,7 @@ class Tower:
 
     def draw(self, win):
         img = self.get_level_img()
-        # Miekki cien z gradientem
-        for alpha, scale in [(30, 1.0), (25, 0.75), (20, 0.5)]:
-            sw, sh = int(80 * scale), int(20 * scale)
-            shadow = pygame.Surface((sw, sh), pygame.SRCALPHA)
-            pygame.draw.ellipse(shadow, (0, 0, 0, alpha), shadow.get_rect())
-            win.blit(shadow, (self.x - sw // 2, self.y + 28 - sh // 2))
+        # Cien usuniety na prosbe gracza
         win.blit(img, (self.x-img.get_width()//2, self.y-img.get_height()//2))
         # U7: gwiazdki poziomu nad wieza
         for i in range(self.level):

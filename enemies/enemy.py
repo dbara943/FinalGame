@@ -115,8 +115,7 @@ class Enemy:
         if self.slow_timer > 0 and random.random() < 0.2:
             # (rysowane przez game.py particles)
             pass
-        # V5: miekki cien pod wrogiem (gradientowy, nie twarda elipsa)
-        self._draw_soft_shadow(win, self.x, self.y + 18, 50, 14)
+        # V5: cien usuniety na prosbe gracza
         img_to_draw = self.img
         # V1: hit flash - biala sylwetka (maska, nie prostokat)
         if self.flash_timer > 0:
