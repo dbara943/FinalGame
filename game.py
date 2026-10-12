@@ -208,8 +208,8 @@ class Game:
         self.seagulls = [(random.randint(200, 900), random.randint(50, 150), random.random()*6) for _ in range(2)]
         self.game_time = 0  # Q17: zegar sesji (ticki)
         self.muted = False  # Q16 (legacy - teraz rozdzielone)
-        self.music_muted = False  # wyciszenie muzyki
-        self.sfx_muted = False  # wyciszenie efektow dzwiekowych
+        self.music_muted = not sound  # jesli sound=False z menu, muzyka wyciszona
+        self.sfx_muted = not sound  # dzwieki tez wyciszone
         self.build_queue = []  # Q14: kolejka budowy
         self.tower_filter = None  # Q15: filtr wiez
         self.display_money = 200  # Niespodzianka 4: animowany licznik zlota
@@ -595,16 +595,17 @@ class Game:
         while run:
             clock.tick_busy_loop(RENDER_FPS)
             
-            if time.time() - self.timer >= random.randrange(1, 5)/2:
+            if not self.paused and time.time() - self.timer >= random.randrange(1, 5)/2:
                     self.timer = time.time()
                     self.gen_enemies()
-            # Statek w tempie logiki 100Hz (akumulator, z capem)
-            ship_acc = min(ship_acc + LOGIC_HZ / RENDER_FPS, 5.0)
-            while ship_acc >= 1.0:
-                self.ship.update()
-                ship_acc -= 1.0
-            self._update_cannonballs()
-            self._update_bombardment()
+            # Statek w tempie logiki 100Hz (akumulator, z capem) - pauza blokuje
+            if not self.paused:
+                ship_acc = min(ship_acc + LOGIC_HZ / RENDER_FPS, 5.0)
+                while ship_acc >= 1.0:
+                    self.ship.update()
+                    ship_acc -= 1.0
+                self._update_cannonballs()
+                self._update_bombardment()
             if self.ship.state == Ship.AWAY and not self.won:
                 if self.last_wave_done:
                     self.won = True
@@ -2472,11 +2473,11 @@ class Game:
         has_boss = boss_alive or self.pending_boss is not None
         
         if remaining or has_boss:
-            # Dynamiczna szerokosc
-            item_w = 60
+            # Dynamiczna szerokosc (sprite 32 + liczba + odstep)
+            item_w = 85
             num_items = len(remaining) + (1 if has_boss else 0)
             panel_w = num_items * item_w + 20
-            panel_h = 70
+            panel_h = 62
             # Z powrotem po lewej, pod wave/lives/cash
             preview_x = 10
             preview_y = 65
@@ -2489,30 +2490,33 @@ class Game:
             font_head = pygame.font.SysFont("arial", 14, bold=True)
             label = font_head.render("Enemies", True, (200, 220, 255))
             self.win.blit(label, (preview_x + panel_w//2 - label.get_width()//2, preview_y + 5))
-            # Ikony
-            font_cnt = pygame.font.SysFont("arial", 13, bold=True)
+            # Ikony - liczba OBOK sprite'a, wycentrowana w pionie
+            font_cnt = pygame.font.SysFont("arial", 15, bold=True)
             x_off = preview_x + 10
             for i, count in remaining:
                 try:
                     enemy_cls = self.enemy_classes[i]
                     temp = enemy_cls()
                     icon = pygame.transform.scale(temp.imgs[0], (32, 32))
-                    # Wycentrowana kolumna
-                    cx = x_off + item_w // 2
-                    self.win.blit(icon, (cx - 16, preview_y + 22))
+                    # Sprite po lewej, liczba po prawej, wycentrowane w pionie
+                    icon_y = preview_y + 20
+                    self.win.blit(icon, (x_off, icon_y))
                     cnt_label = font_cnt.render(str(count), True, (255, 255, 120))
-                    self.win.blit(cnt_label, (cx - cnt_label.get_width()//2, preview_y + 54))
-                    x_off += item_w
+                    cnt_x = x_off + 36
+                    cnt_y = icon_y + 16 - cnt_label.get_height() // 2
+                    self.win.blit(cnt_label, (cnt_x, cnt_y))
+                    x_off += 36 + cnt_label.get_width() + 14
                 except:
                     pass
             if has_boss:
                 try:
                     boss_temp = Boss()
                     boss_icon = pygame.transform.scale(boss_temp.imgs[0], (32, 32))
-                    cx = x_off + item_w // 2
-                    self.win.blit(boss_icon, (cx - 16, preview_y + 22))
+                    icon_y = preview_y + 20
+                    self.win.blit(boss_icon, (x_off, icon_y))
                     blabel = font_cnt.render("BOSS", True, (255, 100, 100))
-                    self.win.blit(blabel, (cx - blabel.get_width()//2, preview_y + 54))
+                    blabel_y = icon_y + 16 - blabel.get_height() // 2
+                    self.win.blit(blabel, (x_off + 36, blabel_y))
                 except:
                     pass
     def add_tower(self, name):
