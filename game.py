@@ -806,9 +806,7 @@ class Game:
             if getattr(en, '_dust', False):
                 en._dust = False
                 self.particles.burst(en.x, en.y + 15, (180, 160, 140), count=2, speed=1, life=20, size=3, gravity=-0.05)
-            # Slad lodu za spowolnionymi
-            if en.slow_timer > 0 and random.random() < 0.15:
-                self.particles.burst(en.x, en.y + 10, (180, 220, 255), count=1, speed=0.5, life=20, size=2, gravity=0)
+            # Slad lodu za spowolnionymi - usuniety na prosbe gracza
             # Slady stop bossa - usuniete na prosbe gracza
             # Boss finalny: ryk przy enrage
             if isinstance(en, Boss) and en.get_roar_request():

@@ -141,16 +141,7 @@ class Enemy:
                                              unsetcolor=(0, 0, 0, 0))
                 self._flash_cache = {'img': self.img, 'surf': flash_surf}
             img_to_draw = self._flash_cache['surf']
-        # V2: wskaznik spowolnienia - subtelne krysztalki lodu u stop (nie zaslania modelu)
-        if self.slow_timer > 0:
-            # Male niebieskie romby u podstawy wroga
-            for ox, oy in [(-12, 12), (0, 16), (12, 12)]:
-                pts = [(self.x + ox, self.y + oy - 6),
-                       (self.x + ox + 5, self.y + oy),
-                       (self.x + ox, self.y + oy + 6),
-                       (self.x + ox - 5, self.y + oy)]
-                pygame.draw.polygon(win, (150, 210, 255, 200), pts)
-                pygame.draw.polygon(win, (220, 240, 255, 255), pts, 1)
+        # V2: wskaznik spowolnienia - usuniety na prosbe gracza
         win.blit(img_to_draw, (self.x - img_to_draw.get_width()/2, self.y - img_to_draw.get_height()/2 - 35))
         # Pasek HP tylko gdy ranny (wydajnosc) - pelne HP = brak paska
         if not self.dying and self.health < self.max_health:
