@@ -578,6 +578,8 @@ class Game:
                             self._screen = pygame.display.set_mode((self._native_w, self._native_h))
                         # Zaktualizuj rzeczywisty rozmiar
                         self._native_w, self._native_h = self._screen.get_size()
+                    if event.key == pygame.K_F3:
+                        self._debug_show = not getattr(self, '_debug_show', False)
                     # Spacja: pauza
                     if event.key == pygame.K_SPACE:
                         self.paused = not self.paused
@@ -2285,6 +2287,18 @@ class Game:
         return True
 
     def draw_hud(self):
+        # DEBUG: F3 pokazuje stan wewnetrzny
+        if getattr(self, '_debug_show', False):
+            dbg_font = pygame.font.SysFont("consolas", 14)
+            lines = [
+                f"wave={self.wave} enemies={len(self.enemies)}",
+                f"waiting={self.waiting_for_clear} ship={self.ship.state}",
+                f"current_wave_sum={sum(self.current_wave)}",
+                f"clear_timer={self._clear_timer}",
+            ]
+            for i, line in enumerate(lines):
+                txt = dbg_font.render(line, True, (255, 255, 0))
+                self.win.blit(txt, (10, 120 + i*20))
         # Rzad spojnych "pigulek": fala, zycia, kasa (tla prerenderowane)
         pill_h = self._pill_h
         y = 10
