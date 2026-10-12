@@ -4,13 +4,15 @@ import os
 os.environ.setdefault("SDL_HINT_RENDER_SCALE_QUALITY", "2")
 pygame.font.init()
 pygame.display.set_caption('Island Defenders')
-# Ekran ladowania (zanim ciezkie assety)
+# Ekran ladowania (zanim ciezkie assety) - fullscreen zeby nie bylo czarnego paska
 try:
-    _load_win = pygame.display.set_mode((400, 200))
+    _info = pygame.display.Info()
+    _lw, _lh = _info.current_w, _info.current_h
+    _load_win = pygame.display.set_mode((_lw, _lh), pygame.FULLSCREEN)
     _load_win.fill((20, 25, 35))
-    _lf = pygame.font.SysFont("arial", 24)
+    _lf = pygame.font.SysFont("arial", 36)
     _lt = _lf.render("Loading Island Defenders...", True, (255, 255, 255))
-    _load_win.blit(_lt, (200 - _lt.get_width()//2, 90))
+    _load_win.blit(_lt, (_lw//2 - _lt.get_width()//2, _lh//2 - 20))
     pygame.display.flip()
 except Exception:
     pass
@@ -295,7 +297,7 @@ class Game:
         if self.pending_boss:
             self.enemies.append(self.pending_boss)
             # A10: intro bossa
-            self.wave_banner_text = "⚠ BOSS ⚠"
+            self.wave_banner_text = "! BOSS !"
             self.wave_banner_timer = 150
             self.screen_shake = 10
             sound_roar.play()
@@ -806,10 +808,7 @@ class Game:
         # Update wrogow (animacje, ruch, timery) - TU, nie w draw()!
         for en in self.enemies:
             en.update()
-            # A7: kurz
-            if getattr(en, '_dust', False):
-                en._dust = False
-                self.particles.burst(en.x, en.y + 15, (180, 160, 140), count=2, speed=1, life=20, size=3, gravity=-0.05)
+            # A7: kurz - usuniety na prosbe gracza
             # Slad lodu za spowolnionymi - usuniety na prosbe gracza
             # Slady stop bossa - usuniete na prosbe gracza
             # Boss finalny: ryk przy enrage
@@ -1232,9 +1231,9 @@ class Game:
                     pygame.draw.rect(mask, (255, 255, 255, 255), mask.get_rect(), border_radius=8)
                     fg.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
                     self.win.blit(fg, (bx + 3, by + 3))
-                # Czaszka + nazwa
+                # Nazwa bossa (bez emoji - brak glyfu w czcionce)
                 boss_font = self.font_boss16
-                skull = "☠ BOSS" if not getattr(en, 'final', False) else "☠ FINAL BOSS"
+                skull = "BOSS" if not getattr(en, 'final', False) else "FINAL BOSS"
                 if getattr(en, 'enraged', False):
                     skull += " (ENRAGED!)"
                     scol = (255, 100, 100)

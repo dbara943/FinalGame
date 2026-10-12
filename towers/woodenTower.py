@@ -231,7 +231,7 @@ archer_imgs2.append(pygame.transform.scale(
     pygame.image.load(os.path.join("images/turrets/projectiles", str(2) + ".png" )), (25, 25))) 
 
 class MetalTower(WoodenTower):
-    buy_price = 200
+    buy_price = 500
     ability_name = "Frost Nova"
     ability_desc = "Slows all enemies in range"
     def __init__(self, x, y):
@@ -300,7 +300,7 @@ tower_imgs3 = [_gold_tint(img) for img in tower_imgs3]
 archer_imgs3 = [_gold_tint(img) for img in archer_imgs3]
 
 class GoldenTower(WoodenTower):
-    buy_price = 300
+    buy_price = 750
     ability_name = "Golden Touch"
     ability_desc = "Double gold for kills for 10s"
     def __init__(self, x, y):
@@ -354,7 +354,7 @@ archer_imgs4.append(pygame.transform.scale(
     pygame.image.load(os.path.join("images/turrets/projectiles", str(4) + ".png" )), (25, 25))) 
 
 class FireTower(WoodenTower):
-    buy_price = 400
+    buy_price = 1000
     ability_name = "Meteor"
     ability_desc = "Powerful 3x damage projectile, big splash"
     damage_type = "fire"
@@ -412,7 +412,7 @@ archer_imgs5.append(pygame.transform.scale(
     pygame.image.load(os.path.join("images/turrets/projectiles", str(5) + ".png" )), (25, 25))) 
 
 class BlazeTower(WoodenTower):
-    buy_price = 500
+    buy_price = 2000
     ability_name = "Armageddon"
     ability_desc = "Damage to ALL enemies on map"
     damage_type = "fire"
