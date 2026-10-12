@@ -1,5 +1,7 @@
 import pygame
 import os
+# Najwyzsza jakosc skalowania GPU (ostrzejszy fullscreen)
+os.environ.setdefault("SDL_HINT_RENDER_SCALE_QUALITY", "2")
 import math
 from enemies.forkman import Forkman
 from enemies.swordman import Swordman
@@ -417,6 +419,14 @@ class Game:
                     # Q: aktywacja umiejetnosci wybranej wiezy
                     if event.key == pygame.K_q and self.selected_tower:
                         self.selected_tower.activate_ability(self.enemies, self.projectiles)
+                    # F11: przelacz fullscreen / okno 1:1 (ostrzejsze piksele)
+                    if event.key == pygame.K_F11:
+                        self._fullscreen = not getattr(self, '_fullscreen', True)
+                        if self._fullscreen:
+                            self.win = pygame.display.set_mode(
+                                (self.width, self.height), pygame.SCALED | pygame.FULLSCREEN)
+                        else:
+                            self.win = pygame.display.set_mode((self.width, self.height))
                     # Spacja: pauza
                     if event.key == pygame.K_SPACE:
                         self.paused = not self.paused
