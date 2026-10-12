@@ -68,6 +68,11 @@ pygame.mixer.init()
 music = pygame.mixer.music.load(os.path.join("sounds", "music.wav"))
 sound_1 = pygame.mixer.Sound("sounds/1.wav")
 sound_glass = pygame.mixer.Sound("sounds/glass_shatter.wav")
+sound_ab_rapid = pygame.mixer.Sound("sounds/ability_rapidfire.wav")
+sound_ab_frost = pygame.mixer.Sound("sounds/ability_frostnova.wav")
+sound_ab_gold = pygame.mixer.Sound("sounds/ability_goldentouch.wav")
+sound_ab_meteor = pygame.mixer.Sound("sounds/ability_meteor.wav")
+sound_ab_arma = pygame.mixer.Sound("sounds/ability_armageddon.wav")
 sound_2 = pygame.mixer.Sound("sounds/2.wav")
 sound_3 = pygame.mixer.Sound("sounds/3.wav")
 sound_4 = pygame.mixer.Sound("sounds/4.wav")
@@ -209,6 +214,7 @@ class Game:
         if not sound:
             pygame.mixer.music.pause()
             for s in (sound_1, sound_2, sound_3, sound_4, sound_5, sound_glass,
+                      sound_ab_rapid, sound_ab_frost, sound_ab_gold, sound_ab_meteor, sound_ab_arma,
                       tower_sound_1, tower_sound_2, tower_sound_3,
                       tower_sound_4, tower_sound_5, sound_win, sound_lose, sound_roar,
                       sound_levelup, sound_horn, sound_rain, sound_gull, sound_fanfare,
@@ -591,10 +597,19 @@ class Game:
                     if hasattr(self, 'ability_slots'):
                         for rect, tname in self.ability_slots:
                             if rect.collidepoint(pos):
+                                # WSZYSTKIE wieze tego typu z gotowym cooldownem aktywuja umiejetnosc
+                                activated = False
                                 for tw in self.towers:
                                     if type(tw).__name__.startswith(tname) and tw.ability_cooldown <= 0:
                                         tw.activate_ability(self.enemies, self.projectiles)
-                                        break
+                                        activated = True
+                                if activated:
+                                    # Unikalny dzwiek dla kazdej umiejetnosci
+                                    snd = {"Wooden": sound_ab_rapid, "Metal": sound_ab_frost,
+                                           "Golden": sound_ab_gold, "Fire": sound_ab_meteor,
+                                           "Blaze": sound_ab_arma}.get(tname)
+                                    if snd:
+                                        snd.play()
                                 continue
                     # R2: przycisk wczesniejszej fali
                     if self.early_wave_rect and self.early_wave_rect.collidepoint(pos):
@@ -1444,7 +1459,9 @@ class Game:
         elif action == "sfx":
             self.sfx_muted = not self.sfx_muted
             vol = 0 if self.sfx_muted else 1
-            for s in (sound_1, sound_2, sound_3, sound_4, sound_5, sound_glass, sound_win, sound_lose, sound_roar,
+            for s in (sound_1, sound_2, sound_3, sound_4, sound_5, sound_glass,
+                      sound_ab_rapid, sound_ab_frost, sound_ab_gold, sound_ab_meteor, sound_ab_arma,
+                      sound_win, sound_lose, sound_roar,
                       sound_levelup, sound_horn, sound_gull, sound_fanfare,
                       *shoot_sounds.values()):
                 s.set_volume(vol)
@@ -1998,7 +2015,7 @@ class Game:
             self.particles.burst(150, 620, (255, 255, 255), count=3, speed=2, life=20, size=3)
 
     def draw_ability_dock(self):
-        """Pasek 5 umiejetnosci (po jednej na typ wiezy). Kliknij aby aktywowac."""
+        """Nowoczesny pasek 5 umiejetnosci - glassmorphism, pulsowanie, licznik gotowych."""
         tower_types = [
             ("Wooden", "Rapid Fire", (139, 90, 43)),
             ("Metal", "Frost Nova", (120, 130, 140)),
@@ -2006,52 +2023,72 @@ class Game:
             ("Fire", "Meteor", (220, 80, 40)),
             ("Blaze", "Armageddon", (180, 40, 180)),
         ]
-        slot_w, slot_h = 110, 64
-        gap = 8
+        slot_w, slot_h = 120, 72
+        gap = 10
         total_w = 5 * slot_w + 4 * gap
         start_x = self.width // 2 - total_w // 2
-        y = self.height - slot_h - 10
+        y = self.height - slot_h - 12
         self.ability_slots = []
-        
+        t_now = pygame.time.get_ticks() / 1000.0
+
         for i, (tname, aname, color) in enumerate(tower_types):
             x = start_x + i * (slot_w + gap)
             rect = pygame.Rect(x, y, slot_w, slot_h)
             self.ability_slots.append((rect, tname))
-            ready_tower = None
+            # Policz gotowe wieze
+            ready_count = sum(1 for tw in self.towers
+                              if type(tw).__name__.startswith(tname) and tw.ability_cooldown <= 0)
             cooling = None
             for tw in self.towers:
-                if type(tw).__name__.startswith(tname):
-                    if tw.ability_cooldown <= 0:
-                        ready_tower = tw
-                        break
-                    elif cooling is None:
+                if type(tw).__name__.startswith(tname) and tw.ability_cooldown > 0:
+                    if cooling is None or tw.ability_cooldown < cooling.ability_cooldown:
                         cooling = tw
+            has_tower = ready_count > 0 or cooling is not None
+
             bg = pygame.Surface((slot_w, slot_h), pygame.SRCALPHA)
-            if ready_tower:
-                pygame.draw.rect(bg, (*color, 230), bg.get_rect(), border_radius=10)
-                pygame.draw.rect(bg, (255, 255, 255, 200), bg.get_rect(), 2, border_radius=10)
+            if ready_count > 0:
+                # Pulsowanie gdy gotowe
+                pulse = int(15 * math.sin(t_now * 4 + i))
+                r, g, b = color
+                # Glow
+                glow = pygame.Surface((slot_w + 8, slot_h + 8), pygame.SRCALPHA)
+                pygame.draw.rect(glow, (*color, 60 + pulse), glow.get_rect(), border_radius=14)
+                self.win.blit(glow, (x - 4, y - 4))
+                # Tlo z gradientem
+                pygame.draw.rect(bg, (r, g, b, 235), bg.get_rect(), border_radius=12)
+                # Blysk na gorze
+                pygame.draw.rect(bg, (255, 255, 255, 50), (0, 0, slot_w, 20), border_radius=12)
+                pygame.draw.rect(bg, (255, 255, 255, 220), bg.get_rect(), 2, border_radius=12)
             elif cooling:
-                pygame.draw.rect(bg, (40, 50, 65, 230), bg.get_rect(), border_radius=10)
+                pygame.draw.rect(bg, (35, 42, 55, 235), bg.get_rect(), border_radius=12)
+                pygame.draw.rect(bg, (70, 80, 95, 150), bg.get_rect(), 1, border_radius=12)
+                # Pasek cooldownu na dole
                 cd_ratio = cooling.ability_cooldown / cooling.ability_max_cooldown
-                overlay_h = int(slot_h * cd_ratio)
-                pygame.draw.rect(bg, (0, 0, 0, 150), (0, 0, slot_w, overlay_h), border_radius=10)
+                bar_w = int((slot_w - 16) * (1 - cd_ratio))
+                pygame.draw.rect(bg, (100, 110, 125, 100), (8, slot_h - 10, slot_w - 16, 4), border_radius=2)
+                pygame.draw.rect(bg, (*color, 200), (8, slot_h - 10, bar_w, 4), border_radius=2)
             else:
-                pygame.draw.rect(bg, (30, 35, 45, 180), bg.get_rect(), border_radius=10)
+                pygame.draw.rect(bg, (25, 30, 40, 160), bg.get_rect(), border_radius=12)
             self.win.blit(bg, (x, y))
+
+            # Teksty
             f1 = self.font_f13
             f2 = self.font_f11
             t1 = f1.render(aname, True, (255, 255, 255))
-            self.win.blit(t1, (x + slot_w//2 - t1.get_width()//2, y + 6))
-            if ready_tower:
-                t2 = self._txt_ready
+            self.win.blit(t1, (x + slot_w//2 - t1.get_width()//2, y + 8))
+            if ready_count > 0:
+                # Licznik gotowych wiez
+                badge = f2.render(f"{ready_count}x READY", True, (255, 255, 200))
+                self.win.blit(badge, (x + slot_w//2 - badge.get_width()//2, y + 30))
             elif cooling:
                 secs = cooling.ability_cooldown // 60
-                t2 = f2.render(f"{secs}s", True, (180, 180, 180))
+                t2 = f2.render(f"{secs}s", True, (170, 170, 170))
+                self.win.blit(t2, (x + slot_w//2 - t2.get_width()//2, y + 30))
             else:
                 t2 = self._txt_no_tower
-            self.win.blit(t2, (x + slot_w//2 - t2.get_width()//2, y + 28))
-            t3 = f2.render(tname, True, (200, 200, 200))
-            self.win.blit(t3, (x + slot_w//2 - t3.get_width()//2, y + 44))
+                self.win.blit(t2, (x + slot_w//2 - t2.get_width()//2, y + 30))
+            t3 = f2.render(tname, True, (190, 190, 190))
+            self.win.blit(t3, (x + slot_w//2 - t3.get_width()//2, y + 48))
 
     def draw_placement_grid(self, win, mx, my):
         """Podswietlenie poprawnosci miejsca (bez siatki)."""
