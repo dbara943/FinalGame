@@ -190,6 +190,7 @@ class Game:
         self.chameleon_hue = 0  # 25: kameleon
         self.shockwaves = []  # Kregi uderzeniowe
         self.screen_shake = 0  # Wstrzas ekranu
+        self.boss_intro_dark = 0  # Przyciemnienie przy wejsciu bossa
         self.scorch_marks = []  # Spalenizna [(x, y, timer)]
         self.clouds = [(random.randint(0, 1124), random.randint(20, 200), random.randint(20, 40)) for _ in range(3)]
         self.leaves = [(random.randint(0, 1124), random.randint(0, 720)) for _ in range(15)]
@@ -201,6 +202,7 @@ class Game:
         self.build_queue = []  # Q14: kolejka budowy
         self.tower_filter = None  # Q15: filtr wiez
         self.display_money = 200  # Niespodzianka 4: animowany licznik zlota
+        self.display_lives = 20  # Animowany licznik zyc
         # Wizualne: fale, odbicia, niebo
         self.wave_phase = 0  # faza fal wody
         self.shooting_stars = []  # spadajace gwiazdy
@@ -302,10 +304,11 @@ class Game:
         # Boss czeka na zadokowanie - spawnuj gdy statek w porcie
         if self.pending_boss:
             self.enemies.append(self.pending_boss)
-            # A10: intro bossa
+            # A10: intro bossa - dramatyczne wejscie
             self.wave_banner_text = "! BOSS !"
             self.wave_banner_timer = 150
             self.screen_shake = 10
+            self.boss_intro_dark = 180  # przyciemnienie ekranu na 3s
             sound_roar.play()
             self.pending_boss = None
         if sum(self.current_wave) == 0:
@@ -414,6 +417,7 @@ class Game:
                 self.wave_banner_text = "FINALNA FALA - BOSS!"
         self.waiting_for_clear = False
     def run(self):
+        self._music_intense = False
         if self.sound:
             pygame.mixer.music.play(loops=-1)
         run = True
@@ -783,6 +787,8 @@ class Game:
                 self.shockwaves.remove(s)
         if self.screen_shake > 0:
             self.screen_shake -= 1
+        if self.boss_intro_dark > 0:
+            self.boss_intro_dark -= 1
         for sc in self.scorch_marks[:]:
             sc[2] -= 1
             if sc[2] <= 0:
@@ -813,6 +819,23 @@ class Game:
             self.display_money = min(self.money, self.display_money + max(1, (self.money - self.display_money) // 10))
         elif self.display_money > self.money:
             self.display_money = self.money
+        # Dynamiczna muzyka: intensywna gdy boss lub malo zyc
+        if self.sound and not self.music_muted:
+            boss_alive = any(isinstance(en, Boss) for en in self.enemies)
+            want_intense = boss_alive or self.lives <= 5
+            if want_intense != self._music_intense:
+                self._music_intense = want_intense
+                track = "sounds/music_intense.wav" if want_intense else "sounds/music.wav"
+                try:
+                    pygame.mixer.music.load(track)
+                    pygame.mixer.music.play(loops=-1)
+                except:
+                    pass
+        # Animowany licznik zyc
+        if self.display_lives < self.lives:
+            self.display_lives = min(self.lives, self.display_lives + 1)
+        elif self.display_lives > self.lives:
+            self.display_lives = max(self.lives, self.display_lives - 1)
         # V4: muzzle flashes
         for mf in self.muzzle_flashes[:]:
             mf[2] -= 1
@@ -1291,6 +1314,13 @@ class Game:
         
         # Ability dock - pasek umiejetnosci na dole
         self.draw_ability_dock()
+
+        # Przyciemnienie przy wejsciu bossa (dramatyczny efekt)
+        if self.boss_intro_dark > 0:
+            alpha = int(120 * (self.boss_intro_dark / 180))
+            dark = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            dark.fill((0, 0, 0, alpha))
+            self.win.blit(dark, (0, 0))
         
         # U9: podglad zasiegu wiezy ze sklepu (hover)
         # Q12: porownanie DPS
@@ -2177,7 +2207,7 @@ class Game:
         y = 10
         items = [
             (10, 0, None, "Wave #" + str(self.wave + 1)),
-            (200, 1, self._lives_icon, str(self.lives)),
+            (200, 1, self._lives_icon, str(int(self.display_lives))),
             (340, 2, self._money_icon, str(int(self.display_money))),
         ]
         for x, pi, icon, text in items:
