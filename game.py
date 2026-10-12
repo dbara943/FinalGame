@@ -1663,27 +1663,29 @@ class Game:
         self._present()
 
     def _draw_bombard_zoom(self):
-        """Efekt zoomu na wieze podczas bombardowania."""
-        if not self.bombard_active or self.bombard_zoom == 0 or not self.bombard_zoom_tower:
+        """Efekt podczas bombardowania - przyciemnienie i oznaczenie celu."""
+        if not self.bombard_active or not self.bombard_zoom_tower:
             return
         tw = self.bombard_zoom_tower
-        # Przyciemnij ekran
+        # Lekkie przyciemnienie ekranu
         dark = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        dark.fill((0, 0, 0, 120))
+        dark.fill((0, 0, 0, 80))
         self.win.blit(dark, (0, 0))
-        # Okragly zoom na wieze - powiekszony widok
-        zoom_r = 150
-        # Pobierz fragment ekranu wokol wiezy i powieksz
-        # (uproszczone: rysujemy okrag z celownikiem)
-        pygame.draw.circle(self.win, (255, 50, 50), (int(tw.x), int(tw.y)), zoom_r, 3)
-        pygame.draw.circle(self.win, (255, 50, 50, 100), (int(tw.x), int(tw.y)), zoom_r - 10, 1)
-        # Celownik
-        pygame.draw.line(self.win, (255, 50, 50), (tw.x - 20, tw.y), (tw.x + 20, tw.y), 2)
-        pygame.draw.line(self.win, (255, 50, 50), (tw.x, tw.y - 20), (tw.x, tw.y + 20), 2)
-        # Napis TARGET
-        font = pygame.font.SysFont("arial", 24, bold=True)
-        txt = font.render("TARGET", True, (255, 50, 50))
-        self.win.blit(txt, (tw.x - txt.get_width()//2, tw.y - zoom_r - 30))
+        # Pulsujacy marker nad wieza
+        t = pygame.time.get_ticks() / 300.0
+        pulse = int(5 * math.sin(t * 6))
+        # Strzalka w dol nad wieza
+        ax, ay = int(tw.x), int(tw.y - 60 - pulse)
+        pygame.draw.polygon(self.win, (255, 60, 60), [
+            (ax - 12, ay), (ax + 12, ay), (ax, ay + 18)
+        ])
+        # Napis
+        font = pygame.font.SysFont("arial", 20, bold=True)
+        txt = font.render("INCOMING!", True, (255, 80, 80))
+        shadow = font.render("INCOMING!", True, (0, 0, 0))
+        tx = int(tw.x - txt.get_width() // 2)
+        self.win.blit(shadow, (tx + 1, ay - 28))
+        self.win.blit(txt, (tx, ay - 29))
 
     def _menu_action(self, action):
         """Akcje przyciskow menu ESC."""
@@ -2255,26 +2257,34 @@ class Game:
             self.particles.burst(150, 620, (255, 255, 255), count=3, speed=2, life=20, size=3)
 
     def draw_ability_dock(self):
-        """Nowoczesny pasek 5 umiejetnosci - glassmorphism, pulsowanie, licznik gotowych."""
+        """Nowoczesny pasek 5 umiejetnosci - wieksze czcionki, hover pop, zywe kolory."""
         tower_types = [
-            ("Wooden", "Rapid Fire", (139, 90, 43)),
-            ("Metal", "Frost Nova", (120, 130, 140)),
-            ("Golden", "Golden Touch", (212, 175, 55)),
-            ("Fire", "Meteor", (220, 80, 40)),
-            ("Blaze", "Armageddon", (180, 40, 180)),
+            ("Wooden", "Rapid Fire", (205, 133, 63)),    # jasny braz
+            ("Metal", "Frost Nova", (135, 206, 250)),     # jasny blekit
+            ("Golden", "Golden Touch", (255, 215, 0)),    # zloto
+            ("Fire", "Meteor", (255, 99, 71)),            # pomidorowy
+            ("Blaze", "Armageddon", (218, 112, 214)),     # orchidea
         ]
-        slot_w, slot_h = 120, 72
-        gap = 10
+        slot_w, slot_h = 130, 80
+        gap = 12
         total_w = 5 * slot_w + 4 * gap
         start_x = self.width // 2 - total_w // 2
         y = self.height - slot_h - 12
         self.ability_slots = []
         t_now = pygame.time.get_ticks() / 1000.0
+        mouse_pos = self._mouse_pos()
+        # Wieksze czcionki
+        f_name = pygame.font.SysFont("arial", 16, bold=True)
+        f_status = pygame.font.SysFont("arial", 14, bold=True)
+        f_type = pygame.font.SysFont("arial", 12)
 
         for i, (tname, aname, color) in enumerate(tower_types):
             x = start_x + i * (slot_w + gap)
             rect = pygame.Rect(x, y, slot_w, slot_h)
             self.ability_slots.append((rect, tname))
+            # Hover pop effect
+            is_hover = rect.collidepoint(mouse_pos)
+            scale = 1.12 if is_hover else 1.0
             # Policz gotowe wieze
             ready_count = sum(1 for tw in self.towers
                               if type(tw).__name__.startswith(tname) and tw.ability_cooldown <= 0)
@@ -2285,50 +2295,59 @@ class Game:
                         cooling = tw
             has_tower = ready_count > 0 or cooling is not None
 
-            bg = pygame.Surface((slot_w, slot_h), pygame.SRCALPHA)
+            # Rysuj z efektem pop (wiekszy gdy hover)
+            draw_w, draw_h = int(slot_w * scale), int(slot_h * scale)
+            draw_x = x - (draw_w - slot_w) // 2
+            draw_y = y - (draw_h - slot_h) // 2
+            
+            bg = pygame.Surface((draw_w, draw_h), pygame.SRCALPHA)
             if ready_count > 0:
                 # Pulsowanie gdy gotowe
-                pulse = int(15 * math.sin(t_now * 4 + i))
+                pulse = int(20 * math.sin(t_now * 5 + i))
                 r, g, b = color
-                # Glow
-                glow = pygame.Surface((slot_w + 8, slot_h + 8), pygame.SRCALPHA)
-                pygame.draw.rect(glow, (*color, 60 + pulse), glow.get_rect(), border_radius=14)
-                self.win.blit(glow, (x - 4, y - 4))
-                # Tlo z gradientem
-                pygame.draw.rect(bg, (r, g, b, 235), bg.get_rect(), border_radius=12)
+                # Glow (wiekszy przy hover)
+                glow_size = 12 if is_hover else 8
+                glow = pygame.Surface((draw_w + glow_size*2, draw_h + glow_size*2), pygame.SRCALPHA)
+                pygame.draw.rect(glow, (*color, 80 + pulse), glow.get_rect(), border_radius=16)
+                self.win.blit(glow, (draw_x - glow_size, draw_y - glow_size))
+                # Zywe tlo
+                pygame.draw.rect(bg, (r, g, b, 245), bg.get_rect(), border_radius=14)
                 # Blysk na gorze
-                pygame.draw.rect(bg, (255, 255, 255, 50), (0, 0, slot_w, 20), border_radius=12)
-                pygame.draw.rect(bg, (255, 255, 255, 220), bg.get_rect(), 2, border_radius=12)
+                pygame.draw.rect(bg, (255, 255, 255, 70), (0, 0, draw_w, 24), border_radius=14)
+                pygame.draw.rect(bg, (255, 255, 255, 230), bg.get_rect(), 3 if is_hover else 2, border_radius=14)
             elif cooling:
-                pygame.draw.rect(bg, (35, 42, 55, 235), bg.get_rect(), border_radius=12)
-                pygame.draw.rect(bg, (70, 80, 95, 150), bg.get_rect(), 1, border_radius=12)
+                pygame.draw.rect(bg, (40, 48, 62, 245), bg.get_rect(), border_radius=14)
+                pygame.draw.rect(bg, (*color, 120), bg.get_rect(), 2, border_radius=14)
                 # Pasek cooldownu na dole
                 cd_ratio = cooling.ability_cooldown / cooling.ability_max_cooldown
-                bar_w = int((slot_w - 16) * (1 - cd_ratio))
-                pygame.draw.rect(bg, (100, 110, 125, 100), (8, slot_h - 10, slot_w - 16, 4), border_radius=2)
-                pygame.draw.rect(bg, (*color, 200), (8, slot_h - 10, bar_w, 4), border_radius=2)
+                bar_w = int((draw_w - 20) * (1 - cd_ratio))
+                pygame.draw.rect(bg, (100, 110, 125, 100), (10, draw_h - 12, draw_w - 20, 5), border_radius=3)
+                pygame.draw.rect(bg, (*color, 220), (10, draw_h - 12, bar_w, 5), border_radius=3)
             else:
-                pygame.draw.rect(bg, (25, 30, 40, 160), bg.get_rect(), border_radius=12)
-            self.win.blit(bg, (x, y))
+                pygame.draw.rect(bg, (28, 33, 44, 180), bg.get_rect(), border_radius=14)
+            self.win.blit(bg, (draw_x, draw_y))
 
-            # Teksty
-            f1 = self.font_f13
-            f2 = self.font_f11
-            t1 = f1.render(aname, True, (255, 255, 255))
-            self.win.blit(t1, (x + slot_w//2 - t1.get_width()//2, y + 8))
+            # Teksty - wieksze i czytelniejsze
+            cx = draw_x + draw_w // 2
+            t1 = f_name.render(aname, True, (255, 255, 255))
+            # Cien pod tekstem dla czytelnosci
+            shadow = f_name.render(aname, True, (0, 0, 0))
+            self.win.blit(shadow, (cx - t1.get_width()//2 + 1, draw_y + 9))
+            self.win.blit(t1, (cx - t1.get_width()//2, draw_y + 8))
             if ready_count > 0:
-                # Licznik gotowych wiez
-                badge = f2.render(f"{ready_count}x READY", True, (255, 255, 200))
-                self.win.blit(badge, (x + slot_w//2 - badge.get_width()//2, y + 30))
+                badge = f_status.render(f"{ready_count}x READY", True, (255, 255, 180))
+                bshadow = f_status.render(f"{ready_count}x READY", True, (0, 0, 0))
+                self.win.blit(bshadow, (cx - badge.get_width()//2 + 1, draw_y + 33))
+                self.win.blit(badge, (cx - badge.get_width()//2, draw_y + 32))
             elif cooling:
                 secs = cooling.ability_cooldown // 60
-                t2 = f2.render(f"{secs}s", True, (170, 170, 170))
-                self.win.blit(t2, (x + slot_w//2 - t2.get_width()//2, y + 30))
+                t2 = f_status.render(f"{secs}s", True, (200, 200, 200))
+                self.win.blit(t2, (cx - t2.get_width()//2, draw_y + 32))
             else:
-                t2 = self._txt_no_tower
-                self.win.blit(t2, (x + slot_w//2 - t2.get_width()//2, y + 30))
-            t3 = f2.render(tname, True, (190, 190, 190))
-            self.win.blit(t3, (x + slot_w//2 - t3.get_width()//2, y + 48))
+                t2 = f_type.render("no tower", True, (140, 140, 140))
+                self.win.blit(t2, (cx - t2.get_width()//2, draw_y + 32))
+            t3 = f_type.render(tname, True, (210, 210, 210))
+            self.win.blit(t3, (cx - t3.get_width()//2, draw_y + 54))
 
     def draw_placement_grid(self, win, mx, my):
         """Podswietlenie poprawnosci miejsca (bez siatki)."""
@@ -2448,41 +2467,64 @@ class Game:
         label = self.hud_font.render(f"{self.speed}x", True, (255, 255, 255))
         self.win.blit(label, (sr.x + sr.width//2 - label.get_width()//2,
                               sr.y + sr.height//2 - label.get_height()//2))
-        # Podglad nastepnej fali (ikony wrogow)
-        if self.wave + 1 < len(waves):
-            next_wave = waves[self.wave + 1]
-            preview_x = 10
+        # Licznik wrogow biezacej fali (nowoczesny, dynamiczny)
+        # Zlicz pozostale: niespawned (current_wave) + zywi na mapie
+        remaining = []
+        for i in range(len(self.enemy_classes)):
+            # Niespawned
+            unspawned = self.current_wave[i] if i < len(self.current_wave) else 0
+            # Zywi na mapie tego typu
+            alive = sum(1 for en in self.enemies 
+                       if type(en).__name__ == self.enemy_classes[i].__name__ and not en.dead)
+            total = unspawned + alive
+            if total > 0:
+                remaining.append((i, total))
+        # Boss
+        boss_alive = any(isinstance(en, Boss) and not en.dead for en in self.enemies)
+        has_boss = boss_alive or self.pending_boss is not None
+        
+        if remaining or has_boss:
+            # Dynamiczna szerokosc
+            item_w = 60
+            num_items = len(remaining) + (1 if has_boss else 0)
+            panel_w = num_items * item_w + 20
+            panel_h = 70
+            # Po prawej stronie, wycentrowany tekst
+            preview_x = self.width - panel_w - 20
             preview_y = 65
-            # Tlo podgladu
-            s = pygame.Surface((300, 50), pygame.SRCALPHA)
-            pygame.draw.rect(s, (8, 18, 38, 150), s.get_rect(), border_radius=10)
+            # Nowoczesne tlo - glassmorphism
+            s = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+            pygame.draw.rect(s, (15, 25, 45, 180), s.get_rect(), border_radius=14)
+            pygame.draw.rect(s, (100, 150, 200, 60), s.get_rect(), 2, border_radius=14)
             self.win.blit(s, (preview_x, preview_y))
-            font_small = self.font_small16
-            label = self._txt_next
-            self.win.blit(label, (preview_x + 8, preview_y + 15))
-            # Ikony wrogow (po jednej na typ, z liczba POD sprajtem)
-            x_off = preview_x + 60
-            for i, count in enumerate(next_wave):
-                if count > 0 and x_off < preview_x + 280:
-                    # Uzyj pierwszej klatki animacji jako ikony
-                    try:
-                        enemy_cls = self.enemy_classes[i]
-                        temp = enemy_cls()
-                        icon = pygame.transform.scale(temp.imgs[0], (30, 30))
-                        self.win.blit(icon, (x_off, preview_y + 5))
-                        cnt_label = font_small.render(str(count), True, (255, 255, 0))
-                        self.win.blit(cnt_label, (x_off + 15 - cnt_label.get_width()//2, preview_y + 36))
-                        x_off += 55
-                    except:
-                        pass
-            # Boss w nastepnej fali? - ikona zamiast tekstu
-            if (self.wave + 2) % 4 == 0 and x_off < preview_x + 280:
+            # Naglowek "Enemies" - wycentrowany
+            font_head = pygame.font.SysFont("arial", 14, bold=True)
+            label = font_head.render("Enemies", True, (200, 220, 255))
+            self.win.blit(label, (preview_x + panel_w//2 - label.get_width()//2, preview_y + 5))
+            # Ikony
+            font_cnt = pygame.font.SysFont("arial", 13, bold=True)
+            x_off = preview_x + 10
+            for i, count in remaining:
+                try:
+                    enemy_cls = self.enemy_classes[i]
+                    temp = enemy_cls()
+                    icon = pygame.transform.scale(temp.imgs[0], (32, 32))
+                    # Wycentrowana kolumna
+                    cx = x_off + item_w // 2
+                    self.win.blit(icon, (cx - 16, preview_y + 22))
+                    cnt_label = font_cnt.render(str(count), True, (255, 255, 120))
+                    self.win.blit(cnt_label, (cx - cnt_label.get_width()//2, preview_y + 54))
+                    x_off += item_w
+                except:
+                    pass
+            if has_boss:
                 try:
                     boss_temp = Boss()
-                    boss_icon = pygame.transform.scale(boss_temp.imgs[0], (30, 30))
-                    self.win.blit(boss_icon, (x_off, preview_y + 5))
-                    cnt_label = font_small.render("1", True, (255, 100, 100))
-                    self.win.blit(cnt_label, (x_off + 15 - cnt_label.get_width()//2, preview_y + 36))
+                    boss_icon = pygame.transform.scale(boss_temp.imgs[0], (32, 32))
+                    cx = x_off + item_w // 2
+                    self.win.blit(boss_icon, (cx - 16, preview_y + 22))
+                    blabel = font_cnt.render("BOSS", True, (255, 100, 100))
+                    self.win.blit(blabel, (cx - blabel.get_width()//2, preview_y + 54))
                 except:
                     pass
     def add_tower(self, name):
