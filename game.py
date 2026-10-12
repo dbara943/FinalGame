@@ -1406,7 +1406,7 @@ class Game:
         if not self.waiting_for_clear:
             self._boss_warned = False
         
-        self.menu.draw(self.win)
+        self.menu.draw(self.win, self._mouse_pos())
         self.draw_hud()
 
         self._present()
@@ -1528,16 +1528,7 @@ class Game:
         phase = (self.wave // 2) % 4
         night = (phase == 2)
 
-        # 11: wodospad na skale
-        wx, wy = 1085, 250
-        pygame.draw.rect(self.win, (110, 110, 120), (wx - 14, wy - 60, 28, 70), border_radius=6)
-        for i in range(6):
-            fy = wy - 55 + ((t * 120 + i * 22) % 65)
-            pygame.draw.line(self.win, (180, 220, 255, 160), (wx - 8 + i * 3, fy), (wx - 8 + i * 3, fy + 14), 2)
-        # Piana u dolu
-        for i in range(4):
-            px = wx - 12 + i * 8 + 3 * math.sin(t * 3 + i)
-            pygame.draw.circle(self.win, (255, 255, 255, 140), (int(px), wy + 12), 4)
+        # 11: wodospad - usuniety na prosbe gracza
 
         # 13: usuniety wulkan na horyzoncie (na prosbe gracza)
 

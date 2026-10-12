@@ -179,15 +179,18 @@ class VerticalMenu(Menu):
         panel_h = len(self.buttons) * 78 + 50
         return pygame.Rect(self.x - panel_w // 2, self.y - 140, panel_w, panel_h)
 
-    def draw(self, win):
+    def draw(self, win, mouse_pos=None):
         # Nowoczesny sklep: ciemny panel, wyrownane ceny, bez niebieskiego tła
+        # mouse_pos w wspolrzednych gry (po przeskalowaniu) - do hovera
+        if mouse_pos is None:
+            mouse_pos = pygame.mouse.get_pos()
         panel_w = 200
         panel_h = len(self.buttons) * 78 + 50
         px = self.x - panel_w // 2
         py = self.y - 140
 
         # Przezroczystosc gdy mysz nie jest nad panelem
-        mx, my = pygame.mouse.get_pos()
+        mx, my = mouse_pos
         hovered_panel = self.get_rect().collidepoint(mx, my)
         alpha = 255 if hovered_panel else 110
 
