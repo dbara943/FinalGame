@@ -1349,11 +1349,14 @@ class Game:
                 continue
             alpha = min(255, a[1] * 4)
             f = pygame.font.SysFont("arial", 44, bold=True)
+            # Czarny kontur dla czytelnosci na jasnym tle
+            outline = f.render(a[0], True, (20, 20, 20))
             label = f.render(a[0], True, (255, 210, 60))
-            label.set_alpha(alpha)
-            # Kontur
             s = pygame.Surface((label.get_width() + 8, label.get_height() + 8), pygame.SRCALPHA)
+            for ox, oy in [(-2, 0), (2, 0), (0, -2), (0, 2), (-2, -2), (2, 2), (-2, 2), (2, -2)]:
+                s.blit(outline, (4 + ox, 4 + oy))
             s.blit(label, (4, 4))
+            s.set_alpha(alpha)
             self.win.blit(s, (self.width // 2 - s.get_width() // 2, 180))
 
     def draw_ambient_life(self):
@@ -1510,23 +1513,7 @@ class Game:
                 pygame.draw.ellipse(self.win, (200, 120, 140), (gx - 6, gy - 10, 12, 10))
                 pygame.draw.rect(self.win, (230, 220, 200), (gx - 2, gy - 2, 4, 8))
 
-        # 24: pajeczyna z pajakiem
-        sx, sy = 1062, 52
-        for a in range(6):
-            ang = a * math.pi / 6
-            pygame.draw.line(self.win, (220, 220, 220, 90), (sx, sy),
-                             (sx + 34 * math.cos(ang), sy + 34 * math.sin(ang)), 1)
-        for r in (12, 22, 32):
-            pygame.draw.circle(self.win, (220, 220, 220, 70), (sx, sy), r, 1)
-        # Pajak czasem sie rusza
-        spx = sx + 10 * math.sin(t * 0.4)
-        spy = sy + 12 + 6 * math.sin(t * 0.9)
-        pygame.draw.line(self.win, (200, 200, 200, 120), (sx, sy), (spx, spy), 1)
-        pygame.draw.circle(self.win, (40, 40, 45), (int(spx), int(spy)), 4)
-        for li in range(4):
-            la = li * math.pi / 4 + math.sin(t * 2) * 0.2
-            pygame.draw.line(self.win, (40, 40, 45), (spx, spy),
-                             (spx + 8 * math.cos(la), spy + 8 * math.sin(la)), 1)
+        # 24: pajeczyna z pajakiem - usunieta na prosbe gracza
 
         # 25: kameleon na lisciu
         self.chameleon_hue = (self.chameleon_hue + 0.4) % 360
@@ -1894,27 +1881,7 @@ class Game:
                 gx = x + w // 2 - group_w // 2
                 self.win.blit(ic, (gx, y + pill_h // 2 - ic.get_height() // 2))
                 self.win.blit(label, (gx + ic.get_width() + 8, cy))
-        # Q1: pasek postepu fali (pozostali wrogowie)
-        remaining = sum(self.current_wave) + len(self.enemies)
-        if remaining > 0:
-            pw, ph = 180, 14
-            px, py = 10, 58
-            bg = pygame.Surface((pw, ph), pygame.SRCALPHA)
-            pygame.draw.rect(bg, (0, 0, 0, 150), bg.get_rect(), border_radius=7)
-            self.win.blit(bg, (px, py))
-            # Pasek maleje wraz z postepem
-            total = getattr(self, '_wave_enemy_total', remaining)
-            if remaining > total:
-                total = remaining
-                self._wave_enemy_total = total
-            ratio = 1.0 - (remaining / total) if total > 0 else 1.0
-            fill_w = int(pw * ratio)
-            if fill_w > 0:
-                fg = pygame.Surface((fill_w, ph), pygame.SRCALPHA)
-                pygame.draw.rect(fg, (100, 200, 100), fg.get_rect(), border_radius=7)
-                self.win.blit(fg, (px, py))
-        else:
-            self._wave_enemy_total = 0
+        # Q1: pasek postepu fali - usuniety na prosbe gracza
         # Przyciski pauzy i predkosci (prawy gorny rog)
         for rect, text in [(self.pause_btn_rect, "II" if not self.paused else "▶"),
                            (self.speed_btn_rect, f"{self.speed}x")]:
