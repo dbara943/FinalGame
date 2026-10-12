@@ -97,7 +97,11 @@ class Game:
         _info = pygame.display.Info()
         self._native_w, self._native_h = _info.current_w, _info.current_h
         # Display w natywnej rozdzielczosci (bez SCALED - reczne smoothscale)
-        self._screen = pygame.display.set_mode((self._native_w, self._native_h), pygame.FULLSCREEN)
+        # Fallback jesli FULLSCREEN nie dziala
+        try:
+            self._screen = pygame.display.set_mode((self._native_w, self._native_h), pygame.FULLSCREEN)
+        except pygame.error:
+            self._screen = pygame.display.set_mode((self._native_w, self._native_h))
         # Uzyj RZECZYWISTEGO rozmiaru (Windows moze zwrocic inny niz zadany)
         self._native_w, self._native_h = self._screen.get_size()
         # Bufor gry 1124x720 - cala logika bez zmian
