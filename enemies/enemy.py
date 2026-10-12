@@ -151,7 +151,7 @@ class Enemy:
                        (self.x + ox - 5, self.y + oy)]
                 pygame.draw.polygon(win, (150, 210, 255, 200), pts)
                 pygame.draw.polygon(win, (220, 240, 255, 255), pts, 1)
-        win.blit(img_to_draw, (self.x - img_to_draw.get_width()/2, self.y - img_to_draw.get_height()/2 - 35))
+        win.blit(img_to_draw, (self.x - img_to_draw.get_width()/2, self.y - img_to_draw.get_height()/2))
         # Pasek HP tylko gdy ranny (wydajnosc) - pelne HP = brak paska
         if not self.dying and self.health < self.max_health:
             self.draw_health_bar(win)
@@ -211,7 +211,7 @@ class Enemy:
         # Nowoczesny pasek: zaokraglone tlo, elegancka zielen/czerwien
         bar_w, bar_h = 50, 8
         x = self.x - bar_w / 2
-        y = self.y - 70
+        y = self.y - 40
         ratio = max(0.0, min(1.0, self.health / self.max_health)) if self.max_health > 0 else 0
         # Tlo (ciemne, zaokraglone)
         bg = pygame.Surface((bar_w, bar_h), pygame.SRCALPHA)
