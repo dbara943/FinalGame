@@ -1711,10 +1711,7 @@ class Game:
             self.win.blit(self._overlay_sunset, (0, 0))
         elif phase == 2:
             self.win.blit(self._overlay_night, (0, 0))
-            # B10: latarnie w nocy
-            for x, y in [(400, 500), (600, 480), (800, 460), (500, 420)]:
-                pygame.draw.circle(self.win, (255, 220, 120, 80), (x, y), 25)
-                pygame.draw.circle(self.win, (255, 240, 180), (x, y), 6)
+            # B10: latarnie w nocy - usuniete na prosbe gracza
         elif phase == 3:
             self.win.blit(self._overlay_dawn, (0, 0))
             # Mgla poranna (15s)
