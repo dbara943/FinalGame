@@ -90,20 +90,23 @@ class Enemy:
         # Culling: nie rysuj poza ekranem (wydajnosc)
         if self.x < -80 or self.x > 1204 or self.y < -80 or self.y > 800:
             return
-        # 6: zloci wrogowie (elitarni / oznaczeni Golden Touch) - caly model w zlocie,
-        # jak Golden Tower, zamiast brzydkiego kolka
+        # 6: zloci wrogowie (elitarni / oznaczeni Golden Touch) - caly model ZE ZLOTA
         is_golden = self.elite or getattr(self, '_gold_marked', False)
         if is_golden:
             _gc = getattr(self, '_gold_cache', None)
             if not _gc or _gc.get('img') is not self.img:
-                tinted = self.img.copy()
-                # Mocny zloty tint - wyraznie widoczny
-                tint = pygame.Surface(self.img.get_size())
-                tint.fill((255, 175, 40))
-                tinted.blit(tint, (0, 0), special_flags=pygame.BLEND_MULT)
-                bright = pygame.Surface(self.img.get_size())
-                bright.fill((60, 35, 0))
-                tinted.blit(bright, (0, 0), special_flags=pygame.BLEND_ADD)
+                # Prawdziwy filtr zlota: grayscale -> pokoloruj na zloto
+                # (jak posag ze zlota, nie tylko tint)
+                gray = pygame.transform.grayscale(self.img)
+                tinted = gray.copy()
+                # Zlota paleta: ciemne -> braz, jasne -> jasne zloto
+                gold = pygame.Surface(self.img.get_size())
+                gold.fill((255, 190, 50))
+                tinted.blit(gold, (0, 0), special_flags=pygame.BLEND_MULT)
+                # Polysk
+                shine = pygame.Surface(self.img.get_size())
+                shine.fill((40, 25, 0))
+                tinted.blit(shine, (0, 0), special_flags=pygame.BLEND_ADD)
                 self._gold_cache = {'img': self.img, 'surf': tinted}
             img_to_draw = self._gold_cache['surf']
         else:
