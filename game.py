@@ -11,6 +11,7 @@ from enemies.ogre import Ogre
 from enemies.evilVillager import EvilVillager
 from enemies.boss import Boss
 from towers.woodenTower import (WoodenTower, MetalTower, GoldenTower, FireTower, BlazeTower,
+                                _gold_tint,
                                 sound_1 as tower_sound_1, sound_2 as tower_sound_2,
                                 sound_3 as tower_sound_3, sound_4 as tower_sound_4,
                                 sound_5 as tower_sound_5)
@@ -27,7 +28,7 @@ money_img = pygame.image.load(os.path.join("images", "money.png"))
 side_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "side_menu.png")), (375, 475))
 t1_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t1.png")), (30, 30))
 t2_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t2.png")), (30, 30))
-t3_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t3.png")), (30, 30))
+t3_img = _gold_tint(pygame.transform.scale(pygame.image.load(os.path.join("images", "t3.png")), (30, 30)))
 t4_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t4.png")), (30, 30))
 t5_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t5.png")), (30, 30))
 wave_bg = pygame.transform.scale(pygame.image.load(os.path.join("images","wave.png")), (225, 75))
@@ -178,6 +179,9 @@ class Game:
         self.menu.add_btn(t4_img, "t4", 400)
         self.menu.add_btn(t5_img, "t5", 500)
         self.moving_object =  None
+        self.menu_dragging = False  # przeciganie sklepu myszka
+        self.menu_drag_dx = 0
+        self.menu_drag_dy = 0
         self.wave = 0
         self.current_wave = waves[self.wave][:]
         self.won = False
@@ -249,20 +253,17 @@ class Game:
         elif self.wave + 1 >= len(waves):
             self.last_wave_done = True
         else:
-            # Zloto za fale: baza + bonus za czysta fale + odsetki
+            # Zloto za fale: baza + bonus za czysta fale (bez odsetek)
             base_gold = (self.wave + 1) * 100
             bonus = 0
             if hasattr(self, '_wave_start_lives') and self.lives == self._wave_start_lives:
                 bonus = 50 + self.wave * 10
-            interest = int(self.money * 0.05)
-            total = base_gold + bonus + interest
+            total = base_gold + bonus
             self.money += total
             # Widoczne powiadomienie o zlocie
             parts = [f"+{base_gold} for wave"]
             if bonus > 0:
                 parts.append(f"+{bonus} clean wave")
-            if interest > 0:
-                parts.append(f"+{interest} interest")
             self.gold_notifications.append([" | ".join(parts), 180])
             self.wave += 1
             self.current_wave = waves[self.wave][:]
@@ -336,6 +337,12 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     run = False
+                # Przeciganie sklepu
+                if event.type == pygame.MOUSEMOTION and self.menu_dragging:
+                    self.menu.x = max(85, min(self.width - 85, event.pos[0] + self.menu_drag_dx))
+                    self.menu.y = max(190, min(self.height - 190, event.pos[1] + self.menu_drag_dy))
+                if event.type == pygame.MOUSEBUTTONUP:
+                    self.menu_dragging = False
                 if event.type == pygame.KEYDOWN:
                     # Q: aktywacja umiejetnosci wybranej wiezy
                     if event.key == pygame.K_q and self.selected_tower:
@@ -418,6 +425,13 @@ class Game:
                         self.selected_tower = None
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
+                    # Przeciganie sklepu: klik na panel (poza przyciskami) = drag
+                    if self.menu.get_rect().collidepoint(pos):
+                        if not self.menu.get_clicked(pos[0], pos[1]):
+                            self.menu_dragging = True
+                            self.menu_drag_dx = self.menu.x - pos[0]
+                            self.menu_drag_dy = self.menu.y - pos[1]
+                            continue
                     # Q3: Shift+klik = szybka sprzedaz wiezy
                     keys = pygame.key.get_mods()
                     if keys & pygame.KMOD_SHIFT and self.selected_tower:
@@ -1531,7 +1545,7 @@ class Game:
 
     def draw_campfire(self):
         t = pygame.time.get_ticks() / 1000.0
-        cx, cy = 835, 355  # przed wejsciem do namiotu (teepee po prawej)
+        cx, cy = 830, 385  # na trawie przed wejsciem do namiotu (poziom ziemi)
         for i in range(8):
             ang = i * math.pi / 4
             pygame.draw.circle(self.win, (120, 120, 120),
@@ -1899,9 +1913,6 @@ class Game:
                 fg = pygame.Surface((fill_w, ph), pygame.SRCALPHA)
                 pygame.draw.rect(fg, (100, 200, 100), fg.get_rect(), border_radius=7)
                 self.win.blit(fg, (px, py))
-            qfont = pygame.font.SysFont("arial", 12)
-            qlabel = qfont.render(f"Enemies: {remaining}", True, (220, 220, 220))
-            self.win.blit(qlabel, (px + pw + 8, py - 1))
         else:
             self._wave_enemy_total = 0
         # Przyciski pauzy i predkosci (prawy gorny rog)
@@ -1945,12 +1956,6 @@ class Game:
             if (self.wave + 2) % 4 == 0:
                 boss_label = font_small.render("BOSS!", True, (255, 50, 50))
                 self.win.blit(boss_label, (x_off, preview_y + 15))
-            # Q19: rozbicie ekonomii
-            wave_gold = (self.wave + 2) * 100
-            interest = int(self.money * 0.05)
-            efont = pygame.font.SysFont("arial", 12)
-            elabel = efont.render(f"wave {wave_gold}$ + interest {interest}$", True, (180, 180, 180))
-            self.win.blit(elabel, (preview_x + 8, preview_y + 60))
     def add_tower(self, name):
         x, y = pygame.mouse.get_pos()
         name_list = ["t1", "t2", "t3", "t4", "t5"]
