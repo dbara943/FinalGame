@@ -585,12 +585,10 @@ class Game:
                         continue
                     if self.moving_object:
                         if self.moving_object.name in towers_names:
-                            # R4: tylko na poprawnym miejscu
-                            gx = round(self.moving_object.x / 40) * 40
-                            gy = round(self.moving_object.y / 40) * 40
-                            if self.is_valid_placement(gx, gy):
-                                self.moving_object.x, self.moving_object.y = gx, gy
-                                self.moving_object.menu.x, self.moving_object.menu.y = gx, gy
+                            # Swobodne stawianie (bez przyciagania do siatki)
+                            mx, my = self.moving_object.x, self.moving_object.y
+                            if self.is_valid_placement(mx, my):
+                                self.moving_object.menu.x, self.moving_object.menu.y = mx, my
                                 self.moving_object.menu.update()
                                 # Q14: Shift = kolejka budowy
                                 if pygame.key.get_mods() & pygame.KMOD_SHIFT:
@@ -2036,27 +2034,21 @@ class Game:
             self.win.blit(t3, (x + slot_w//2 - t3.get_width()//2, y + 44))
 
     def draw_placement_grid(self, win, mx, my):
-        """R4: Siatka + podswietlenie poprawnosci miejsca."""
-        grid = 40
-        # Siatka
-        for x in range(0, self.width, grid):
-            pygame.draw.line(win, (255, 255, 255, 25), (x, 0), (x, self.height), 1)
-        for y in range(0, self.height, grid):
-            pygame.draw.line(win, (255, 255, 255, 25), (0, y), (self.width, y), 1)
-        # Przyciagnij do siatki
-        gx = round(mx / grid) * grid
-        gy = round(my / grid) * grid
-        valid = self.is_valid_placement(gx, gy)
-        color = (80, 220, 100, 120) if valid else (220, 80, 80, 120)
-        hl = pygame.Surface((grid, grid), pygame.SRCALPHA)
-        pygame.draw.rect(hl, color, hl.get_rect(), border_radius=6)
-        win.blit(hl, (gx - grid//2, gy - grid//2))
+        """Podswietlenie poprawnosci miejsca (bez siatki)."""
+        valid = self.is_valid_placement(mx, my)
+        color = (80, 220, 100, 130) if valid else (220, 80, 80, 130)
+        # Okrag podswietlenia w miejscu kursora
+        r = 35
+        hl = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
+        pygame.draw.circle(hl, color, (r, r), r)
+        pygame.draw.circle(hl, (255, 255, 255, 180), (r, r), r, 2)
+        win.blit(hl, (mx - r, my - r))
         # Okrag zasiegu w miejscu stawiania
         if hasattr(self.moving_object, 'range'):
-            r = self.moving_object.range
-            surf = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
-            pygame.draw.circle(surf, (150, 220, 255, 60), (r, r), r, 2)
-            win.blit(surf, (gx - r, gy - r))
+            rg = self.moving_object.range
+            surf = pygame.Surface((rg*2, rg*2), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (150, 220, 255, 60), (rg, rg), rg, 2)
+            win.blit(surf, (mx - rg, my - rg))
 
     def shop_price(self, tower_name):
         """Cena wiezy w sklepie. Mapuje nazwe klasy (woodenTower) na przycisk (t1)."""
