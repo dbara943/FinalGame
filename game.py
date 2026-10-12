@@ -158,6 +158,7 @@ class Game:
         self.wave_banner_timer = 0
         self.muzzle_flashes = []  # V4: blyski przy strzale [(x, y, timer)]
         self.waiting_for_clear = False  # Czekamy na wyczyszczenie planszy przed nastepna fala
+        self._clear_timer = 0  # Zabezpieczenie przed zawieszeniem fali
         self.gold_notifications = []  # Widoczne powiadomienia o zlocie [(tekst, timer)]
         self.corpses = []  # Trupy wrogow: [img, x, y, timer]
         self.early_wave_rect = None  # R2: prostokat przycisku "Nastepna fala"
@@ -317,6 +318,7 @@ class Game:
             # Nastepna fala zacznie sie dopiero gdy nie bedzie wrogow na mapie.
             if not self.waiting_for_clear:
                 self.waiting_for_clear = True
+                self._clear_timer = 0
                 self.ship.sail_out()
         else:
             for i in range(len(self.current_wave)):
@@ -519,10 +521,20 @@ class Game:
                     # Statek odplynal po rozladunku - czekamy na wyczyszczenie planszy.
                     # Nastepna fala dopiero gdy nie ma wrogow.
                     if len(self.enemies) == 0:
+                        self._clear_timer = 0
                         self.advance_wave()
                         if not self.last_wave_done:
                             # Statek wraca losowo z lewej lub prawej (sail_in losuje strone)
                             self.ship.sail_in()
+                    else:
+                        # Zabezpieczenie: jesli wrogowie sa niewidzialni/zablokowani >20s, wymus awans
+                        self._clear_timer += 1
+                        if self._clear_timer > 1200:  # 20 sekund przy 60 FPS
+                            self._clear_timer = 0
+                            self.enemies.clear()
+                            self.advance_wave()
+                            if not self.last_wave_done:
+                                self.ship.sail_in()
                 else:
                     self.ship.sail_in()
             pos = self._mouse_pos()                 
