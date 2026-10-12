@@ -818,10 +818,7 @@ class Game:
             if d.reached_end:
                 sound_1.play()
                 self.lives -= 1
-                # Q6: auto-pauza przy 3 zyciach
-                if self.lives == 3 and not self.paused:
-                    self.paused = True
-                    self.gold_notifications.append(["WARNING: 3 lives! Paused.", 180])
+                # Q6: auto-pauza przy 3 zyciach - usunieta na prosbe gracza
             else:
                 # Wrog zabity pociskiem - kasa za niego.
                 # Golden Touch: podwojna kasa (oznaczeni lub globalny buff)
@@ -1124,16 +1121,7 @@ class Game:
             en = self._hover_enemy
             hlabel = self.font_e14.render(f"HP: {int(en.health)}/{en.max_health}", True, (255, 180, 180))
             self.win.blit(hlabel, (en.x - hlabel.get_width()//2, en.y - 95))
-        # Q9: podswietl wrogow w zasiegu wybranej wiezy
-        if self.selected_tower:
-            st = self.selected_tower
-            for en in self.enemies:
-                if en.dying or en.dead or en.reached_end:
-                    continue
-                _dx, _dy = en.x - st.x, en.y - st.y
-                if _dx*_dx + _dy*_dy < st.range * st.range:
-                    pygame.draw.circle(self.win, (255, 255, 100, 100),
-                                     (int(en.x), int(en.y - 35)), 30, 2)
+        # Q9: podswietl wrogow w zasiegu wybranej wiezy - usuniete na prosbe gracza
         # 7: deszcz
         if self.raining and not self.paused:
             for i, (x, y, speed) in enumerate(self.raindrops):
@@ -1339,14 +1327,7 @@ class Game:
             sy = 550 - ((t * 20 + i * 30) % 60)
             alpha = int(80 * (1 - ((t * 20 + i * 30) % 60) / 60))
             pygame.draw.circle(self.win, (150, 150, 150, alpha), (int(sx), int(sy)), 8)
-        # Pochodnie przy zamku (migoczacy ogien)
-        for tx, ty in [(240, 330), (320, 330)]:
-            flame_h = 12 + 4 * math.sin(t * 10 + tx)
-            pygame.draw.polygon(self.win, (255, 120, 20),
-                              [(tx-6, ty), (tx, ty-flame_h), (tx+6, ty)])
-            pygame.draw.polygon(self.win, (255, 220, 100),
-                              [(tx-3, ty), (tx, ty-flame_h*0.6), (tx+3, ty)])
-            pygame.draw.circle(self.win, (255, 200, 120, 60), (tx, ty-8), 18)
+        # Pochodnie przy zamku - usuniete na prosbe gracza
 
         # Motyle (dzien)
         phase = (self.wave // 2) % 4

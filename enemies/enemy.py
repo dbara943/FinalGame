@@ -24,10 +24,10 @@ class Enemy:
         self.velocity = 3
         # Punkty dobrane do namalowanej drogi: dolna droga w prawo,
         # zakret w gore, gorna droga z powrotem do bazy.
-        self.path = [(300, 600), (325, 640), (340, 635), (380, 620), (440, 600),
-                     (535, 575), (700, 560), (850, 543), (980, 512),
-                     (1040, 462), (1000, 415), (800, 412), (600, 414),
-                     (400, 410), (300, 375)]
+        self.path = [(550, 620), (550, 580), (555, 550), (620, 542), (720, 532),
+                     (820, 515), (880, 495), (920, 475), (980, 470), (1040, 470),
+                     (980, 450), (880, 440), (780, 430), (700, 425),
+                     (600, 418), (500, 412), (400, 405), (300, 392), (250, 388)]
         # Precompute kierunkow segmentow (wydajnosc) - bez sqrt co tick
         self._path_dirs = []
         for i in range(len(self.path) - 1):
@@ -66,12 +66,20 @@ class Enemy:
         self.elite = False  # 6: elitarny wrog (3x HP, 5x zlota)
 
     def make_elite(self):
-        """6: Zamienia w elitarnego (3x HP, 5x zlota)."""
+        """6: Zamienia w elitarnego (3x HP, 5x zlota, wiekszy zlociutki model)."""
         if not self.elite:
             self.elite = True
             self.max_health *= 3
             self.health = self.max_health
             self.money *= 5
+            # Wiekszy sprite (1.25x) - wyraznie silniejszy
+            self._elite_scale = 1.25
+            # Przeskaluj wszystkie klatki animacji
+            for lst in (self.imgs, self.die_imgs, self.hurt_imgs):
+                for i, img in enumerate(lst):
+                    w, h = img.get_size()
+                    lst[i] = pygame.transform.scale(img, (int(w * 1.25), int(h * 1.25)))
+            self._gold_cache = None  # reset cache tintu
 
     def draw(self, win):
         # Czyste rysowanie - bez zmiany stanu (stan zmienia update()).
