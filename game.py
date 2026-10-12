@@ -95,6 +95,12 @@ class Game:
         self.show_menu = False  # menu ESC
         self._show_help = False  # pod-ekran "How to Play"
         self._menu_buttons = []  # [rect, action] - budowane w draw_menu
+        # Strefy stawiania wiez (narysowane przez gracza)
+        self._placement_zones = [
+            [(96, 369), (2, 387), (0, 441), (143, 483), (314, 489), (428, 505), (465, 529), (487, 547), (494, 556), (970, 496), (118, 369), (101, 370), (101, 369)],
+            [(465, 370), (455, 379), (420, 383), (903, 432), (1070, 474), (1080, 478), (1095, 474), (1119, 484), (1119, 369), (1029, 362), (1022, 375), (994, 385), (953, 385), (924, 383), (892, 382), (864, 373), (852, 365), (469, 370), (458, 378)],
+            [(1076, 511), (1062, 522), (1055, 530), (918, 550), (791, 566), (685, 578), (574, 585), (557, 594), (606, 607), (682, 615), (765, 623), (813, 630), (857, 629), (944, 624), (989, 622), (1042, 612), (1093, 594), (1116, 586), (1116, 523), (1095, 523), (1077, 513)],
+        ]
         # Konwersja formatu obrazkow po inicjalizacji display (szybszy blit)
         global lives_img, money_img, side_img, t1_img, t2_img, t3_img, t4_img, t5_img
         lives_img = lives_img.convert_alpha()
@@ -2035,13 +2041,22 @@ class Game:
         """Cena wiezy w sklepie. Mapuje nazwe klasy (woodenTower) na przycisk (t1)."""
         return self.menu.get_item_cost(tower_shop_names.get(tower_name, tower_name))
 
+    def _point_in_poly(self, x, y, poly):
+        """Test punkt-w-wielokacie (ray casting)."""
+        inside = False
+        n = len(poly)
+        for i in range(n):
+            x1, y1 = poly[i]
+            x2, y2 = poly[(i + 1) % n]
+            if ((y1 > y) != (y2 > y)) and (x < (x2 - x1) * (y - y1) / (y2 - y1) + x1):
+                inside = not inside
+        return inside
+
     def _is_grass(self, x, y):
-        """Czy punkt (x, y) to trawa - probka koloru z tla."""
-        if 0 <= x < self.width and 0 <= y < self.height:
-            r, g, b, _a = self.bg.get_at((int(x), int(y)))
-            # Trawa: zielony dominant (jasna i ciemna), nie sciezka/woda/budynek
-            # Ciemna trawa przy namiocie ma G~60, jasna G~150+
-            return g > 50 and g > r + 5 and b < 100
+        """Czy punkt (x, y) w strefie stawiania (narysowanej przez gracza)."""
+        for zone in self._placement_zones:
+            if self._point_in_poly(x, y, zone):
+                return True
         return False
 
     def is_valid_placement(self, x, y):
