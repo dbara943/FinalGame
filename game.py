@@ -87,6 +87,8 @@ class Game:
         self._native_w, self._native_h = _info.current_w, _info.current_h
         # Display w natywnej rozdzielczosci (bez SCALED - reczne smoothscale)
         self._screen = pygame.display.set_mode((self._native_w, self._native_h), pygame.FULLSCREEN)
+        # Uzyj RZECZYWISTEGO rozmiaru (Windows moze zwrocic inny niz zadany)
+        self._native_w, self._native_h = self._screen.get_size()
         # Bufor gry 1124x720 - cala logika bez zmian
         self.win = pygame.Surface((self.width, self.height))
         self._fullscreen = True
@@ -438,6 +440,8 @@ class Game:
                         else:
                             # Okno w natywnej rozdzielczosci (czarne tlo, gra 1:1 na srodku)
                             self._screen = pygame.display.set_mode((self._native_w, self._native_h))
+                        # Zaktualizuj rzeczywisty rozmiar
+                        self._native_w, self._native_h = self._screen.get_size()
                     # Spacja: pauza
                     if event.key == pygame.K_SPACE:
                         self.paused = not self.paused
@@ -1409,13 +1413,14 @@ class Game:
 
     def _present(self):
         """Wyswietla bufor 1124x720 w natywnej rozdzielczosci (smoothscale HQ)."""
+        _sw, _sh = self._screen.get_size()
         if self._fullscreen:
-            pygame.transform.smoothscale(self.win, (self._native_w, self._native_h), self._screen)
+            pygame.transform.smoothscale(self.win, (_sw, _sh), self._screen)
         else:
             # Okno 1:1 - bez skalowania, wycentrowane
             self._screen.fill((0, 0, 0))
-            ox = (self._native_w - self.width) // 2
-            oy = (self._native_h - self.height) // 2
+            ox = (_sw - self.width) // 2
+            oy = (_sh - self.height) // 2
             self._screen.blit(self.win, (ox, oy))
         pygame.display.flip()
 
