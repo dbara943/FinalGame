@@ -815,7 +815,7 @@ class Game:
                             bonus = len(self.enemies) * 5
                             self.money += bonus
                             self.gold_notifications.append([f"+{bonus}$ rush bonus!", 150])
-                            self.enemies.clear()
+                            # Pozostali wrogowie ZYJA - ida dalej, nowa fala dolacza
                             self.advance_wave()
                             if self.last_wave_done:
                                 self.won = True
