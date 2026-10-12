@@ -136,6 +136,7 @@ class Game:
         self.enemies = []
         self.towers = []
         self.projectiles = []
+        self.cannonballs = []  # Pociski armatnie statku
         self.lives = lives
         self.money = money
         self._start_lives = lives
@@ -381,6 +382,9 @@ class Game:
             self._wave_start_lives = self.lives
             self.wave_banner_text = f"WAVE {self.wave + 1}"  # V3
             self.wave_banner_timer = 120  # 2 sekundy
+            # Bombardowanie: fale 4 i 8, jesli gracz nie stracil zyc
+            if self.wave + 1 in (4, 8) and self.lives >= self._start_lives:
+                self._trigger_bombardment()
             # U8: modyfikator co 3 fale (nie na bossach)
             self.wave_modifier = None
             wave_num = self.wave + 1
@@ -415,6 +419,75 @@ class Game:
             elif self.wave + 1 == 10:
                 self.pending_boss = Boss(final=True)
                 self.wave_banner_text = "FINALNA FALA - BOSS!"
+    def _trigger_bombardment(self):
+        """Statek ostrzeliwuje wieze gracza - fale 4 i 8 przy pelnych zyciach."""
+        if not self.towers:
+            return
+        self.wave_banner_text = "CANNON BARRAGE!"
+        self.wave_banner_timer = 150
+        # Wybierz do 3 losowych wiez do ostrzelania
+        targets = random.sample(self.towers, min(3, len(self.towers)))
+        for tw in targets:
+            # Pocisk armatni leci ze statku do wiezy
+            sx, sy = self.ship.x, self.ship.y - 20
+            self.cannonballs.append({
+                "x": sx, "y": sy,
+                "tx": tw.x, "ty": tw.y,
+                "tower": tw,
+                "speed": 8,
+                "trail": [],
+            })
+        self.ship.cannon_flash = 30
+        try:
+            sound_ab_meteor.play()  # dzwiek wystrzalu
+        except:
+            pass
+
+    def _update_cannonballs(self):
+        """Aktualizacja pociskow armatnich."""
+        for cb in self.cannonballs[:]:
+            # Ruch w strone celu
+            dx = cb["tx"] - cb["x"]
+            dy = cb["ty"] - cb["y"]
+            dist = max(1, (dx*dx + dy*dy) ** 0.5)
+            if dist < 15:
+                # Trafienie!
+                self.cannonballs.remove(cb)
+                tw = cb["tower"]
+                # Eksplozja
+                self.particles.burst(cb["tx"], cb["ty"], (255, 150, 50), count=20, speed=5, life=30, size=4)
+                self.screen_shake = 8
+                # 50% szans na zniszczenie wiezy
+                if random.random() < 0.5 and tw in self.towers:
+                    # Wieza rozpada sie na kawalki
+                    for _ in range(15):
+                        self.particles.burst(tw.x + random.randint(-20, 20),
+                                           tw.y + random.randint(-20, 20),
+                                           (139, 90, 43), count=3, speed=4, life=40, size=5)
+                    self.towers.remove(tw)
+                    if self.selected_tower == tw:
+                        self.selected_tower = None
+                    self.gold_notifications.append(["Tower destroyed!", 150])
+                else:
+                    self.gold_notifications.append(["Tower survived!", 120])
+            else:
+                cb["x"] += dx / dist * cb["speed"]
+                cb["y"] += dy / dist * cb["speed"]
+                cb["trail"].append((cb["x"], cb["y"]))
+                if len(cb["trail"]) > 10:
+                    cb["trail"].pop(0)
+
+    def _draw_cannonballs(self):
+        """Rysowanie pociskow armatnich."""
+        for cb in self.cannonballs:
+            # Smuga
+            for i, (tx, ty) in enumerate(cb["trail"]):
+                alpha = int(150 * (i / len(cb["trail"])))
+                pygame.draw.circle(self.win, (200, 200, 200, alpha), (int(tx), int(ty)), 3)
+            # Kula armatnia
+            pygame.draw.circle(self.win, (30, 30, 30), (int(cb["x"]), int(cb["y"])), 8)
+            pygame.draw.circle(self.win, (80, 80, 80), (int(cb["x"]) - 2, int(cb["y"]) - 2), 3)
+
         self.waiting_for_clear = False
     def run(self):
         self._music_intense = False
@@ -438,6 +511,7 @@ class Game:
             while ship_acc >= 1.0:
                 self.ship.update()
                 ship_acc -= 1.0
+            self._update_cannonballs()
             if self.ship.state == Ship.AWAY and not self.won:
                 if self.last_wave_done:
                     self.won = True
@@ -730,6 +804,7 @@ class Game:
         self.enemies = []
         self.towers = []
         self.projectiles = []
+        self.cannonballs = []
         self.damage_numbers = []
         self.lives = self._start_lives
         self.money = self._start_money
@@ -1200,6 +1275,7 @@ class Game:
             en.draw(self.win)
         # Statek na wierzchu wrogow (nie wyglada dziwnie przy nachodzeniu)
         self.ship.draw(self.win)
+        self._draw_cannonballs()
         for proj in self.projectiles:
             proj.draw(self.win)
         # Latajace liczby obrazen

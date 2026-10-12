@@ -22,6 +22,9 @@ class Ship:
         self.img = self.base_img
         self.from_left = True
         self._t0 = time.time()
+        # Armaty
+        self.cannon_cooldown = 0
+        self.cannon_flash = 0  # timer blysku przy strzale
 
     def sail_in(self):
         """Rozpoczyna przyplyniecie - losowo z lewej albo z prawej."""
@@ -71,3 +74,11 @@ class Ship:
         bob = math.sin((time.time() - self._t0) * 2.0) * 4
         win.blit(self.img, (self.x - self.img.get_width() // 2,
                             self.y - self.img.get_height() // 2 + bob))
+        # Blysk armat przy strzale
+        if self.cannon_flash > 0:
+            self.cannon_flash -= 1
+            flash_size = self.cannon_flash * 2
+            fx = self.x + (30 if self.from_left else -30)
+            fy = self.y - 20 + bob
+            pygame.draw.circle(win, (255, 200, 100, 200), (int(fx), int(fy)), flash_size)
+            pygame.draw.circle(win, (255, 255, 200, 150), (int(fx), int(fy)), flash_size // 2)
