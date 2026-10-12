@@ -2125,15 +2125,30 @@ class Game:
                 self.win.blit(label, (gx + icon.get_width() + 8, cy))
         # Q1: pasek postepu fali - usuniety na prosbe gracza
         # Przyciski pauzy i predkosci (prawy gorny rog)
-        for rect, text in [(self.pause_btn_rect, "II" if not self.paused else "▶"),
-                           (self.speed_btn_rect, f"{self.speed}x")]:
-            s = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-            pygame.draw.rect(s, (8, 18, 38, 190), s.get_rect(), border_radius=10)
-            pygame.draw.rect(s, (255, 255, 255, 70), s.get_rect(), 2, border_radius=10)
-            self.win.blit(s, rect)
-            label = self.hud_font.render(text, True, (255, 255, 255))
-            self.win.blit(label, (rect.x + rect.width//2 - label.get_width()//2,
-                                  rect.y + rect.height//2 - label.get_height()//2))
+        # Pauza: ikona graficzna (nie font - pewny render)
+        pr = self.pause_btn_rect
+        s = pygame.Surface((pr.width, pr.height), pygame.SRCALPHA)
+        pygame.draw.rect(s, (8, 18, 38, 190), s.get_rect(), border_radius=10)
+        pygame.draw.rect(s, (255, 255, 255, 70), s.get_rect(), 2, border_radius=10)
+        cx, cy = pr.width // 2, pr.height // 2
+        if not self.paused:
+            # Dwie kreski pauzy
+            pygame.draw.rect(s, (255, 255, 255), (cx - 8, cy - 10, 6, 20), border_radius=2)
+            pygame.draw.rect(s, (255, 255, 255), (cx + 2, cy - 10, 6, 20), border_radius=2)
+        else:
+            # Trojkat play
+            pygame.draw.polygon(s, (255, 255, 255),
+                                [(cx - 7, cy - 11), (cx - 7, cy + 11), (cx + 10, cy)])
+        self.win.blit(s, pr)
+        # Predkosc
+        sr = self.speed_btn_rect
+        s2 = pygame.Surface((sr.width, sr.height), pygame.SRCALPHA)
+        pygame.draw.rect(s2, (8, 18, 38, 190), s2.get_rect(), border_radius=10)
+        pygame.draw.rect(s2, (255, 255, 255, 70), s2.get_rect(), 2, border_radius=10)
+        self.win.blit(s2, sr)
+        label = self.hud_font.render(f"{self.speed}x", True, (255, 255, 255))
+        self.win.blit(label, (sr.x + sr.width//2 - label.get_width()//2,
+                              sr.y + sr.height//2 - label.get_height()//2))
         # Podglad nastepnej fali (ikony wrogow)
         if self.wave + 1 < len(waves):
             next_wave = waves[self.wave + 1]
