@@ -92,7 +92,8 @@ class Enemy:
         # jak Golden Tower, zamiast brzydkiego kolka
         is_golden = self.elite or getattr(self, '_gold_marked', False)
         if is_golden:
-            if not hasattr(self, '_gold_cache') or self._gold_cache.get('img') is not self.img:
+            _gc = getattr(self, '_gold_cache', None)
+            if not _gc or _gc.get('img') is not self.img:
                 tinted = self.img.copy()
                 # Mocny zloty tint - wyraznie widoczny
                 tint = pygame.Surface(self.img.get_size())
