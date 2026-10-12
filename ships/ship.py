@@ -32,11 +32,12 @@ class Ship:
         w = self.base_img.get_width()
         if self.from_left:
             self.x = -w // 2
-            # sprite bazowy patrzy w lewo -> odwracamy do kierunku ruchu
-            self.img = pygame.transform.flip(self.base_img, True, False)
+            # sprite bazowy patrzy w prawo = kierunek ruchu, bez flipa
+            self.img = self.base_img
         else:
             self.x = self.screen_w + w // 2
-            self.img = self.base_img
+            # plynie w lewo, odwracamy
+            self.img = pygame.transform.flip(self.base_img, True, False)
         self.y = self.dock_y
         self.state = Ship.IN
 
@@ -53,14 +54,14 @@ class Ship:
             else:
                 self.x += step
         elif self.state == Ship.OUT:
-            # Statek plynie przodem w kierunku ruchu (wczesniej plynal tylem)
+            # Statek plynie przodem w kierunku ruchu
             if self.from_left:
-                # Plynie w lewo - sprite bazowy patrzy w lewo
-                self.img = self.base_img
+                # Wraca w lewo - odwrocony sprite (bazowy patrzy w prawo)
+                self.img = pygame.transform.flip(self.base_img, True, False)
                 step = -self.speed
             else:
-                # Plynie w prawo - odwrocony sprite
-                self.img = pygame.transform.flip(self.base_img, True, False)
+                # Wraca w prawo - bazowy sprite
+                self.img = self.base_img
                 step = self.speed
             self.x += step
             w = self.base_img.get_width()

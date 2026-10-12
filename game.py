@@ -1969,13 +1969,8 @@ class Game:
         phase = (self.wave // 2) % 4  # 0=dzien, 1=zachod, 2=noc, 3=swit
         t = self._now_s
         if phase == 0:
-            # Dzien - brak nakladki (oszczednosc), tylko cienie chmur
+            # Dzien - brak nakladki (oszczednosc)
             self.morning_fog = 0
-            for i, (base_x, cy, size) in enumerate(self.clouds):
-                cx = (base_x + t * 8) % (self.width + 200) - 100
-                shadow = pygame.Surface((size * 3, size), pygame.SRCALPHA)
-                pygame.draw.ellipse(shadow, (0, 0, 0, 40), shadow.get_rect())
-                self.win.blit(shadow, (cx - size * 1.5 + 30, 450))
             return
         if phase == 1:
             self.win.blit(self._overlay_sunset, (0, 0))
