@@ -40,8 +40,8 @@ import random
 lives_img = pygame.image.load(os.path.join("images", "heart.png"))
 money_img = pygame.image.load(os.path.join("images", "money.png"))
 side_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "side_menu.png")), (375, 475))
-t1_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t1.png")), (30, 30))
-t2_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t2.png")), (30, 30))
+t1_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t2.png")), (30, 30))
+t2_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t1.png")), (30, 30))
 t3_img = _gold_tint(pygame.transform.scale(pygame.image.load(os.path.join("images", "t3.png")), (30, 30)))
 t4_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t4.png")), (30, 30))
 t5_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t5.png")), (30, 30))
@@ -613,12 +613,17 @@ class Game:
                                 continue
                     # R2: przycisk wczesniejszej fali
                     if self.early_wave_rect and self.early_wave_rect.collidepoint(pos):
-                        bonus = len(self.enemies) * 5
-                        self.money += bonus
-                        self.gold_notifications.append([f"+{bonus}$ rush bonus!", 150])
-                        self.advance_wave()
-                        if not self.last_wave_done and not self.won:
-                            self.ship.sail_in()
+                        # Nie mozna pominac gdy boss zyje
+                        boss_alive = any(isinstance(en, Boss) for en in self.enemies)
+                        if boss_alive:
+                            self.gold_notifications.append(["Cannot skip - boss is alive!", 150])
+                        else:
+                            bonus = len(self.enemies) * 5
+                            self.money += bonus
+                            self.gold_notifications.append([f"+{bonus}$ rush bonus!", 150])
+                            self.advance_wave()
+                            if not self.last_wave_done and not self.won:
+                                self.ship.sail_in()
                         continue
                     # Przycisk predkosci (pauza tylko przez ESC)
                     if self.speed_btn_rect.collidepoint(pos):
@@ -2225,10 +2230,16 @@ class Game:
                         x_off += 60
                     except:
                         pass
-            # Boss w nastepnej fali?
-            if (self.wave + 2) % 4 == 0:
-                boss_label = self._txt_boss
-                self.win.blit(boss_label, (x_off, preview_y + 15))
+            # Boss w nastepnej fali? - ikona zamiast tekstu
+            if (self.wave + 2) % 4 == 0 and x_off < preview_x + 280:
+                try:
+                    boss_temp = Boss()
+                    boss_icon = pygame.transform.scale(boss_temp.imgs[0], (30, 30))
+                    self.win.blit(boss_icon, (x_off, preview_y + 10))
+                    cnt_label = font_small.render("1", True, (255, 100, 100))
+                    self.win.blit(cnt_label, (x_off + 32, preview_y + 15))
+                except:
+                    pass
     def add_tower(self, name):
         x, y = self._mouse_pos()
         name_list = ["t1", "t2", "t3", "t4", "t5"]

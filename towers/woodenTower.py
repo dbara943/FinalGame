@@ -40,7 +40,7 @@ tower_imgs1.append(pygame.transform.scale(
 
 # load projectile shooter
 archer_imgs1.append(pygame.transform.scale(
-    pygame.image.load(os.path.join("images/turrets/projectiles", str(1) + ".png" )), (25, 25))) 
+    pygame.image.load(os.path.join("images/turrets/projectiles", str(2) + ".png" )), (25, 25))) 
 
 class WoodenTower(Tower):
     buy_price = 100
@@ -228,7 +228,7 @@ tower_imgs2.append(pygame.transform.scale(
 
 # load projectile shooter
 archer_imgs2.append(pygame.transform.scale(
-    pygame.image.load(os.path.join("images/turrets/projectiles", str(2) + ".png" )), (25, 25))) 
+    pygame.image.load(os.path.join("images/turrets/projectiles", str(1) + ".png" )), (25, 25))) 
 
 class MetalTower(WoodenTower):
     buy_price = 500
