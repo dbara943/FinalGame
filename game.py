@@ -1382,8 +1382,8 @@ class Game:
                 break
         
         # R2: Przycisk "Nastepna fala" - wczesniejsze przywolanie za bonus
-        # (gdy statek odplynal ale wrogowie jeszcze sa na mapie)
-        if self.waiting_for_clear and len(self.enemies) > 0 and not self.won and not self.last_wave_done:
+        # (gdy statek odplynal ale wrogowie jeszcze sa na mapie, lub awaryjnie gdy fala utknela)
+        if self.waiting_for_clear and not self.won and not self.last_wave_done:
             btn_w, btn_h = 220, 44
             bx = self.width - btn_w - 20
             by = 70
