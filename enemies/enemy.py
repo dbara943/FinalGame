@@ -86,11 +86,12 @@ class Enemy:
         if is_golden:
             if not hasattr(self, '_gold_cache') or self._gold_cache.get('img') is not self.img:
                 tinted = self.img.copy()
+                # Mocny zloty tint - wyraznie widoczny
                 tint = pygame.Surface(self.img.get_size())
-                tint.fill((255, 200, 70))
+                tint.fill((255, 175, 40))
                 tinted.blit(tint, (0, 0), special_flags=pygame.BLEND_MULT)
                 bright = pygame.Surface(self.img.get_size())
-                bright.fill((30, 18, 0))
+                bright.fill((60, 35, 0))
                 tinted.blit(bright, (0, 0), special_flags=pygame.BLEND_ADD)
                 self._gold_cache = {'img': self.img, 'surf': tinted}
             img_to_draw = self._gold_cache['surf']

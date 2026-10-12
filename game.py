@@ -1640,13 +1640,7 @@ class Game:
             alpha = int(70 * (1 - ((t * 14 + i * 40) % 50) / 50))
             pygame.draw.circle(self.win, (150, 150, 150, alpha), (int(sx), int(sy)), 7)
 
-        # 23: swiecace grzyby (noc)
-        if night:
-            for gx, gy in [(350, 555), (365, 560), (950, 470)]:
-                glow = 90 + 50 * math.sin(t * 3 + gx)
-                pygame.draw.circle(self.win, (120, 220, 255, int(glow)), (gx, gy - 6), 10)
-                pygame.draw.ellipse(self.win, (200, 120, 140), (gx - 6, gy - 10, 12, 10))
-                pygame.draw.rect(self.win, (230, 220, 200), (gx - 2, gy - 2, 4, 8))
+        # 23: swiecace grzyby - usuniete na prosbe gracza
 
         # 24: pajeczyna z pajakiem - usunieta na prosbe gracza
 
