@@ -1491,13 +1491,7 @@ class Game:
             pygame.draw.polygon(s, (255, 245, 200, 45), [(lx, ly - 7), (ex - 18, ey), (ex + 18, ey)])
             self.win.blit(s, (0, 0))
 
-        # 20: wrak statku na skalach + mewy
-        rx, ry = 150, 610
-        pygame.draw.polygon(self.win, (90, 65, 40), [(rx - 40, ry), (rx + 40, ry), (rx + 25, ry - 28), (rx - 25, ry - 28)])
-        pygame.draw.line(self.win, (70, 50, 30), (rx, ry - 28), (rx + 6, ry - 70), 4)
-        pygame.draw.polygon(self.win, (200, 190, 170, 200), [(rx + 6, ry - 70), (rx + 34, ry - 58), (rx + 6, ry - 52)])
-        pygame.draw.circle(self.win, (110, 110, 115), (rx - 48, ry + 4), 10)
-        pygame.draw.circle(self.win, (110, 110, 115), (rx + 48, ry + 4), 12)
+        # 20: wrak statku - usuniety na prosbe gracza
 
         # 22: dmiace ruiny
         ux, uy = 950, 360
