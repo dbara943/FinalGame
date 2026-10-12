@@ -319,6 +319,11 @@ class Game:
             if not self.waiting_for_clear:
                 self.waiting_for_clear = True
                 self._clear_timer = 0
+                try:
+                    with open("wave_debug.log", "a") as f:
+                        f.write(f"sail_out: wave={self.wave}, current_wave_sum={sum(self.current_wave)}\n")
+                except:
+                    pass
                 self.ship.sail_out()
         else:
             for i in range(len(self.current_wave)):
@@ -337,6 +342,12 @@ class Game:
     def advance_wave(self):
         """Przechodzi do nastepnej fali: zloto, bonusy, powiadomienie. Wywolywane
         gdy plansza jest wyczyszczona i statek ma wrocic."""
+        # DEBUG LOG
+        try:
+            with open("wave_debug.log", "a") as f:
+                f.write(f"advance_wave: wave {self.wave} -> {self.wave+1}, enemies={len(self.enemies)}, waiting={self.waiting_for_clear}\n")
+        except:
+            pass
         # 9: raport po fali
         if self.wave > 0 or self.endless_wave > 0:
             kills = self.stats_kills - self._wave_kills_start
