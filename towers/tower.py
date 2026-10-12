@@ -21,6 +21,10 @@ class Tower:
         self.max_level = 3
         self.selected = False
         self.total_spent = self.buy_price
+        # Cache na gorace petle (wydajnosc) - bez getattr
+        self._synergy = 1.0
+        self._rain_mod = 1.0
+        self._target_buf = []  # reuzywalny bufor celow (bez alokacji co tick)
         self._setup_menu()
         self.tower_imgs = []
         self.damage = 1
@@ -137,7 +141,8 @@ class Tower:
             if tw is self:
                 continue
             if type(tw).__name__ == type(self).__name__:
-                if math.hypot(tw.x - self.x, tw.y - self.y) < 100:
+                dx, dy = tw.x - self.x, tw.y - self.y
+                if dx*dx + dy*dy < 10000:
                     return 1.15
         return 1.0
 

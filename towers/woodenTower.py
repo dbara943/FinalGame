@@ -72,7 +72,8 @@ class WoodenTower(Tower):
             # Szukaj dowolnego wroga w zasiegu
             for en in enemies:
                 if not en.dying and not en.dead and not en.reached_end:
-                    if math.hypot(en.x - self.x, en.y - self.y) < self.range:
+                    dx, dy = en.x - self.x, en.y - self.y
+                    if dx*dx + dy*dy < self.range * self.range:
                         target = en
                         break
         if target:
@@ -140,11 +141,13 @@ class WoodenTower(Tower):
     def attack(self, enemies, projectiles, grid=None, grid_cell=120):
         self.inRange = False
         self.current_target = None
-        enemy_closest = []
+        # Reuzywalny bufor (wydajnosc) - brak alokacji listy co tick
+        enemy_closest = self._target_buf
+        enemy_closest.clear()
         shot_fired = False
 
         # 7: deszcz zmniejsza zasieg (liczone raz, nie w petli)
-        eff_range = self.range * getattr(self, '_rain_mod', 1.0)
+        eff_range = self.range * self._rain_mod
         eff_range_sq = eff_range * eff_range
         # Kandydaci: z siatki przestrzennej (tylko pobliskie komorki) lub wszyscy
         if grid is not None:
@@ -167,19 +170,22 @@ class WoodenTower(Tower):
             if dx * dx + dy * dy < eff_range_sq:
                 self.inRange = True
                 enemy_closest.append(enemy)
-        # Sortowanie wedlug priorytetu celowania
-        if self.target_priority == "first":
-            enemy_closest.sort(key=lambda x: (x.path_pos, x.dis), reverse=True)
-        elif self.target_priority == "last":
-            enemy_closest.sort(key=lambda x: (x.path_pos, x.dis))
-        elif self.target_priority == "strong":
-            enemy_closest.sort(key=lambda x: x.max_health, reverse=True)
-        elif self.target_priority == "weak":
-            enemy_closest.sort(key=lambda x: x.max_health)
+        # Wybor celu wg priorytetu - min/max (O(n)) zamiast sort (O(n log n))
+        first_enemy = None
+        if enemy_closest:
+            if self.target_priority == "first":
+                first_enemy = max(enemy_closest, key=lambda x: (x.path_pos, x.dis))
+            elif self.target_priority == "last":
+                first_enemy = min(enemy_closest, key=lambda x: (x.path_pos, x.dis))
+            elif self.target_priority == "strong":
+                first_enemy = max(enemy_closest, key=lambda x: x.max_health)
+            elif self.target_priority == "weak":
+                first_enemy = min(enemy_closest, key=lambda x: x.max_health)
+            else:
+                first_enemy = enemy_closest[0]
         # Celuj we wroga najbliżej bazy (najdalszy na ścieżce).
-        
-        if len(enemy_closest) > 0:            
-            first_enemy = enemy_closest[0]
+
+        if first_enemy is not None:
             self.current_target = first_enemy  # R3: zapamietaj cel
             cooldown_ticks = 60  # 1s
             if self.attack_cooldown <= 0:
@@ -251,7 +257,8 @@ class MetalTower(WoodenTower):
         if target is None or target.dying or target.dead:
             for en in enemies:
                 if not en.dying and not en.dead and not en.reached_end:
-                    if math.hypot(en.x - self.x, en.y - self.y) < self.range:
+                    dx, dy = en.x - self.x, en.y - self.y
+                    if dx*dx + dy*dy < self.range * self.range:
                         target = en
                         break
         if target:
@@ -321,7 +328,9 @@ class GoldenTower(WoodenTower):
                 break
             if en.dying or en.dead or en.reached_end:
                 continue
-            if math.hypot(en.x - self.x, en.y - self.y) < self.range * 1.5:
+            _dx, _dy = en.x - self.x, en.y - self.y
+            _rr = self.range * 1.5
+            if _dx*_dx + _dy*_dy < _rr * _rr:
                 img = Projectile.make_special_img((255, 215, 0), 24)
                 projectiles.append(Projectile(
                     self.x, self.y - 30, img, en, self.damage,
