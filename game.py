@@ -2063,11 +2063,12 @@ class Game:
         return self.menu.get_item_cost(tower_shop_names.get(tower_name, tower_name))
 
     def _is_grass(self, x, y):
-        """Czy punkt (x, y) to jasna trawa - probka koloru z tla."""
+        """Czy punkt (x, y) to trawa - probka koloru z tla."""
         if 0 <= x < self.width and 0 <= y < self.height:
             r, g, b, _a = self.bg.get_at((int(x), int(y)))
-            # Jasna, zoltawo-zielona trawa (nie morski odcien wzgorz)
-            return g > 110 and g > r + 15 and b < 80
+            # Trawa: zielony dominant (jasna i ciemna), nie sciezka/woda/budynek
+            # Ciemna trawa przy namiocie ma G~60, jasna G~150+
+            return g > 50 and g > r + 5 and b < 100
         return False
 
     def is_valid_placement(self, x, y):
