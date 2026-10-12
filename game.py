@@ -86,6 +86,7 @@ sound_rain = pygame.mixer.Sound("sounds/rain.wav")
 sound_rain.set_volume(0.35)  # deszcz wyraznie ciszej niz reszta
 sound_gull = pygame.mixer.Sound("sounds/gull.wav")
 sound_fanfare = pygame.mixer.Sound("sounds/fanfare.wav")
+sound_pirate = pygame.mixer.Sound("sounds/music_pirate.wav")  # piracki fanfar przy wplynieciu statku
 shoot_sounds = {
     "WoodenTower": pygame.mixer.Sound("sounds/shoot_wood.wav"),
     "MetalTower": pygame.mixer.Sound("sounds/shoot_metal.wav"),

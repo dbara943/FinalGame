@@ -40,6 +40,12 @@ class Ship:
             self.img = pygame.transform.flip(self.base_img, True, False)
         self.y = self.dock_y
         self.state = Ship.IN
+        # Piracki fanfar przy wplynieciu
+        try:
+            snd = pygame.mixer.Sound(os.path.join("sounds", "music_pirate.wav"))
+            snd.play()
+        except:
+            pass
 
     def sail_out(self):
         if self.state == Ship.DOCKED:

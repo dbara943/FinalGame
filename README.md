@@ -49,7 +49,8 @@ Nine enemy types with full walk, hurt, and death animations:
 
 ## Features
 
-- **Animated pirate ship** — sails in from alternating sides, docks, disembarks enemies, and departs
+- **Animated pirate ship** — sails in from alternating sides with pirate fanfare, docks, disembarks enemies, and departs; lively animations (wave bobbing, rotation, wake trail, bow splashes, glowing demonic rune)
+- **Cannon barrage** — on waves 4 and 8 (with enough lives), the ship sails to a bombardment position and fires cannonballs at your towers (50% destroy chance)
 - **Dynamic day/night cycle** with smooth transitions
 - **Weather system** — rain with splash particles and ambient audio
 - **Ambient life** — seagulls, butterflies, campfire with dancers
