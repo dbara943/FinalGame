@@ -24,7 +24,7 @@ class Enemy:
         self.velocity = 3
         # Punkty dobrane do namalowanej drogi: dolna droga w prawo,
         # zakret w gore, gorna droga z powrotem do bazy.
-        self.path = [(550, 620), (550, 580), (555, 550), (620, 542), (720, 532),
+        self.path = [(550, 635), (550, 610), (550, 580), (555, 550), (620, 542), (720, 532),
                      (820, 515), (880, 495), (920, 475), (980, 470), (1040, 470),
                      (980, 450), (880, 440), (780, 430), (700, 425),
                      (600, 418), (500, 412), (400, 405), (300, 392), (250, 388)]
@@ -72,9 +72,11 @@ class Enemy:
             self.max_health *= 3
             self.health = self.max_health
             self.money *= 5
-            # Wiekszy sprite (1.25x) - wyraznie silniejszy
-            self._elite_scale = 1.25
-            # Przeskaluj wszystkie klatki animacji
+            # Kopia list (nie modyfikuj wspoldzielonych!) potem skalowanie 1.25x
+            self.imgs = self.imgs[:]
+            self.die_imgs = self.die_imgs[:]
+            self.hurt_imgs = self.hurt_imgs[:]
+            self._imgs_copied = True
             for lst in (self.imgs, self.die_imgs, self.hurt_imgs):
                 for i, img in enumerate(lst):
                     w, h = img.get_size()

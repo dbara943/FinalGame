@@ -1828,7 +1828,7 @@ class Game:
             for i, c in enumerate(colors):
                 pygame.draw.arc(self.win, (*c, 100), 
                               (self.width//2 - 200, 100, 400, 200), 
-                              math.pi, 2 * math.pi, 8 - i)
+                              0, math.pi, 8 - i)
         # B6: blyskawice w deszczu
         if self.raining:
             if random.random() < 0.005:
