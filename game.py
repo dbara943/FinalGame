@@ -79,6 +79,16 @@ class Game:
         self.width = 1124
         self.height = 720
         self.win = pygame.display.set_mode((self.width, self.height), pygame.SCALED | pygame.FULLSCREEN)
+        # Konwersja formatu obrazkow po inicjalizacji display (szybszy blit)
+        global lives_img, money_img, side_img, t1_img, t2_img, t3_img, t4_img, t5_img
+        lives_img = lives_img.convert_alpha()
+        money_img = money_img.convert_alpha()
+        side_img = side_img.convert_alpha()
+        t1_img = t1_img.convert_alpha()
+        t2_img = t2_img.convert_alpha()
+        t3_img = t3_img.convert_alpha()
+        t4_img = t4_img.convert_alpha()
+        t5_img = t5_img.convert_alpha()
         self.enemies = []
         self.towers = []
         self.projectiles = []
@@ -213,6 +223,8 @@ class Game:
         self._frame = 0
         self._ambient_t = 0.0
         self._hover_enemy = None
+        self._now = 0
+        self._now_s = 0.0
         # Prerender nakladek dnia/nocy (fullscreen Surface raz, nie co klatke)
         self._overlay_sunset = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         self._overlay_sunset.fill((255, 150, 50, 40))
@@ -365,13 +377,13 @@ class Game:
         logic_acc = 0.0
         ship_acc = 0.0
         while run:
-            clock.tick(RENDER_FPS)
+            clock.tick_busy_loop(RENDER_FPS)
             
             if time.time() - self.timer >= random.randrange(1, 5)/2:
                     self.timer = time.time()
                     self.gen_enemies()
-            # Statek w tempie logiki 100Hz (akumulator)
-            ship_acc += LOGIC_HZ / RENDER_FPS
+            # Statek w tempie logiki 100Hz (akumulator, z capem)
+            ship_acc = min(ship_acc + LOGIC_HZ / RENDER_FPS, 5.0)
             while ship_acc >= 1.0:
                 self.ship.update()
                 ship_acc -= 1.0
@@ -581,8 +593,9 @@ class Game:
                             else:
                                 tw.selected = False     
             # Logika gry w tempie 100Hz (akumulator) - pauza pomija, predkosc mnozy
+            # Cap 5 tickow/klatke: zapobiega spirali smierci i skokom po stallu
             if not self.paused:
-                logic_acc += (LOGIC_HZ / RENDER_FPS) * self.speed
+                logic_acc = min(logic_acc + (LOGIC_HZ / RENDER_FPS) * self.speed, 5.0)
                 while logic_acc >= 1.0:
                     self.update_game_logic()
                     logic_acc -= 1.0
@@ -611,7 +624,11 @@ class Game:
                 else:
                     run = False
 
-            self.draw()
+            try:
+                self.draw()
+            except pygame.error:
+                # Utrata kontekstu graficznego (alt-tab) - nie crashuj
+                pass
         pygame.quit()
 
     def reset_game(self):
@@ -795,7 +812,7 @@ class Game:
                 if isinstance(d, Boss):
                     self.chests.append([d.x, d.y, 0])
                 # 37: spiker serii zabojstw
-                now = pygame.time.get_ticks()
+                now = self._now
                 self.kill_streak = [t for t in getattr(self, 'kill_streak', []) if now - t < 3000]
                 self.kill_streak.append(now)
                 n = len(self.kill_streak)
@@ -991,6 +1008,9 @@ class Game:
         
     def draw(self):
         self._frame += 1
+        # Jeden odczyt czasu na klatke (wydajnosc) - uzywany w calej klatce
+        self._now = pygame.time.get_ticks()
+        self._now_s = self._now / 1000.0
         # A6: wstrzas ekranu
         ox, oy = 0, 0
         if self.screen_shake > 0:
@@ -1253,7 +1273,7 @@ class Game:
         for c in self.coins:
             c.draw(self.win)
         # A4: chmury (wolno, pozycja bazowa + przesuniecie czasowe)
-        t = pygame.time.get_ticks() / 1000.0
+        t = self._now_s
         for i, (base_x, cy, size) in enumerate(self.clouds):
             cx = (base_x + t * 8) % (self.width + 200) - 100
             for ox in [-20, 0, 20]:
@@ -1369,7 +1389,7 @@ class Game:
     def draw_castle_damage(self):
         """1: Wizualne uszkodzenia zamku zaleza od liczby zyc."""
         cx, cy = 300, 375  # koniec sciezki (baza)
-        t = pygame.time.get_ticks() / 1000.0
+        t = self._now_s
         if self.lives <= 15:
             # Pekniecia
             for x1, y1, x2, y2 in [(cx-20, cy-30, cx-5, cy-10), (cx+15, cy-35, cx+5, cy-15),
@@ -1450,7 +1470,7 @@ class Game:
     def draw_ambient_life(self):
         """11-20, 22-25: zycie na wyspie (animacje 30Hz - pozycje co 2. klatke)."""
         if self._frame % 2 == 0:
-            self._ambient_t = pygame.time.get_ticks() / 1000.0
+            self._ambient_t = self._now_s
         t = self._ambient_t
         phase = (self.wave // 2) % 4
         night = (phase == 2)
@@ -1602,7 +1622,7 @@ class Game:
         pygame.draw.arc(self.win, (r_, max(0,g_), max(0,b_)), (kx - 30, ky - 16, 18, 18), 0, math.pi * 1.5, 4)
 
     def draw_campfire(self):
-        t = pygame.time.get_ticks() / 1000.0
+        t = self._now_s
         cx, cy = 830, 385  # na trawie przed wejsciem do namiotu (poziom ziemi)
         for i in range(8):
             ang = i * math.pi / 4
@@ -1639,7 +1659,7 @@ class Game:
     def draw_day_night(self):
         """B1: Cykl dnia/nocy - przyciemnienie co 2 fale (nakladki prerenderowane)."""
         phase = (self.wave // 2) % 4  # 0=dzien, 1=zachod, 2=noc, 3=swit
-        t = pygame.time.get_ticks() / 1000.0
+        t = self._now_s
         if phase == 0:
             # Dzien - brak nakladki (oszczednosc), tylko cienie chmur
             self.morning_fog = 0
@@ -1729,7 +1749,7 @@ class Game:
 
     def draw_sky_effects(self):
         """Wizualne: niebo (slonce, ksiezyc, gwiazdy, zorza, spadajace gwiazdy)."""
-        t = pygame.time.get_ticks() / 1000.0
+        t = self._now_s
         phase = (self.wave // 2) % 4
         # Slonce w dzien / ksiezyc w nocy
         if phase in (0, 1, 3):
@@ -1770,7 +1790,7 @@ class Game:
 
     def draw_water_effects(self):
         """Wizualne: woda (fale, odbicia, kilwater, pecherzyki)."""
-        t = pygame.time.get_ticks() / 1000.0
+        t = self._now_s
         # Fale (3 warstwy)
         for layer in range(3):
             for i in range(20):

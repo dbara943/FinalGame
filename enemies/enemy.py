@@ -28,6 +28,17 @@ class Enemy:
                      (535, 575), (700, 560), (850, 543), (980, 512),
                      (1040, 462), (1000, 415), (800, 412), (600, 414),
                      (400, 410), (300, 375)]
+        # Precompute kierunkow segmentow (wydajnosc) - bez sqrt co tick
+        self._path_dirs = []
+        for i in range(len(self.path) - 1):
+            x1, y1 = self.path[i]
+            x2, y2 = self.path[i + 1]
+            dx, dy = x2 - x1, y2 - y1
+            length = math.sqrt(dx*dx + dy*dy)
+            if length == 0:
+                self._path_dirs.append((0, 0))
+            else:
+                self._path_dirs.append((dx / length, dy / length))
         self.x = self.path[0][0]
         self.y = self.path[0][1]        
         self.img = None
@@ -65,6 +76,9 @@ class Enemy:
     def draw(self, win):
         # Czyste rysowanie - bez zmiany stanu (stan zmienia update()).
         if self.img is None:
+            return
+        # Culling: nie rysuj poza ekranem (wydajnosc)
+        if self.x < -80 or self.x > 1204 or self.y < -80 or self.y > 800:
             return
         # 6: zloci wrogowie (elitarni / oznaczeni Golden Touch) - caly model w zlocie,
         # jak Golden Tower, zamiast brzydkiego kolka
@@ -108,7 +122,8 @@ class Enemy:
                 pygame.draw.polygon(win, (150, 210, 255, 200), pts)
                 pygame.draw.polygon(win, (220, 240, 255, 255), pts, 1)
         win.blit(img_to_draw, (self.x - img_to_draw.get_width()/2, self.y - img_to_draw.get_height()/2 - 35))
-        if not self.dying:
+        # Pasek HP tylko gdy ranny (wydajnosc) - pelne HP = brak paska
+        if not self.dying and self.health < self.max_health:
             self.draw_health_bar(win)
 
     def _draw_soft_shadow(self, win, cx, cy, w, h):
@@ -207,13 +222,11 @@ class Enemy:
            x2, y2 = self.path[self.path_pos]
        else:
            x2, y2 = self.path[self.path_pos + 1]
-
-       dx, dy = x2 - x1, y2 - y1
-       length = math.sqrt(dx**2 + dy**2)
-       if length == 0:
-           dirn = (0, 0)
+       # Kierunek z precompute (wydajnosc) - bez sqrt co tick
+       if self.path_pos < len(self._path_dirs):
+           dirn = self._path_dirs[self.path_pos]
        else:
-           dirn = (dx / length, dy / length)
+           dirn = (0, 0)
 
        if dirn[0] < 0 and not(self.flipped):
            self.flipped = True

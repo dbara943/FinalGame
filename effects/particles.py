@@ -7,6 +7,7 @@ class ParticleSystem:
     MAX_PARTICLES = 400  # limit chroniacy przed spadkami FPS przy masakrze
     def __init__(self):
         self.particles = []  # [x, y, vx, vy, life, max_life, color, size, gravity]
+        self._circle_cache = {}  # cache sprite'ow (size, alpha) - wydajnosc
 
     def burst(self, x, y, color, count=12, speed=3, life=30, size=4, gravity=0.1):
         # Nie przekraczaj limitu - odrzucaj nadwyzke zamiast lagowac
@@ -23,20 +24,31 @@ class ParticleSystem:
             ])
 
     def update(self):
-        for p in self.particles[:]:
+        # Iteracja od konca (bez kopiowania listy)
+        for i in range(len(self.particles) - 1, -1, -1):
+            p = self.particles[i]
             p[0] += p[2]
             p[1] += p[3]
             p[3] += p[8]  # gravity
             p[4] -= 1
             if p[4] <= 0:
-                self.particles.remove(p)
+                del self.particles[i]
 
     def draw(self, win):
+        # Cache kolistych sprite'ow (rozmiar + poziom alfy) - brak alokacji co klatke
         for x, y, vx, vy, life, max_life, color, size, grav in self.particles:
-            alpha = int(255 * life / max_life)
-            s = pygame.Surface((size * 2, size * 2), pygame.SRCALPHA)
-            c = (*color[:3], alpha) if len(color) == 3 else (*color[:3], alpha)
-            pygame.draw.circle(s, c, (size, size), size)
+            alpha_bucket = int(15 * life / max_life)  # 16 poziomow
+            key = (size, alpha_bucket)
+            s = self._circle_cache.get(key)
+            if s is None:
+                s = pygame.Surface((size * 2, size * 2), pygame.SRCALPHA)
+                a = int(255 * alpha_bucket / 15)
+                c = (*color[:3], a)
+                pygame.draw.circle(s, c, (size, size), size)
+                self._circle_cache[key] = s
+                # Ogranicz rozmiar cache
+                if len(self._circle_cache) > 64:
+                    self._circle_cache.clear()
             win.blit(s, (x - size, y - size))
 
 class FloatingCoin:

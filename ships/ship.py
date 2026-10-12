@@ -11,7 +11,7 @@ class Ship:
     IN, DOCKED, OUT, AWAY = "in", "docked", "out", "away"
 
     def __init__(self, img_path, dock_x, dock_y, screen_w=1124):
-        self.base_img = pygame.image.load(img_path).convert_alpha()
+        self.base_img = pygame.image.load(img_path)
         self.dock_x = dock_x
         self.dock_y = dock_y
         self.screen_w = screen_w
