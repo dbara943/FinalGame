@@ -796,11 +796,7 @@ class Game:
             # Slad lodu za spowolnionymi
             if en.slow_timer > 0 and random.random() < 0.15:
                 self.particles.burst(en.x, en.y + 10, (180, 220, 255), count=1, speed=0.5, life=20, size=2, gravity=0)
-            # Slady stop bossa
-            if isinstance(en, Boss) and random.random() < 0.15:
-                self.boss_footprints.append([en.x, en.y + 10, 300])
-                if len(self.boss_footprints) > 20:
-                    self.boss_footprints.pop(0)
+            # Slady stop bossa - usuniete na prosbe gracza
             # Boss finalny: ryk przy enrage
             if isinstance(en, Boss) and en.get_roar_request():
                 sound_roar.play()
@@ -1360,15 +1356,7 @@ class Game:
                 pygame.draw.line(self.win, (60, 60, 60), (bx, by), (bx+8, by+wing), 2)
             if flock[0] > self.width + 100:
                 self.bird_flocks.remove(flock)
-        # Slady stop bossa
-        for fp in self.boss_footprints[:]:
-            fp[2] -= 1
-            if fp[2] <= 0:
-                self.boss_footprints.remove(fp)
-            else:
-                alpha = int(100 * fp[2] / 300)
-                pygame.draw.ellipse(self.win, (60, 50, 40, alpha),
-                                  (fp[0]-15, fp[1]-8, 30, 16))
+        # Slady stop bossa - usuniete na prosbe gracza
         # Ognisko z tanczacymi
         self.draw_campfire()
         self.draw_chests()
