@@ -305,7 +305,7 @@ class Game:
         if self.pending_boss:
             self.enemies.append(self.pending_boss)
             # A10: intro bossa - dramatyczne wejscie
-            self.wave_banner_text = "! BOSS !"
+            self.wave_banner_text = "BOSS"
             self.wave_banner_timer = 150
             self.screen_shake = 10
             self.boss_intro_dark = 180  # przyciemnienie ekranu na 3s
@@ -2245,7 +2245,7 @@ class Game:
             font_small = self.font_small16
             label = self._txt_next
             self.win.blit(label, (preview_x + 8, preview_y + 15))
-            # Ikony wrogow (po jednej na typ, z liczba)
+            # Ikony wrogow (po jednej na typ, z liczba POD sprajtem)
             x_off = preview_x + 60
             for i, count in enumerate(next_wave):
                 if count > 0 and x_off < preview_x + 280:
@@ -2254,10 +2254,10 @@ class Game:
                         enemy_cls = self.enemy_classes[i]
                         temp = enemy_cls()
                         icon = pygame.transform.scale(temp.imgs[0], (30, 30))
-                        self.win.blit(icon, (x_off, preview_y + 10))
+                        self.win.blit(icon, (x_off, preview_y + 5))
                         cnt_label = font_small.render(str(count), True, (255, 255, 0))
-                        self.win.blit(cnt_label, (x_off + 32, preview_y + 15))
-                        x_off += 60
+                        self.win.blit(cnt_label, (x_off + 15 - cnt_label.get_width()//2, preview_y + 36))
+                        x_off += 55
                     except:
                         pass
             # Boss w nastepnej fali? - ikona zamiast tekstu
@@ -2265,9 +2265,9 @@ class Game:
                 try:
                     boss_temp = Boss()
                     boss_icon = pygame.transform.scale(boss_temp.imgs[0], (30, 30))
-                    self.win.blit(boss_icon, (x_off, preview_y + 10))
+                    self.win.blit(boss_icon, (x_off, preview_y + 5))
                     cnt_label = font_small.render("1", True, (255, 100, 100))
-                    self.win.blit(cnt_label, (x_off + 32, preview_y + 15))
+                    self.win.blit(cnt_label, (x_off + 15 - cnt_label.get_width()//2, preview_y + 36))
                 except:
                     pass
     def add_tower(self, name):
