@@ -443,8 +443,8 @@ class Game:
                             self._show_help = False
                         else:
                             self.show_menu = not getattr(self, 'show_menu', False)
-                            if self.show_menu:
-                                self.paused = True
+                            # ESC toggle: menu+pauza razem
+                            self.paused = self.show_menu
                         continue
                     # Gdy menu otwarte: blokuj wszystkie akcje wiez
                     if self.show_menu:
@@ -856,9 +856,7 @@ class Game:
                     d.last_hit_by.kills += 1
                 self.stats_kills += 1
                 self.stats_gold += reward
-                # 21: skrzynia skarbow po bossie
-                if isinstance(d, Boss):
-                    self.chests.append([d.x, d.y, 0])
+                # 21: skrzynia skarbow po bossie - usunieta na prosbe gracza
                 # 37: spiker serii zabojstw
                 now = self._now
                 self.kill_streak = [t for t in getattr(self, 'kill_streak', []) if now - t < 3000]
@@ -2068,10 +2066,11 @@ class Game:
         # Tylko na trawie
         if not self._is_grass(x, y):
             return False
-        # Na drodze (punkty sciezki wroga)
-        path = [(480, 590), (600, 560), (750, 530), (900, 495),
-                (980, 460), (1020, 430), (980, 385),
-                (800, 375), (600, 370), (400, 365), (280, 355)]
+        # Na drodze (aktualna sciezka wroga z enemies/enemy.py)
+        path = [(550, 635), (550, 610), (550, 580), (555, 550), (620, 542), (720, 532),
+                (820, 515), (880, 495), (920, 475), (980, 470), (1040, 470),
+                (980, 450), (880, 440), (780, 430), (700, 425),
+                (600, 418), (500, 412), (400, 405), (300, 392), (250, 388)]
         for i in range(len(path) - 1):
             x1, y1 = path[i]
             x2, y2 = path[i + 1]

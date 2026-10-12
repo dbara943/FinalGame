@@ -65,6 +65,18 @@ class Enemy:
         self.last_hit_by = None  # R5: wieza ktora zadala ostatni cios
         self.elite = False  # 6: elitarny wrog (3x HP, 5x zlota)
 
+    def _apply_gold_filter(self, img):
+        """Zloty filtr (grayscale -> zloto) - jak posag ze zlota."""
+        gray = pygame.transform.grayscale(img)
+        tinted = gray.copy()
+        gold = pygame.Surface(img.get_size())
+        gold.fill((255, 190, 50))
+        tinted.blit(gold, (0, 0), special_flags=pygame.BLEND_MULT)
+        shine = pygame.Surface(img.get_size())
+        shine.fill((40, 25, 0))
+        tinted.blit(shine, (0, 0), special_flags=pygame.BLEND_ADD)
+        return tinted
+
     def make_elite(self):
         """6: Zamienia w elitarnego (3x HP, 5x zlota, wiekszy zlociutki model)."""
         if not self.elite:
@@ -72,16 +84,17 @@ class Enemy:
             self.max_health *= 3
             self.health = self.max_health
             self.money *= 5
-            # Kopia list (nie modyfikuj wspoldzielonych!) potem skalowanie 1.25x
+            # Kopia list (nie modyfikuj wspoldzielonych!)
             self.imgs = self.imgs[:]
             self.die_imgs = self.die_imgs[:]
             self.hurt_imgs = self.hurt_imgs[:]
             self._imgs_copied = True
+            # Skalowanie 1.25x + zloty filtr NA STALE (pre-render, nie co klatke)
             for lst in (self.imgs, self.die_imgs, self.hurt_imgs):
                 for i, img in enumerate(lst):
                     w, h = img.get_size()
-                    lst[i] = pygame.transform.scale(img, (int(w * 1.25), int(h * 1.25)))
-            self._gold_cache = None  # reset cache tintu
+                    scaled = pygame.transform.scale(img, (int(w * 1.25), int(h * 1.25)))
+                    lst[i] = self._apply_gold_filter(scaled)
 
     def draw(self, win):
         # Czyste rysowanie - bez zmiany stanu (stan zmienia update()).
@@ -90,8 +103,9 @@ class Enemy:
         # Culling: nie rysuj poza ekranem (wydajnosc)
         if self.x < -80 or self.x > 1204 or self.y < -80 or self.y > 800:
             return
-        # 6: zloci wrogowie (elitarni / oznaczeni Golden Touch) - caly model ZE ZLOTA
-        is_golden = self.elite or getattr(self, '_gold_marked', False)
+        # 6: elitarni maja juz zloty filtr nalozony w make_elite() (pre-render)
+        # _gold_marked (Golden Touch): tymczasowy tint
+        is_golden = getattr(self, '_gold_marked', False) and not self.elite
         if is_golden:
             _gc = getattr(self, '_gold_cache', None)
             if not _gc or _gc.get('img') is not self.img:
