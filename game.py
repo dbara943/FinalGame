@@ -296,6 +296,12 @@ class Game:
         self.menu_drag_dy = 0
         self.wave = 0
         self.current_wave = waves[self.wave][:]
+        # DEBUG LOG - start gry
+        try:
+            with open("wave_debug.log", "a") as f:
+                f.write(f"GAME START: wave={self.wave}, current_wave={self.current_wave}, waves[0]={waves[0]}\n")
+        except:
+            pass
         self.won = False
         self.enemy_classes = [Forkman, Swordman, Knight, Goblin, Cyclop, Impostor, Ogre, EvilVillager]
 
