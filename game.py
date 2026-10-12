@@ -507,7 +507,6 @@ class Game:
             pygame.draw.circle(self.win, (30, 30, 30), (int(cb["x"]), int(cb["y"])), 8)
             pygame.draw.circle(self.win, (80, 80, 80), (int(cb["x"]) - 2, int(cb["y"]) - 2), 3)
 
-        self.waiting_for_clear = False
     def run(self):
         self._music_intense = False
         if self.sound:
@@ -841,6 +840,7 @@ class Game:
         self.money = self._start_money
         self.wave = 0
         self.current_wave = waves[self.wave][:]
+        self.waiting_for_clear = False
         self.won = False
         self.last_wave_done = False
         self.endless = False
