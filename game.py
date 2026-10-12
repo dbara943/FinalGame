@@ -1561,20 +1561,7 @@ class Game:
                 if ot >= 180:
                     self.octo = None
 
-        # 19: latarnia morska (snop w nocy)
-        lx, ly = 60, 150
-        pygame.draw.polygon(self.win, (240, 240, 245), [(lx - 14, ly + 60), (lx - 8, ly), (lx + 8, ly), (lx + 14, ly + 60)])
-        pygame.draw.rect(self.win, (200, 60, 60), (lx - 10, ly - 14, 20, 14), border_radius=3)
-        if night:
-            glow = 150 + 60 * math.sin(t * 2)
-            pygame.draw.circle(self.win, (255, 240, 180, int(glow)), (lx, ly - 7), 8)
-            ang = t * 0.7
-            beam_len = 260
-            ex = lx + beam_len * math.cos(ang)
-            ey = ly - 7 + beam_len * math.sin(ang) * 0.35
-            s = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-            pygame.draw.polygon(s, (255, 245, 200, 45), [(lx, ly - 7), (ex - 18, ey), (ex + 18, ey)])
-            self.win.blit(s, (0, 0))
+        # 19: latarnia morska - usunieta na prosbe gracza
 
         # 20: wrak statku - usuniety na prosbe gracza
 

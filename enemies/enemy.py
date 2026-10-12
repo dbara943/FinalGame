@@ -66,15 +66,22 @@ class Enemy:
         # Czyste rysowanie - bez zmiany stanu (stan zmienia update()).
         if self.img is None:
             return
-        # 6: zlota obwiednia dla elitarnych + pulsujaca aura
-        if self.elite:
-            t = pygame.time.get_ticks() / 1000.0
-            pulse = 3 + 2 * math.sin(t * 5)
-            pygame.draw.circle(win, (255, 215, 0, 150), (int(self.x), int(self.y - 35)), int(34 + pulse), 3)
-            # Aura
-            aura = pygame.Surface((90, 90), pygame.SRCALPHA)
-            pygame.draw.circle(aura, (255, 215, 0, 40), (45, 45), 40)
-            win.blit(aura, (self.x - 45, self.y - 80))
+        # 6: zloci wrogowie (elitarni / oznaczeni Golden Touch) - caly model w zlocie,
+        # jak Golden Tower, zamiast brzydkiego kolka
+        is_golden = self.elite or getattr(self, '_gold_marked', False)
+        if is_golden:
+            if not hasattr(self, '_gold_cache') or self._gold_cache.get('img') is not self.img:
+                tinted = self.img.copy()
+                tint = pygame.Surface(self.img.get_size())
+                tint.fill((255, 200, 70))
+                tinted.blit(tint, (0, 0), special_flags=pygame.BLEND_MULT)
+                bright = pygame.Surface(self.img.get_size())
+                bright.fill((30, 18, 0))
+                tinted.blit(bright, (0, 0), special_flags=pygame.BLEND_ADD)
+                self._gold_cache = {'img': self.img, 'surf': tinted}
+            img_to_draw = self._gold_cache['surf']
+        else:
+            img_to_draw = self.img
         # Slad lodu za spowolnionymi
         if self.slow_timer > 0 and random.random() < 0.2:
             # (rysowane przez game.py particles)
