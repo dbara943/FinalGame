@@ -13,22 +13,16 @@ class StartMenu:
     def __init__(self, width, height, bg):
         self.width = width
         self.height = height
-        # Uzyj istniejacego display (z preloadu) - nie zmieniaj trybu
-        self.win = pygame.display.get_surface()
-        if self.win is None:
-            # Fallback jesli brak display (nie powinno sie zdarzyc)
+        # Proba FULLSCREEN+SCALED, fallback jesli renderer nie dziala (niektore Windowsy)
+        try:
+            self.win = pygame.display.set_mode((width, height), pygame.SCALED | pygame.FULLSCREEN)
+        except pygame.error:
             try:
-                self.win = pygame.display.set_mode((width, height), pygame.SCALED | pygame.FULLSCREEN)
+                self.win = pygame.display.set_mode((width, height), pygame.FULLSCREEN)
             except pygame.error:
-                try:
-                    self.win = pygame.display.set_mode((width, height), pygame.FULLSCREEN)
-                except pygame.error:
-                    self.win = pygame.display.set_mode((width, height))
+                self.win = pygame.display.set_mode((width, height))
         pygame.display.set_caption("Island Defenders")
-        # Skaluj tlo do aktualnego rozmiaru ekranu
-        sw, sh = self.win.get_size()
-        self.bg = pygame.transform.scale(bg, (sw, sh))
-        self.width, self.height = sw, sh
+        self.bg = pygame.transform.scale(bg, (width, height))
         # Dzwiek klikniecia w menu
         try:
             pygame.mixer.init()

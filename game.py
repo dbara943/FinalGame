@@ -2368,27 +2368,9 @@ class Game:
     
 if __name__ == "__main__":
     from menu.start_menu import StartMenu
-    # PRELOAD: tworzymy Game podczas ekranu ladowania, zeby PLAY bylo instant
-    # (ciezkie assety laduja sie teraz, nie po kliknieciu)
-    try:
-        _load_win.fill((20, 25, 35))
-        _lt2 = _lf.render("Loading game assets...", True, (200, 220, 255))
-        _load_win.blit(_lt2, (_lw//2 - _lt2.get_width()//2, _lh//2 + 20))
-        pygame.display.flip()
-    except Exception:
-        pass
-    g = Game(lives=20, money=200, sound=True)  # preload z domyslnymi
     start_menu = StartMenu(1124, 720, pygame.image.load(os.path.join("images", "bg.png")))
     settings = start_menu.run()
     if settings is not None:
-        # Zastosuj wybrane ustawienia do juz zaladowanej gry
-        g.lives = settings["lives"]
-        g.money = settings["money"]
-        g.sound = settings["sound"]
-        # Przywroc display gry (menu moglo go zmienic)
-        try:
-            g._screen = pygame.display.set_mode((g._native_w, g._native_h), pygame.FULLSCREEN)
-        except pygame.error:
-            g._screen = pygame.display.set_mode((g._native_w, g._native_h))
+        g = Game(lives=settings["lives"], money=settings["money"], sound=settings["sound"])
         g.run()
     pygame.quit()
