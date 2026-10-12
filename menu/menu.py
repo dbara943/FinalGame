@@ -63,75 +63,88 @@ class Menu():
         return self.item_cost[self.tower.level - 1]
         
     def draw(self, win):
-        # Nowoczesny panel: rysowany programowo, bez grafiki tła
+        # Hologram HUD (wariant D) - kolor zalezny od typu wiezy
         tw = self.tower
-        panel_w, panel_h = 230, 150
+        tname = type(tw).__name__
+        colors = {
+            "WoodenTower": (139, 90, 43),
+            "MetalTower": (120, 150, 180),
+            "GoldenTower": (212, 175, 55),
+            "FireTower": (220, 80, 40),
+            "BlazeTower": (180, 60, 200),
+        }
+        holo = colors.get(tname, (0, 255, 204))
+        panel_w, panel_h = 240, 160
         px = self.x - panel_w // 2
-        py = self.y - 120
-        
-        # Tło panelu
+        py = self.y - 130
         bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-        pygame.draw.rect(bg, (12, 20, 36, 235), bg.get_rect(), border_radius=14)
-        pygame.draw.rect(bg, (90, 140, 200, 120), bg.get_rect(), 2, border_radius=14)
+        pygame.draw.rect(bg, (8, 14, 22, 220), bg.get_rect(), border_radius=8)
+        pygame.draw.rect(bg, (*holo, 255), bg.get_rect(), 2, border_radius=8)
+        c = 12
+        for cx, cy in [(0, 0), (panel_w, 0), (0, panel_h), (panel_w, panel_h)]:
+            dx = -1 if cx == 0 else 1
+            dy = -1 if cy == 0 else 1
+            pygame.draw.line(bg, (*holo, 255), (cx, cy), (cx + dx*c, cy), 3)
+            pygame.draw.line(bg, (*holo, 255), (cx, cy), (cx, cy + dy*c), 3)
         win.blit(bg, (px, py))
-        
-        # Nazwa wieży i poziom (kropki)
-        name_font = pygame.font.SysFont("segoe ui, calibri, arial", 18, bold=True)
-        name_text = tw.name if hasattr(tw, 'name') else "Wieza"
-        label = name_font.render(name_text, True, (255, 255, 255))
-        win.blit(label, (px + 14, py + 10))
-        # Kropki poziomu
-        for i in range(tw.max_level):
-            cx = px + panel_w - 20 - i * 18
-            cy = py + 20
-            color = (255, 215, 0) if i < tw.level else (70, 90, 120)
-            pygame.draw.circle(win, color, (cx, cy), 6)
-        
-        # Przyciski rysowane jako nowoczesne prostokąty
-        btn_y = py + 44
-        btn_h = 36
-        # Upgrade
-        up_cost = self.item_cost[tw.level - 1] if tw.level < tw.max_level else "MAX"
-        self._draw_modern_btn(win, px + 12, btn_y, 100, btn_h, "UPGRADE", 
-                              str(up_cost), (46, 134, 193), tw.level >= tw.max_level)
-        # Sell
+        tag_font = pygame.font.SysFont("consolas, monospace", 11)
+        tag = tag_font.render("TOWER.EXE", True, holo)
+        pygame.draw.rect(win, (8, 14, 22), (px + 8, py - 10, tag.get_width() + 8, 14))
+        win.blit(tag, (px + 12, py - 8))
+        name_font = pygame.font.SysFont("consolas, monospace", 15, bold=True)
+        name_text = tw.name if hasattr(tw, 'name') else tname
+        label = name_font.render(f"> {name_text.upper()}", True, holo)
+        win.blit(label, (px + 14, py + 14))
+        lvl, maxlvl = tw.level, tw.max_level
+        bar_x, bar_y, bar_w, bar_h = px + 14, py + 36, panel_w - 28, 8
+        pygame.draw.rect(win, (40, 50, 65), (bar_x, bar_y, bar_w, bar_h), border_radius=4)
+        fill_w = int(bar_w * lvl / maxlvl)
+        pygame.draw.rect(win, holo, (bar_x, bar_y, fill_w, bar_h), border_radius=4)
+        lvl_txt = tag_font.render(f"LV.{lvl}/{maxlvl}", True, holo)
+        win.blit(lvl_txt, (px + panel_w - lvl_txt.get_width() - 14, py + 32))
+        stat_font = pygame.font.SysFont("consolas, monospace", 12)
+        slabel = stat_font.render(f"DMG {tw.damage}  RNG {tw.range}", True, holo)
+        win.blit(slabel, (px + 14, py + 52))
+        klabel = stat_font.render(f"KILLS {tw.kills}", True, holo)
+        win.blit(klabel, (px + 14, py + 68))
+        btn_y, btn_h = py + 92, 52
+        is_max = tw.level >= tw.max_level
+        if not is_max:
+            up_cost = self.item_cost[tw.level - 1]
+            self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "UPGRADE", f"${up_cost}", holo, False)
+        else:
+            self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "MAX LEVEL", "", (100, 110, 120), True)
         sell_val = tw.sell_value()
-        self._draw_modern_btn(win, px + 118, btn_y, 100, btn_h, "SELL",
-                              f"+${sell_val}", (46, 160, 90), False)
-        
-        # Statystyki wieży
-        stat_font = pygame.font.SysFont("segoe ui, calibri, arial", 15)
-        # Q8: DPS = obrazenia / czas przeladowania
-        dps = tw.damage  # 1 strzal na sekunde
-        stats = f"DMG {tw.damage}  RNG {tw.range}  DPS {dps}"
-        slabel = stat_font.render(stats, True, (170, 190, 210))
-        win.blit(slabel, (px + panel_w//2 - slabel.get_width()//2, py + 92))
-        kfont = pygame.font.SysFont("segoe ui, calibri, arial", 13)
-        klabel = kfont.render(f"KILLS {tw.kills}", True, (255, 215, 0))
-        win.blit(klabel, (px + panel_w//2 - klabel.get_width()//2, py + 110))
-        
-        # Aktualizuj pozycje klikalne przycisków
+        self._draw_holo_btn(win, px + 122, btn_y, 106, btn_h, "SELL", f"+${sell_val}", (255, 100, 100), False)
         if len(self.buttons) >= 2:
-            self.buttons[0].x, self.buttons[0].y = px + 12, btn_y
-            self.buttons[0].width, self.buttons[0].height = 100, btn_h
-            self.buttons[1].x, self.buttons[1].y = px + 118, btn_y
-            self.buttons[1].width, self.buttons[1].height = 100, btn_h
-    
-    def _draw_modern_btn(self, win, x, y, w, h, title, sub, color, disabled):
+            if not is_max:
+                self.buttons[0].x, self.buttons[0].y = px + 12, btn_y
+                self.buttons[0].width, self.buttons[0].height = 106, btn_h
+            else:
+                self.buttons[0].x, self.buttons[0].y = -100, -100
+                self.buttons[0].width, self.buttons[0].height = 0, 0
+            self.buttons[1].x, self.buttons[1].y = px + 122, btn_y
+            self.buttons[1].width, self.buttons[1].height = 106, btn_h
+
+    def _draw_holo_btn(self, win, x, y, w, h, title, sub, color, disabled):
         btn = pygame.Surface((w, h), pygame.SRCALPHA)
-        bg_color = (50, 60, 80, 255) if disabled else (*color, 255)
-        pygame.draw.rect(btn, bg_color, btn.get_rect(), border_radius=9)
-        if not disabled:
-            pygame.draw.rect(btn, (255, 255, 255, 60), btn.get_rect(), 1, border_radius=9)
+        r, g, b = color[0], color[1], color[2]
+        if disabled:
+            pygame.draw.rect(btn, (40, 45, 55, 180), btn.get_rect(), border_radius=6)
+            pygame.draw.rect(btn, (80, 90, 100, 100), btn.get_rect(), 1, border_radius=6)
+        else:
+            pygame.draw.rect(btn, (r, g, b, 40), btn.get_rect(), border_radius=6)
+            pygame.draw.rect(btn, (r, g, b, 255), btn.get_rect(), 2, border_radius=6)
         win.blit(btn, (x, y))
-        tfont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
-        sfont = pygame.font.SysFont("segoe ui, calibri, arial", 13)
-        tcol = (140, 150, 165) if disabled else (255, 255, 255)
-        scol = (140, 150, 165) if disabled else (255, 255, 200)
+        tfont = pygame.font.SysFont("consolas, monospace", 13, bold=True)
+        sfont = pygame.font.SysFont("consolas, monospace", 12)
+        tcol = (120, 130, 140) if disabled else (r, g, b)
         t = tfont.render(title, True, tcol)
-        s = sfont.render(str(sub), True, scol)
-        win.blit(t, (x + w//2 - t.get_width()//2, y + 4))
-        win.blit(s, (x + w//2 - s.get_width()//2, y + 19))
+        win.blit(t, (x + w//2 - t.get_width()//2, y + 8))
+        if sub:
+            s = sfont.render(str(sub), True, tcol)
+            win.blit(s, (x + w//2 - s.get_width()//2, y + 28))
+
             
     def get_clicked(self, X, Y):
         for btn in self.buttons:
