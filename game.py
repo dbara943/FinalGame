@@ -65,6 +65,7 @@ waves = [
 pygame.mixer.init()
 music = pygame.mixer.music.load(os.path.join("sounds", "music.wav"))
 sound_1 = pygame.mixer.Sound("sounds/1.wav")
+sound_glass = pygame.mixer.Sound("sounds/glass_shatter.wav")
 sound_2 = pygame.mixer.Sound("sounds/2.wav")
 sound_3 = pygame.mixer.Sound("sounds/3.wav")
 sound_4 = pygame.mixer.Sound("sounds/4.wav")
@@ -201,7 +202,7 @@ class Game:
         self.morning_fog = 0  # mgla poranna
         if not sound:
             pygame.mixer.music.pause()
-            for s in (sound_1, sound_2, sound_3, sound_4, sound_5,
+            for s in (sound_1, sound_2, sound_3, sound_4, sound_5, sound_glass,
                       tower_sound_1, tower_sound_2, tower_sound_3,
                       tower_sound_4, tower_sound_5, sound_win, sound_lose, sound_roar,
                       sound_levelup, sound_horn, sound_rain, sound_gull, sound_fanfare,
@@ -832,7 +833,10 @@ class Game:
         for d in to_del:
             if d.reached_end:
                 sound_1.play()
+                sound_glass.play()  # tluczone szklo - budynek jest szklany
                 self.lives -= 1
+                # Efekt tluczonego szkla przy budynku
+                self.particles.burst(300, 350, (180, 220, 255), count=15, speed=3, life=40, size=4, gravity=0.3)
                 # Q6: auto-pauza przy 3 zyciach - usunieta na prosbe gracza
             else:
                 # Wrog zabity pociskiem - kasa za niego.
@@ -1439,7 +1443,7 @@ class Game:
         elif action == "sfx":
             self.sfx_muted = not self.sfx_muted
             vol = 0 if self.sfx_muted else 1
-            for s in (sound_1, sound_2, sound_3, sound_4, sound_5, sound_win, sound_lose, sound_roar,
+            for s in (sound_1, sound_2, sound_3, sound_4, sound_5, sound_glass, sound_win, sound_lose, sound_roar,
                       sound_levelup, sound_horn, sound_gull, sound_fanfare,
                       *shoot_sounds.values()):
                 s.set_volume(vol)
