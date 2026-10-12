@@ -1,5 +1,9 @@
 import pygame
 import os
+import sys
+# PyInstaller: gdy uruchomione jako .exe, pliki sa w sys._MEIPASS
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    os.chdir(sys._MEIPASS)
 # Najwyzsza jakosc skalowania GPU (ostrzejszy fullscreen)
 os.environ.setdefault("SDL_HINT_RENDER_SCALE_QUALITY", "2")
 pygame.font.init()
