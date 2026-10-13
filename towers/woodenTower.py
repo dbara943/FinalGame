@@ -150,12 +150,15 @@ class WoodenTower(Tower):
         eff_range = self.range * self._rain_mod
         eff_range_sq = eff_range * eff_range
         # Kandydaci: z siatki przestrzennej (tylko pobliskie komorki) lub wszyscy
+        # Margines na hitboxy: sprite (np. boss 160px) moze wystawac poza
+        # pozycje stop, wiec bierzemy komorki z zapasem.
+        _HB_MARGIN = 120
         if grid is not None:
             candidates = []
-            cx0 = int((self.x - eff_range) // grid_cell)
-            cx1 = int((self.x + eff_range) // grid_cell)
-            cy0 = int((self.y - eff_range) // grid_cell)
-            cy1 = int((self.y + eff_range) // grid_cell)
+            cx0 = int((self.x - eff_range - _HB_MARGIN) // grid_cell)
+            cx1 = int((self.x + eff_range + _HB_MARGIN) // grid_cell)
+            cy0 = int((self.y - eff_range - _HB_MARGIN) // grid_cell)
+            cy1 = int((self.y + eff_range + _HB_MARGIN) // grid_cell)
             for cx in range(cx0, cx1 + 1):
                 for cy in range(cy0, cy1 + 1):
                     candidates.extend(grid.get((cx, cy), []))
@@ -164,10 +167,10 @@ class WoodenTower(Tower):
         for enemy in candidates:
             if enemy.dying or enemy.dead or enemy.reached_end:
                 continue
-            dx = self.x - enemy.x
-            dy = self.y - enemy.y
-            # Kwadrat odleglosci - bez kosztownego sqrt
-            if dx * dx + dy * dy < eff_range_sq:
+            # Hitbox: okrag zasiegu vs prostokat sprite'a (nie punkt stop).
+            # Wiekszy sprite = wiekszy hitbox = wieza strzela tez gdy
+            # zasieg dotyka np. samej glowy wroga.
+            if enemy.hitbox_in_radius(self.x, self.y, eff_range):
                 self.inRange = True
                 enemy_closest.append(enemy)
         # Wybor celu wg priorytetu - min/max (O(n)) zamiast sort (O(n log n))

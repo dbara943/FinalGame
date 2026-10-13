@@ -39,6 +39,10 @@ class Projectile:
         if self.target.reached_end or self.target.dying or self.target.dead:
             self.done = True
             return None
+        # Trafienie gdy pocisk dotknie hitboxa sprite'a (nie tylko stop).
+        if self.target.get_hitbox().collidepoint(self.x, self.y):
+            self.done = True
+            return self.target
         dx = self.target.x - self.x
         dy = self.target.y - self.y
         dist = math.hypot(dx, dy)

@@ -1172,8 +1172,7 @@ class Game:
                     for en in self.enemies:
                         if en.dying or en.dead or en.reached_end:
                             continue
-                        dist = math.sqrt((en.x - hit_enemy.x)**2 + (en.y - hit_enemy.y)**2)
-                        if dist < 150:
+                        if en.hitbox_in_radius(hit_enemy.x, hit_enemy.y, 150):
                             en.apply_slow(240)
                             en.hit(5)
                     self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 50, "FROST NOVA!", 40, (150, 220, 255)])
@@ -1182,8 +1181,7 @@ class Game:
                     for en in self.enemies:
                         if en.dying or en.dead or en.reached_end:
                             continue
-                        dist = math.sqrt((en.x - hit_enemy.x)**2 + (en.y - hit_enemy.y)**2)
-                        if dist < 120:
+                        if en.hitbox_in_radius(hit_enemy.x, hit_enemy.y, 120):
                             dmg = proj.damage * 3 * en.get_damage_mult("fire")
                             if en.hit(dmg):
                                 tower_sound_3.play()
@@ -1211,8 +1209,7 @@ class Game:
                     for en in self.enemies:
                         if en.dying or en.dead or en.reached_end:
                             continue
-                        dist = math.sqrt((en.x - hit_enemy.x)**2 + (en.y - hit_enemy.y)**2)
-                        if dist < proj.splash_radius:
+                        if en.hitbox_in_radius(hit_enemy.x, hit_enemy.y, proj.splash_radius):
                             dmg = proj.damage * crit_mult * en.get_damage_mult(proj.damage_type)
                             if en.hit(dmg):
                                 tower_sound_3.play()
@@ -1344,6 +1341,9 @@ class Game:
                                                (tw.x, tw.y - 20), (tw2.x, tw2.y - 20), 2)
         for tw in self.towers:
             tw.draw(self.win)  # draw() rysuje tez okrag zasiegu (bez duplikatu)
+        # Menu wybranej wiezy NA SAMYM WIERZCHU - zadna wieza go nie przykryje
+        if self.selected_tower is not None and self.selected_tower in self.towers:
+            self.selected_tower.menu.draw(self.win)
         # Q15: przyciemnij odfiltrowane
         if self.tower_filter:
             dim = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -1370,8 +1370,7 @@ class Game:
             for en in self.enemies:
                 if en.dying or en.dead or en.reached_end:
                     continue
-                _dx, _dy = mx - en.x, my - (en.y - 35)
-                if _dx*_dx + _dy*_dy < 1225:
+                if en.get_hitbox().collidepoint(mx, my):
                     self._hover_enemy = en
                     break
         if self._hover_enemy is not None:

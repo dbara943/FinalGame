@@ -86,7 +86,7 @@ class Tower:
                     x2 = int(self.x + (tgt.x - self.x) * t2)
                     y2 = int(self.y - 20 + (tgt.y - (self.y - 20)) * t2)
                     pygame.draw.line(win, (255, 100, 100, 200), (x1, y1), (x2, y2), 2)
-            self.menu.draw(win)
+            # Menu rysowane osobno na samym wierzchu przez game.py (nieprzykryte przez inne wieze)
 
     def draw_radius(self, win):
         if self.selected or getattr(self, 'moving', False):

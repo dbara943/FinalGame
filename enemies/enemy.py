@@ -98,6 +98,26 @@ class Enemy:
                     scaled = pygame.transform.scale(img, (int(w * 1.25), int(h * 1.25)))
                     lst[i] = self._apply_gold_filter(scaled)
 
+    def get_hitbox(self):
+        """Prostokat kolizji na podstawie faktycznego rozmiaru sprite'a.
+        Wieceksze sprite'y = wiekszy hitbox = latwiej trafic.
+        Dopasowany do rysowania: blit(img, (x - w/2, y - h/2 - 35))."""
+        img = self.img
+        if img is None:
+            w, h = 64, 64
+        else:
+            w = img.get_width()
+            h = img.get_height()
+        return pygame.Rect(self.x - w / 2, self.y - h / 2 - 35, w, h)
+
+    def hitbox_in_radius(self, cx, cy, radius):
+        """Czy hitbox sprite'a dotyka okregu o srodku (cx, cy) i promieniu radius."""
+        hb = self.get_hitbox()
+        nx = hb.left if cx < hb.left else (hb.right if cx > hb.right else cx)
+        ny = hb.top if cy < hb.top else (hb.bottom if cy > hb.bottom else cy)
+        dx, dy = cx - nx, cy - ny
+        return dx * dx + dy * dy < radius * radius
+
     def draw(self, win):
         # Czyste rysowanie - bez zmiany stanu (stan zmienia update()).
         if self.img is None:
