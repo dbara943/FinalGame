@@ -861,6 +861,9 @@ class Game:
             pygame.draw.rect(self.win, (101, 67, 33), (bx - 12, by + 15, 24, 18))
             pygame.draw.line(self.win, (80, 50, 25), (bx - 20, by + 10), (bx - 12, by + 15), 2)
             pygame.draw.line(self.win, (80, 50, 25), (bx + 20, by + 10), (bx + 12, by + 15), 2)
+
+    def _update_bombardment(self):
+        """Cinematic bombardowania - fazy."""
         if not self.bombard_active:
             return
         self.bombard_timer += 1
