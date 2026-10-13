@@ -1673,7 +1673,7 @@ class Game:
         self._draw_bombard_zoom()
         # Menu wybranej wiezy NA SAMYM KONCU - nad wrogami, pociskami, HUDem, wszystkim
         if self.selected_tower is not None and self.selected_tower in self.towers:
-            self.selected_tower.menu.draw(self.win)
+            self.selected_tower.menu.draw(self.win, self.money)
 
         self._present()
 

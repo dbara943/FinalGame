@@ -62,7 +62,7 @@ class Menu():
     def get_item_cost(self):
         return self.item_cost[self.tower.level - 1]
         
-    def draw(self, win):
+    def draw(self, win, money=None):
         # Hologram HUD (wariant D) - kolor zalezny od typu wiezy
         tw = self.tower
         tname = type(tw).__name__
@@ -111,7 +111,14 @@ class Menu():
         is_max = tw.level >= tw.max_level
         if not is_max:
             up_cost = self.item_cost[tw.level - 1]
-            self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "UPGRADE", f"${up_cost}", holo, False)
+            # 5: wyszarzony przycisk + brakujaca kwota na czerwono gdy nie stac
+            affordable = money is not None and money >= up_cost
+            if affordable:
+                self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "UPGRADE", f"${up_cost}", holo, False)
+            else:
+                missing = up_cost - (money or 0)
+                self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "UPGRADE",
+                                    f"-${missing}", (255, 90, 90), True, sub_color=(255, 90, 90))
         else:
             self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "MAX LEVEL", "", (100, 110, 120), True)
         sell_val = tw.sell_value()
@@ -126,7 +133,7 @@ class Menu():
             self.buttons[1].x, self.buttons[1].y = px + 122, btn_y
             self.buttons[1].width, self.buttons[1].height = 106, btn_h
 
-    def _draw_holo_btn(self, win, x, y, w, h, title, sub, color, disabled):
+    def _draw_holo_btn(self, win, x, y, w, h, title, sub, color, disabled, sub_color=None):
         btn = pygame.Surface((w, h), pygame.SRCALPHA)
         r, g, b = color[0], color[1], color[2]
         if disabled:
@@ -142,7 +149,8 @@ class Menu():
         t = tfont.render(title, True, tcol)
         win.blit(t, (x + w//2 - t.get_width()//2, y + 8))
         if sub:
-            s = sfont.render(str(sub), True, tcol)
+            scol = sub_color if sub_color else tcol
+            s = sfont.render(str(sub), True, scol)
             win.blit(s, (x + w//2 - s.get_width()//2, y + 28))
 
             
