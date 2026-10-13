@@ -100,9 +100,10 @@ shoot_sounds = {
 }
 
 class Game:
-    def __init__(self, lives=20, money=200, sound=True):
+    def __init__(self, lives=20, money=200, sound=True, difficulty="NORMAL"):
         self.width = 1124
         self.height = 720
+        self.difficulty = difficulty  # EASY / NORMAL / HARD (do HP bossa)
         # Natywna rozdzielczosc ekranu (opcja C: render w pelnej rozdzielczosci)
         if not pygame.display.get_init():
             pygame.display.init()
@@ -349,18 +350,27 @@ class Game:
                 else:
                     self.ship.sail_out()
         else:
-            for i in range(len(self.current_wave)):
-                if self.current_wave[i] != 0:
-                    self.current_wave[i] -= 1
-                    en = self.enemy_classes[i]()
-                    # U8: SWIFT - +30% predkosci
-                    if self.wave_modifier == "swift":
-                        en.velocity *= 1.3
-                    # 6: 8% szansy na elitarnego (nie boss)
-                    if not isinstance(en, Boss) and random.random() < 0.08:
-                        en.make_elite()
-                    self.enemies.append(en)
-                    break
+            # Losowa kolejnosc spawnu (nie od najslabszego) - mniej przewidywalnie
+            available = [i for i, c in enumerate(self.current_wave) if c > 0]
+            if available:
+                i = random.choice(available)
+                self.current_wave[i] -= 1
+                en = self.enemy_classes[i]()
+                # U8: SWIFT - +30% predkosci
+                if self.wave_modifier == "swift":
+                    en.velocity *= 1.3
+                # 6: 8% szansy na elitarnego (nie boss)
+                if not isinstance(en, Boss) and random.random() < 0.08:
+                    en.make_elite()
+                # Endless: 5x HP od startu (za latwe inaczej)
+                if self.endless:
+                    en.max_health *= 5
+                    en.health = en.max_health
+                self.enemies.append(en)
+
+    def _boss_hp(self):
+        """HP bossa z fal 4/8 wg trudnosci: EASY 200, NORMAL 250, HARD 300."""
+        return {"EASY": 200, "NORMAL": 250, "HARD": 300}.get(self.difficulty, 250)
 
     def advance_wave(self):
         """Przechodzi do nastepnej fali: zloto, bonusy, powiadomienie. Wywolywane
@@ -397,7 +407,8 @@ class Game:
             self.money += gold
             self.gold_notifications.append([f"+{gold} gold (endless wave)", 150])
             if self.endless_wave % 4 == 0:
-                self.pending_boss = Boss()
+                # Endless boss: 5x HP (2000) - inaczej za latwy
+                self.pending_boss = Boss(hp=2000)
         elif self.wave + 1 >= len(waves):
             self.last_wave_done = True
         else:
@@ -447,7 +458,7 @@ class Game:
             # Boss na falach 4 i 8; fala 10 (ostatnia) to sam boss FINALNY.
             # Boss spawnuje sie dopiero gdy statek zadokuje (pending_boss).
             if (self.wave + 1) % 4 == 0 and self.wave + 1 < 10:
-                self.pending_boss = Boss()
+                self.pending_boss = Boss(hp=self._boss_hp())
                 self.wave_banner_text = f"WAVE {self.wave + 1} - BOSS!"
             elif self.wave + 1 == 10:
                 self.pending_boss = Boss(final=True)
@@ -1342,6 +1353,8 @@ class Game:
                                 drawn_links.add(key)
                                 pygame.draw.line(self.win, (255, 215, 0, 120),
                                                (tw.x, tw.y - 20), (tw2.x, tw2.y - 20), 2)
+        # Ognisko z tanczacymi PRZED wiezami - wieze zawsze widoczne nad animacja
+        self.draw_campfire()
         for tw in self.towers:
             tw.draw(self.win)  # draw() rysuje tez okrag zasiegu (bez duplikatu)
         # Q15: przyciemnij odfiltrowane
@@ -1621,8 +1634,7 @@ class Game:
             if flock[0] > self.width + 100:
                 self.bird_flocks.remove(flock)
         # Slady stop bossa - usuniete na prosbe gracza
-        # Ognisko z tanczacymi
-        self.draw_campfire()
+        # (Ognisko przeniesione przed wieze - wieze zawsze nad animacja tanczacych)
         self.draw_chests()
         self.draw_announcements()
         # Q17: zegar sesji
@@ -2543,6 +2555,7 @@ if __name__ == "__main__":
     start_menu = StartMenu(1124, 720, pygame.image.load(os.path.join("images", "bg.png")))
     settings = start_menu.run()
     if settings is not None:
-        g = Game(lives=settings["lives"], money=settings["money"], sound=settings["sound"])
+        g = Game(lives=settings["lives"], money=settings["money"], sound=settings["sound"],
+                 difficulty=settings["difficulty"])
         g.run()
     pygame.quit()

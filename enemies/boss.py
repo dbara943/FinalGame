@@ -16,11 +16,12 @@ attack_imgs = load_anim(8, 'attack', (160, 160))
 class Boss(Enemy):
     """Boss pojawiajacy sie co 4 fale. Bardzo wytrzymaly, wolny, wysoka nagroda.
     Fala 10: wzmocniony (1000 HP, enrage, przywoluje miniony)."""
-    def __init__(self, final=False):
+    def __init__(self, final=False, hp=None):
         super().__init__()
         self.name = "boss"
         self.money = 150 if not final else 400
-        self.max_health = 400 if not final else 1000
+        # HP: domyslnie 400 (1000 finalny), mozna nadpisac parametrem hp
+        self.max_health = hp if hp is not None else (400 if not final else 1000)
         self.health = self.max_health
         self.velocity = 1.5
         self.base_velocity = 1.5
