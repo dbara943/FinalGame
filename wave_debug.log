@@ -116,3 +116,13 @@ GAME START: wave=0, current_wave=[40, 0, 0, 0, 0, 0, 0, 0], waves[0]=[40, 0, 0, 
 GAME START: wave=0, current_wave=[40, 0, 0, 0, 0, 0, 0, 0], waves[0]=[40, 0, 0, 0, 0, 0, 0, 0]
 GAME START: wave=0, current_wave=[40, 0, 0, 0, 0, 0, 0, 0], waves[0]=[40, 0, 0, 0, 0, 0, 0, 0]
 advance_wave: wave 9 -> 10, enemies=0, waiting=True
+GAME START: wave=0, current_wave=[40, 0, 0, 0, 0, 0, 0, 0], waves[0]=[40, 0, 0, 0, 0, 0, 0, 0]
+GAME START: wave=0, current_wave=[40, 0, 0, 0, 0, 0, 0, 0], waves[0]=[40, 0, 0, 0, 0, 0, 0, 0]
+GAME START: wave=0, current_wave=[40, 0, 0, 0, 0, 0, 0, 0], waves[0]=[40, 0, 0, 0, 0, 0, 0, 0]
+advance_wave: wave 1 -> 2, enemies=0, waiting=True
+GAME START: wave=0, current_wave=[40, 0, 0, 0, 0, 0, 0, 0], waves[0]=[40, 0, 0, 0, 0, 0, 0, 0]
+GAME START: wave=0, current_wave=[40, 0, 0, 0, 0, 0, 0, 0], waves[0]=[40, 0, 0, 0, 0, 0, 0, 0]
+GAME START: wave=0, current_wave=[40, 0, 0, 0, 0, 0, 0, 0], waves[0]=[40, 0, 0, 0, 0, 0, 0, 0]
+GAME START: wave=0, current_wave=[40, 0, 0, 0, 0, 0, 0, 0], waves[0]=[40, 0, 0, 0, 0, 0, 0, 0]
+GAME START: wave=0, current_wave=[40, 0, 0, 0, 0, 0, 0, 0], waves[0]=[40, 0, 0, 0, 0, 0, 0, 0]
+advance_wave: wave 9 -> 10, enemies=0, waiting=True

@@ -1400,6 +1400,39 @@ class Game:
                 lines.append(f"  {nice}: {count}")
         return lines
 
+    def _draw_glass_button(self, rect, label_text, glow_color, hover=False, font=None):
+        """Szklany przycisk (glassmorphism): poswiata, matowe szklo, jasna krawedz, blysk u gory."""
+        win = self.win
+        font = font or self.font_small30
+        # Miekka poswiata za przyciskiem (kilka warstw = przyblizony blur)
+        for pad, alpha in ((22, 18), (14, 30), (7, 45)):
+            glow = pygame.Surface((rect.w + pad * 2, rect.h + pad * 2), pygame.SRCALPHA)
+            a = alpha + (20 if hover else 0)
+            pygame.draw.rect(glow, (*glow_color, a), glow.get_rect(), border_radius=18)
+            win.blit(glow, (rect.x - pad, rect.y - pad))
+        # Matowe szklo
+        glass = pygame.Surface((rect.w, rect.h), pygame.SRCALPHA)
+        pygame.draw.rect(glass, (235, 240, 250, 95 if not hover else 125),
+                         glass.get_rect(), border_radius=14)
+        # Kolorowy tint
+        tint = pygame.Surface((rect.w, rect.h), pygame.SRCALPHA)
+        tint.fill((*glow_color, 50 if not hover else 70))
+        glass.blit(tint, (0, 0))
+        win.blit(glass, rect.topleft)
+        # Jasna krawedz
+        pygame.draw.rect(win, (255, 255, 255, 170), rect, 2, border_radius=14)
+        # Blysk u gory szkla
+        hl = pygame.Surface((rect.w - 20, rect.h // 3), pygame.SRCALPHA)
+        pygame.draw.rect(hl, (255, 255, 255, 45), hl.get_rect(), border_radius=9)
+        win.blit(hl, (rect.x + 10, rect.y + 7))
+        # Tekst z cieniem
+        label = font.render(label_text, True, (255, 255, 255))
+        tsh = font.render(label_text, True, (0, 0, 0))
+        lx = rect.x + rect.width // 2 - label.get_width() // 2
+        ly = rect.y + rect.height // 2 - label.get_height() // 2
+        win.blit(tsh, (lx + 2, ly + 2))
+        win.blit(label, (lx, ly))
+
     def show_end_screen(self, won, forfeited=False):
         """Ekran koncowy. Zwraca 'restart', 'continue' (endless), 'menu' lub 'quit'."""
         big_font = self.font_big70
@@ -1510,32 +1543,19 @@ class Game:
                     label = stats_font.render(s, True, stat_color)
                     self.win.blit(label, (self.width // 2 - label.get_width() // 2, self.height // 2 + 5 + i * 32))
         _draw_static()
-        # Przyciski - rysowane raz, z hover w petli
+        # Przyciski - szklane (glassmorphism), z hover w petli
         buttons = [
-            (restart_rect, "RESTART", (50, 140, 70)),
-            (menu_rect, "MAIN MENU", (50, 100, 190)),
-            (quit_rect, "QUIT", (170, 50, 50)),
+            (restart_rect, "RESTART", (80, 220, 130)),
+            (menu_rect, "MAIN MENU", (90, 160, 255)),
+            (quit_rect, "QUIT", (255, 100, 100)),
         ]
         if continue_rect:
-            buttons.insert(1, (continue_rect, "CONTINUE", (50, 100, 190)))
+            buttons.insert(1, (continue_rect, "CONTINUE", (90, 160, 255)))
         def _draw_buttons(hover_pos=None):
-            for rect, label_text, btn_color in buttons:
+            for rect, label_text, glow_color in buttons:
                 hov = hover_pos is not None and rect.collidepoint(hover_pos)
-                # Jasniejszy gdy hover
-                fill = tuple(min(255, c + 40) for c in btn_color) if hov else btn_color
-                pygame.draw.rect(self.win, fill, rect, border_radius=12)
-                pygame.draw.rect(self.win, (255, 255, 255), rect, 3, border_radius=12)
-                if hov:
-                    glow = pygame.Surface((rect.w + 12, rect.h + 12), pygame.SRCALPHA)
-                    pygame.draw.rect(glow, (*btn_color, 60), glow.get_rect(), border_radius=16)
-                    self.win.blit(glow, (rect.x - 6, rect.y - 6))
-                label = small_font.render(label_text, True, (255, 255, 255))
-                # Cien tekstu dla czytelnosci
-                tsh = small_font.render(label_text, True, (0, 0, 0))
-                lx = rect.x + rect.width//2 - label.get_width()//2
-                ly = rect.y + rect.height//2 - label.get_height()//2
-                self.win.blit(tsh, (lx + 2, ly + 2))
-                self.win.blit(label, (lx, ly))
+                self._draw_glass_button(rect, label_text, glow_color, hover=hov,
+                                        font=small_font)
         _draw_buttons()
         self._present()
         # Petla czeka na klikniecie przycisku
