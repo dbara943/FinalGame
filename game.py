@@ -36,6 +36,7 @@ from towers.woodenTower import (WoodenTower, MetalTower, GoldenTower, FireTower,
                                 sound_3 as tower_sound_3, sound_4 as tower_sound_4,
                                 sound_5 as tower_sound_5)
 from ships.ship import Ship
+from ships.ally_ship import AllyShip
 from menu.menu import VerticalMenu
 from effects.particles import ParticleSystem, FloatingCoin, Shockwave
 import time
@@ -56,6 +57,30 @@ towers_names = ["woodenTower", "metalTower", "goldenTower", "fireTower", "blazeT
 # get_item_cost() szuka po nazwie przycisku, wiec bez tego zwracal -1.
 tower_shop_names = {"woodenTower": "t1", "metalTower": "t2", "goldenTower": "t3",
                     "fireTower": "t4", "blazeTower": "t5"}
+# Upgrady klikalnego budynku (jednorazowe na run)
+BUILDING_UPGRADES = [
+    {"id": "walls", "name": "Reinforced Walls", "cost": 3500,
+     "desc": "+5 max lives for the building."},
+    {"id": "drones", "name": "Repair Drones", "cost": 5000,
+     "desc": "+1 life every 2 waves. A drone orbits the building."},
+    {"id": "tesla", "name": "Tesla Coil", "cost": 6500,
+     "desc": "Zaps the nearest enemy every few seconds. Stronger in storms."},
+    {"id": "treasury", "name": "War Treasury", "cost": 1200,
+     "desc": "+25% gold from all kills, permanently."},
+    {"id": "bounty", "name": "Bounty Board", "cost": 1500,
+     "desc": "Bosses and elite enemies give +50% gold."},
+    {"id": "ammo", "name": "Ammunition Depot", "cost": 4000,
+     "desc": "All towers shoot 15% faster."},
+    {"id": "lucky", "name": "Lucky Charm", "cost": 2000,
+     "desc": "Towers have 10% chance to deal 2x critical damage."},
+    {"id": "storm", "name": "Storm Caller", "cost": 3000,
+     "desc": "Storms last longer and give +25% gold (instead of +15%)."},
+    {"id": "docks", "name": "Reinforced Docks", "cost": 2500,
+     "desc": "Enemies move 15% slower."},
+    {"id": "cavalry", "name": "Call the Cavalry", "cost": 10000,
+     "desc": "An allied ship cripples the pirate ship, then bombards enemies.",
+     "endless_only": True},
+]
 waves = [
     [40,0,0,0,0,0,0,0],
     [30,10,0,0,0,0,0,0],
@@ -164,11 +189,32 @@ class Game:
         self.stats_towers_lost = 0
         self.stats_abilities_used = 0
         self.stats_gold_spent = 0
-        self.stats_kills_by_type = {}  # nazwa klasy -> liczba zabic
-        self.stats_towers_built = 0
-        self.stats_towers_lost = 0
-        self.stats_abilities_used = 0
-        self.stats_gold_spent = 0
+        # Upgrady budynku (klikany szklany budynek)
+        self.building_upgrades = set()  # id kupionych upgradow
+        self._building_menu_open = False
+        self._building_menu_buttons = []  # (rect, upgrade_id)
+        self._building_rect = pygame.Rect(90, 160, 340, 250)  # szklany budynek na tle
+        self._building_icons = {}
+        for uid in ("walls", "drones", "tesla", "treasury", "bounty",
+                    "ammo", "lucky", "storm", "docks", "cavalry"):
+            try:
+                img = pygame.image.load(os.path.join("images", "upgrades", uid + ".webp"))
+                self._building_icons[uid] = pygame.transform.smoothscale(img, (56, 56))
+            except:
+                self._building_icons[uid] = None
+        self._building_desc_font = pygame.font.SysFont("arial", 16)
+        # Dron naprawczy (wizualny)
+        self._drone_angle = 0.0
+        # Tesla Coil
+        self._tesla_cooldown = 0
+        # Statek sojuszniczy (Call the Cavalry)
+        self.pirate_crippled = False
+        self.ally_ship = None
+        self._ally_strike_at = None  # po ilu rozladowanych wrogach wplynie
+        self._ally_shots_left = 0
+        self._ally_fire_timer = 0
+        self.mortar_shots = []  # pociski mozdzierzowe
+        self._storm_extra = False  # Storm Caller: burza trwa 2 fale
         self.endless = False  # Tryb endless po wygranej
         self.endless_wave = 0
         self.wave_banner_text = ""  # V3: banner fali
@@ -379,11 +425,36 @@ class Game:
                 if not isinstance(en, Boss) and random.random() < 0.08:
                     en.make_elite()
                 # Endless: 5x HP bazowo + 5% co fale (compound), minimum +1 HP na fale
+                # Reinforced Docks: wrogowie 15% wolniejsi
                 if self.endless:
                     scaled = self._endless_hp(en.max_health, self.endless_wave)
                     en.max_health = scaled
                     en.health = scaled
+                    # Endless: 5x zlota + 5% co fale (jak HP)
+                    en.money = self._endless_gold(en.money, self.endless_wave)
+                if "docks" in self.building_upgrades:
+                    en.velocity *= 0.85
                 self.enemies.append(en)
+                # Call the Cavalry: licz rozladowanych, sojusznik wplywa w 1. polowie fali
+                if self._ally_strike_at is not None:
+                    self._ally_unloaded = getattr(self, "_ally_unloaded", 0) + 1
+                    if (self._ally_unloaded >= self._ally_strike_at
+                            and (not self.ally_ship or self.ally_ship.state == AllyShip.AWAY)):
+                        self._ally_strike_at = None  # tylko raz na fale
+                        self.ally_ship = AllyShip(os.path.join("images", "ship_ally.png"),
+                                                  screen_w=self.width)
+                        self.ally_ship.sail_in("strike", fire_x=420)
+                        self.wave_banner_text = "ALLY SHIP INBOUND!"
+                        self.wave_banner_timer = 150
+
+    def _endless_gold(self, base, endless_wave):
+        """Zloto w endless: 5x bazowo od fali 11, potem +5% co fale (compound).
+        Jesli 5% nie daje ani 1 zlota, to +1."""
+        gold = int(base * 5)
+        for _ in range(1, endless_wave):
+            bonus = int(gold * 0.05)
+            gold += bonus if bonus >= 1 else 1
+        return gold
 
     def _setup_endless_wave(self):
         """Generuje kolejna fale endless (proceduralnie, rosnace HP)."""
@@ -400,6 +471,14 @@ class Game:
         if self.endless_wave % 4 == 0:
             # Endless boss: 5x HP + 5% co fale (jak zwykli wrogowie)
             self.pending_boss = Boss(hp=self._endless_hp(400, self.endless_wave))
+        # Call the Cavalry: 50% szans na uderzenie w tej fali (po okaleczeniu pirata)
+        self._ally_strike_at = None
+        if ("cavalry" in self.building_upgrades and self.pirate_crippled
+                and random.random() < 0.5):
+            total = sum(self.current_wave)
+            # Losowy moment w pierwszej polowie fali (po rozladowanych wrogach)
+            self._ally_strike_at = random.randint(1, max(1, total // 2))
+            self._ally_unloaded = 0
 
     def _endless_hp(self, base, endless_wave):
         """HP w endless: 5x bazowo od fali 11, potem +5% co fale (compound).
@@ -440,6 +519,14 @@ class Game:
         self._wave_kills_start = self.stats_kills
         self._wave_gold_start = self.stats_gold
         sound_fanfare.play()  # 40: fanfara fali
+        # Repair Drones: +1 zycie co 2 fale (do maxa)
+        if "drones" in self.building_upgrades:
+            self._drone_wave_count = getattr(self, "_drone_wave_count", 0) + 1
+            if self._drone_wave_count >= 2:
+                self._drone_wave_count = 0
+                if self.lives < self._start_lives:
+                    self.lives += 1
+                    self.gold_notifications.append(["+1 life (drones)", 150])
         if self.endless:
             # Tryb endless: generuj fale proceduralnie z rosnacym HP
             self._setup_endless_wave()
@@ -477,18 +564,23 @@ class Game:
                     self.current_wave = [int(c * 1.5) for c in self.current_wave]
                     self.wave_banner_text += " [SWARM!]"
             # 7: deszcz na losowych falach (20% szansy, nie na bossach)
+            # Storm Caller: burze trwaja dluzej (2 fale zamiast 1)
             was_raining = self.raining
-            self.raining = False
-            if wave_num % 4 != 0 and wave_num != 10 and random.random() < 0.2:
-                self.raining = True
-                self.wave_banner_text += " [RAIN]"
-                self.raindrops = [(random.randint(0, self.width), random.randint(0, self.height),
-                                   random.randint(8, 14)) for _ in range(100)]
-                sound_rain.play(loops=-1)  # 38: szum deszczu
-            elif was_raining:
-                sound_rain.stop()
-                # B4: tecza po deszczu
-                self._rainbow_timer = 600  # 10s
+            if "storm" in self.building_upgrades and was_raining and self._storm_extra:
+                self._storm_extra = False  # druga fala burzy
+            else:
+                self.raining = False
+                if wave_num % 4 != 0 and wave_num != 10 and random.random() < 0.2:
+                    self.raining = True
+                    self.wave_banner_text += " [RAIN]"
+                    self.raindrops = [(random.randint(0, self.width), random.randint(0, self.height),
+                                       random.randint(8, 14)) for _ in range(100)]
+                    sound_rain.play(loops=-1)  # 38: szum deszczu
+                    self._storm_extra = "storm" in self.building_upgrades
+                elif was_raining:
+                    sound_rain.stop()
+                    # B4: tecza po deszczu
+                    self._rainbow_timer = 600  # 10s
             # Boss na falach 4 i 8; fala 10 (ostatnia) to sam boss FINALNY.
             # Boss spawnuje sie dopiero gdy statek zadokuje (pending_boss).
             if (self.wave + 1) % 4 == 0 and self.wave + 1 < 10:
@@ -499,7 +591,17 @@ class Game:
                 self.wave_banner_text = "FINALNA FALA - BOSS!"
         self.waiting_for_clear = False
     def _start_bombardment(self, num_targets=3):
-        """Rozpoczyna cinematic bombardowania: statek plynie na srodek oceanu."""
+        """Rozpoczyna cinematic bombardowania: statek plynie na srodek oceanu.
+        Call the Cavalry: pierwsze bombardowanie w endless po kupnie - przechwycenie."""
+        # Przechwycenie: sojusznik niszczy pirata zamiast barazu w wieze
+        if (self.endless and "cavalry" in self.building_upgrades
+                and not self.pirate_crippled):
+            self._start_interception()
+            return
+        # Okaleczony pirat juz nigdy nie bombarduje
+        if self.pirate_crippled:
+            self.ship.sail_out()
+            return
         self.bombard_active = True
         self.bombard_phase = 0  # 0: statek plynie na srodek
         self.bombard_timer = 0
@@ -513,6 +615,109 @@ class Game:
         self.wave_banner_timer = 180
         # Statek plynie na pozycje wybrana przez gracza (867, 603)
         self.ship.sail_to_bombard(867, 603)
+
+    def _start_interception(self):
+        """Sojuszniczy statek wplywa z lewej i unieszkodliwia pirata."""
+        from ships.ally_ship import AllyShip
+        self.bombard_active = True
+        self.bombard_phase = 10  # 10: przechwycenie - sojusznik plynie
+        self.bombard_timer = 0
+        self.wave_banner_text = "CALL THE CAVALRY!"
+        self.wave_banner_timer = 200
+        # Pirat plynie na pozycje barazu (jak zwykle)
+        self.ship.sail_to_bombard(867, 603)
+        # Sojusznik wplywa z lewej
+        self.ally_ship = AllyShip(os.path.join("images", "ship_ally.png"),
+                                  screen_w=self.width)
+        self.ally_ship.sail_in("cripple", fire_x=350)
+
+    def _update_ally_ship(self):
+        """Sojusznik w trybie 'strike': po doplynieciu strzela 1-4 razy w wrogow."""
+        if not self.ally_ship or self.ally_ship.mode != "strike":
+            return
+        if self.ally_ship.state == AllyShip.FIRING:
+            living = [en for en in self.enemies
+                      if not en.dying and not en.dead and not en.reached_end]
+            if not living:
+                # Nie ma w kogo strzelic - odplywa
+                self.ally_ship.sail_out()
+                return
+            self._ally_fire_timer -= 1
+            if self._ally_fire_timer <= 0:
+                if self._ally_shots_left <= 0:
+                    # Nowa salwa: 1-4 strzaly
+                    self._ally_shots_left = random.randint(1, 4)
+                tgt = random.choice(living)
+                self._fire_mortar(tgt.x, tgt.y - 20)
+                self._ally_shots_left -= 1
+                self._ally_fire_timer = 25  # przerwa miedzy strzalami
+                if self._ally_shots_left <= 0:
+                    self.ally_ship.sail_out()
+        elif self.ally_ship.state == AllyShip.AWAY:
+            self.ally_ship = None
+
+    def _fire_mortar(self, tx, ty):
+        """Pocisk mozdzierzowy: luk paraboliczny, 500 dmg + splash."""
+        if not self.ally_ship:
+            return
+        sx, sy = self.ally_ship.x + 60, self.ally_ship.y - 40
+        self.mortar_shots.append({
+            "x0": sx, "y0": sy, "x1": tx, "y1": ty,
+            "t": 0.0, "dur": 55,  # klatek lotu
+            "dmg": 500, "splash": 110,
+            "trail": [],
+        })
+        self.ally_ship.cannon_flash = 20
+        try:
+            sound_ab_meteor.play()
+        except:
+            pass
+
+    def _update_mortars(self):
+        """Lot pociskow mozdzierzowych po paraboli + eksplozje."""
+        for m in self.mortar_shots[:]:
+            m["t"] += 1.0 / m["dur"]
+            t = m["t"]
+            if t >= 1.0:
+                self.mortar_shots.remove(m)
+                self._mortar_explode(m["x1"], m["y1"], m["dmg"], m["splash"])
+            else:
+                m["trail"].append((m["x0"] + (m["x1"] - m["x0"]) * t,
+                                   m["y0"] + (m["y1"] - m["y0"]) * t
+                                   - math.sin(math.pi * t) * 160))
+                if len(m["trail"]) > 12:
+                    m["trail"].pop(0)
+
+    def _mortar_explode(self, x, y, dmg, splash):
+        """Eksplozja mozdzierza: obrazenia obszarowe."""
+        self.particles.burst(x, y, (255, 150, 50), count=25, speed=6, life=35, size=5)
+        self.particles.burst(x, y, (80, 80, 80), count=12, speed=3, life=50, size=6)
+        self.shockwaves.append(Shockwave(x, y, max_r=splash + 30))
+        self.screen_shake = 8
+        for en in self.enemies[:]:
+            if en.dying or en.dead or en.reached_end:
+                continue
+            d2 = (en.x - x) ** 2 + (en.y - y) ** 2
+            if d2 < splash ** 2:
+                en.health -= dmg
+                self.stats_damage += dmg
+                self.damage_numbers.append([en.x, en.y - 40, str(dmg), 60])
+
+    def _draw_mortars(self):
+        """Rysuje pociski mozdzierzowe (kule z ognistym sladem)."""
+        for m in self.mortar_shots:
+            # Slad
+            for i, (tx, ty) in enumerate(m["trail"]):
+                a = int(120 * i / max(1, len(m["trail"])))
+                pygame.draw.circle(self.win, (255, 150, 50, a), (int(tx), int(ty)), 4)
+            # Kula
+            t = min(1.0, m["t"])
+            x = m["x0"] + (m["x1"] - m["x0"]) * t
+            y = m["y0"] + (m["y1"] - m["y0"]) * t - math.sin(math.pi * t) * 160
+            pygame.draw.circle(self.win, (40, 40, 40), (int(x), int(y)), 9)
+            pygame.draw.circle(self.win, (255, 120, 30), (int(x), int(y)), 9, 2)
+            # Plomien
+            pygame.draw.circle(self.win, (255, 200, 80, 200), (int(x) - 6, int(y) + 4), 5)
 
     def _update_bombardment(self):
         """Cinematic bombardowania - fazy."""
@@ -571,6 +776,54 @@ class Game:
                 self.bombard_zoom = 0
                 self.bombard_zoom_tower = None
                 # Normalny przeplyw: statek juz odplynal, czekamy na wyczyszczenie
+        # === PRZECHWYCENIE (Call the Cavalry) ===
+        elif self.bombard_phase == 10:
+            # Czekamy az pirat doplynie na pozycje i sojusznik na swoja
+            if (self.ship.state == Ship.BOMBARD and self.ally_ship
+                    and self.ally_ship.state == AllyShip.FIRING):
+                self.bombard_phase = 11
+                self.bombard_timer = 0
+        elif self.bombard_phase == 11:
+            # Sojusznik wali salwa w pirata (3 potezne strzaly)
+            if self.bombard_timer == 30:
+                self._ally_broadside_at_pirate()
+            if self.bombard_timer >= 150:
+                # Pirat okaleczony na stale!
+                self.pirate_crippled = True
+                self.wave_banner_text = "PIRATE SHIP CRIPPLED!"
+                self.wave_banner_timer = 200
+                self.ship.sail_out_from_bombard()
+                if self.ally_ship:
+                    self.ally_ship.sail_out()
+                self.bombard_phase = 12
+                self.bombard_timer = 0
+        elif self.bombard_phase == 12:
+            # Czekamy az oba statki odplyna
+            ally_gone = not self.ally_ship or self.ally_ship.state == AllyShip.AWAY
+            if self.ship.state == Ship.AWAY and ally_gone:
+                self.bombard_active = False
+                self.bombard_phase = 0
+                self.ally_ship = None
+
+    def _ally_broadside_at_pirate(self):
+        """Salwa sojusznika w piracki statek (wizualne zniszczenie)."""
+        if not self.ally_ship:
+            return
+        sx, sy = self.ally_ship.x + 80, self.ally_ship.y - 20
+        tx, ty = self.ship.x, self.ship.y - 20
+        for i in range(3):
+            self.cannonballs.append({
+                "x": sx, "y": sy,
+                "tx": tx + random.randint(-30, 30), "ty": ty + random.randint(-20, 20),
+                "speed": 12,
+                "trail": [],
+                "ally_vs_pirate": True,  # nie rani wiez, tylko efekt
+            })
+        self.ally_ship.cannon_flash = 30
+        try:
+            sound_ab_meteor.play()
+        except:
+            pass
 
     def _update_cannonballs(self):
         """Aktualizacja pociskow armatnich."""
@@ -582,6 +835,13 @@ class Game:
             if dist < 15:
                 # Trafienie!
                 self.cannonballs.remove(cb)
+                # Salwa sojusznika w pirata: tylko efekt wizualny
+                if cb.get("ally_vs_pirate"):
+                    self.particles.burst(cb["tx"], cb["ty"], (255, 150, 50), count=25, speed=6, life=40, size=5)
+                    self.particles.burst(cb["tx"], cb["ty"], (80, 80, 80), count=15, speed=3, life=60, size=6)
+                    self.screen_shake = 10
+                    self.shockwaves.append(Shockwave(cb["tx"], cb["ty"], max_r=100))
+                    continue
                 tw = cb["tower"]
                 # Eksplozja
                 self.particles.burst(cb["tx"], cb["ty"], (255, 150, 50), count=20, speed=5, life=30, size=4)
@@ -653,9 +913,13 @@ class Game:
                 ship_acc = min(ship_acc + LOGIC_HZ / RENDER_FPS, 5.0)
                 while ship_acc >= 1.0:
                     self.ship.update()
+                    if self.ally_ship:
+                        self.ally_ship.update()
+                        self._update_ally_ship()
                     ship_acc -= 1.0
                 self._update_cannonballs()
                 self._update_bombardment()
+                self._update_mortars()
             if self.ship.state == Ship.AWAY and not self.won:
                 if self.last_wave_done:
                     self.won = True
@@ -875,6 +1139,19 @@ class Game:
                     if self.speed_btn_rect.collidepoint(pos):
                         self.speed = self.speed % 3 + 1  # 1->2->3->1
                         continue
+                    # Menu upgradow budynku - klik na budynek lub w otwarte menu
+                    if self._building_menu_open:
+                        if self._building_menu_close_rect.collidepoint(pos):
+                            self._building_menu_open = False
+                            continue
+                        for rect, uid in self._building_menu_buttons:
+                            if rect.collidepoint(pos):
+                                self._buy_building_upgrade(uid)
+                                break
+                        continue
+                    if self._building_rect.collidepoint(pos):
+                        self._building_menu_open = True
+                        continue
                     if self.moving_object:
                         if self.moving_object.name in towers_names:
                             # Swobodne stawianie (bez przyciagania do siatki)
@@ -888,6 +1165,7 @@ class Game:
                                     self.money += self.shop_price(self.moving_object.name)  # zwrot, pobierze przy budowie
                                 else:
                                     self.towers.append(self.moving_object)
+                                    self._apply_tower_upgrade_flags(self.moving_object)
                                     self.stats_towers_built += 1
                                     self._recalc_synergy()
                                 # Q7: zapamietaj do Ctrl+Z
@@ -1018,6 +1296,18 @@ class Game:
         self.stats_towers_lost = 0
         self.stats_abilities_used = 0
         self.stats_gold_spent = 0
+        # Reset upgradow budynku
+        self.building_upgrades = set()
+        self._building_menu_open = False
+        self._drone_angle = 0.0
+        self._tesla_cooldown = 0
+        self.pirate_crippled = False
+        self.ally_ship = None
+        self._ally_strike_at = None
+        self._ally_shots_left = 0
+        self._ally_fire_timer = 0
+        self.mortar_shots = []
+        self._storm_extra = False
         self.ship = Ship(os.path.join("images", "ship.png"), dock_x=278, dock_y=669,
                          screen_w=self.width)
         self.ship.sail_in()
@@ -1027,11 +1317,52 @@ class Game:
         for tw in self.towers:
             tw._synergy = tw.get_synergy_bonus(self.towers)
 
+    def _tesla_zap(self):
+        """Tesla Coil: piorun w najblizszego wroga. W burze: 2x dmg + lancuch."""
+        bx, by = 260, 285  # srodek budynku
+        best, best_d2 = None, 450 ** 2
+        for en in self.enemies:
+            if en.dying or en.dead or en.reached_end:
+                continue
+            d2 = (en.x - bx) ** 2 + (en.y - by) ** 2
+            if d2 < best_d2:
+                best, best_d2 = en, d2
+        if not best:
+            return
+        storm = self.raining
+        dmg = 300 if storm else 150
+        targets = [best]
+        if storm:
+            # Lancuch na 3 pobliskich
+            near = sorted(
+                (en for en in self.enemies
+                 if en is not best and not en.dying and not en.dead and not en.reached_end
+                 and (en.x - best.x) ** 2 + (en.y - best.y) ** 2 < 200 ** 2),
+                key=lambda e: (e.x - best.x) ** 2 + (e.y - best.y) ** 2)[:3]
+            targets.extend(near)
+        prev = (bx, by - 100)
+        for tgt in targets:
+            tgt.health -= dmg
+            self.stats_damage += dmg
+            self.damage_numbers.append([tgt.x, tgt.y - 40, str(dmg), 60])
+            self.particles.burst(tgt.x, tgt.y - 30, (150, 220, 255), count=12, speed=4, size=3)
+            # Wizualny piorun (zapisany do rysowania)
+            if not hasattr(self, '_tesla_bolts'):
+                self._tesla_bolts = []
+            self._tesla_bolts.append([prev, (tgt.x, tgt.y - 30), 12])
+            prev = (tgt.x, tgt.y - 30)
+
     def update_game_logic(self):
         """Jedna iteracja logiki gry (ruch wrogow, ataki, pociski)."""
         # V3: banner fali
         if self.wave_banner_timer > 0:
             self.wave_banner_timer -= 1
+        # Tesla Coil: raz na ~3s razi najblizszego wroga
+        if "tesla" in self.building_upgrades:
+            self._tesla_cooldown -= 1
+            if self._tesla_cooldown <= 0:
+                self._tesla_cooldown = 180  # 3s przy 60 FPS
+                self._tesla_zap()
         # Powiadomienia o zlocie
         for gn in self.gold_notifications[:]:
             gn[1] -= 1
@@ -1081,6 +1412,7 @@ class Game:
                              "t4": FireTower, "t5": BlazeTower}
                 tw = tower_map[name](gx, gy)
                 self.towers.append(tw)
+                self._apply_tower_upgrade_flags(tw)
                 self.stats_towers_built += 1
                 self._recalc_synergy()
                 self.build_queue.pop(0)
@@ -1162,12 +1494,19 @@ class Game:
                 reward = d.money
                 if getattr(d, '_gold_marked', False):
                     reward *= 2
+                # Bounty Board: bossowie i elity +50% zlota
+                if "bounty" in self.building_upgrades and (isinstance(d, Boss) or d.elite):
+                    reward = int(reward * 1.5)
                 # U8: RICH - +50% zlota
                 if self.wave_modifier == "rich":
                     reward = int(reward * 1.5)
-                # 7: deszcz +15% zlota
+                # 7: deszcz +15% zlota (Storm Caller: +25%)
                 if self.raining:
-                    reward = int(reward * 1.15)
+                    rain_bonus = 1.25 if "storm" in self.building_upgrades else 1.15
+                    reward = int(reward * rain_bonus)
+                # War Treasury: +25% zlota (multiplikatywnie, po bazowym)
+                if "treasury" in self.building_upgrades:
+                    reward = int(reward * 1.25)
                 self.money += reward
                 # Trup zostaje na ziemi (ostatnia klatka animacji smierci)
                 if d.die_imgs:
@@ -1682,7 +2021,21 @@ class Game:
             en.draw(self.win)
         # Statek na wierzchu wrogow (nie wyglada dziwnie przy nachodzeniu)
         self.ship.draw(self.win)
+        # Okaleczony pirat: dym i ogien
+        if self.pirate_crippled and self.ship.state != Ship.AWAY:
+            if random.random() < 0.3:
+                self.particles.burst(self.ship.x + random.randint(-40, 40),
+                                     self.ship.y - 40 + random.randint(-20, 20),
+                                     (80, 80, 80), count=2, speed=1, life=40, size=5, gravity=-0.05)
+            if random.random() < 0.15:
+                self.particles.burst(self.ship.x + random.randint(-30, 30),
+                                     self.ship.y - 30,
+                                     (255, 120, 30), count=2, speed=2, life=25, size=4)
+        # Sojuszniczy statek
+        if self.ally_ship:
+            self.ally_ship.draw(self.win)
         self._draw_cannonballs()
+        self._draw_mortars()
         for proj in self.projectiles:
             proj.draw(self.win)
         # Latajace liczby obrazen
@@ -1800,6 +2153,12 @@ class Game:
         
         # Ability dock - pasek umiejetnosci na dole
         self.draw_ability_dock()
+
+        # Podswietlenie klikalnego budynku + dron + menu upgradow
+        self.draw_building_highlight()
+        self.draw_repair_drone()
+        self.draw_tesla_bolts()
+        self.draw_building_menu()
 
         # Przyciemnienie przy wejsciu bossa (dramatyczny efekt)
         if self.boss_intro_dark > 0:
@@ -2546,6 +2905,192 @@ class Game:
         # Fale o skaly (splash)
         if random.random() < 0.1:
             self.particles.burst(150, 620, (255, 255, 255), count=3, speed=2, life=20, size=3)
+
+    def _buy_building_upgrade(self, uid):
+        """Kupno upgradu budynku."""
+        upg = next((u for u in BUILDING_UPGRADES if u["id"] == uid), None)
+        if not upg or uid in self.building_upgrades:
+            return
+        # Cavalry: tylko w endless (easter egg w normalnej grze)
+        if upg.get("endless_only") and not self.endless:
+            if self.money >= upg["cost"]:
+                self.gold_notifications.append(
+                    ["The cavalry doesn't sail in safe waters...", 200])
+            else:
+                self.gold_notifications.append(
+                    ["This secret is not for sale... yet.", 200])
+            return
+        if self.money < upg["cost"]:
+            self.gold_notifications.append(["Not enough gold!", 150])
+            return
+        self.money -= upg["cost"]
+        self.stats_gold_spent += upg["cost"]
+        self.building_upgrades.add(uid)
+        self.gold_notifications.append([f"{upg['name']} acquired!", 200])
+        # Natychmiastowe efekty
+        if uid == "walls":
+            self._start_lives += 5
+            self.lives += 5
+        elif uid in ("ammo", "lucky"):
+            for tw in self.towers:
+                self._apply_tower_upgrade_flags(tw)
+
+    def _apply_tower_upgrade_flags(self, tw):
+        """Ustawia flagi upgradow budynku na wiezy."""
+        tw._fire_rate_mult = 1.15 if "ammo" in self.building_upgrades else 1.0
+        tw._lucky_crit = "lucky" in self.building_upgrades
+
+    def draw_building_menu(self):
+        """Menu upgradow budynku (10 slotow, 2 kolumny x 5 rzedow)."""
+        if not self._building_menu_open:
+            return
+        # Przyciemnienie
+        dim = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 120))
+        self.win.blit(dim, (0, 0))
+        # Panel
+        pw, ph = 820, 620
+        px, py = (self.width - pw) // 2, (self.height - ph) // 2
+        pygame.draw.rect(self.win, (22, 28, 38), (px, py, pw, ph), border_radius=16)
+        pygame.draw.rect(self.win, (90, 110, 140), (px, py, pw, ph), 2, border_radius=16)
+        title = self.font_p36.render("BUILDING UPGRADES", True, (255, 215, 100))
+        self.win.blit(title, (px + (pw - title.get_width()) // 2, py + 18))
+        # Przycisk zamkniecia
+        self._building_menu_close_rect = pygame.Rect(px + pw - 46, py + 12, 34, 34)
+        pygame.draw.rect(self.win, (150, 60, 60),
+                         self._building_menu_close_rect, border_radius=8)
+        x_lbl = self.font_btn18.render("X", True, (255, 255, 255))
+        self.win.blit(x_lbl, (self._building_menu_close_rect.centerx - x_lbl.get_width() // 2,
+                              self._building_menu_close_rect.centery - x_lbl.get_height() // 2))
+        # Sloty
+        self._building_menu_buttons = []
+        mx, my = self._mouse_pos()
+        col_w = (pw - 60) // 2
+        row_h = 100
+        for i, upg in enumerate(BUILDING_UPGRADES):
+            col = i % 2
+            row = i // 2
+            sx = px + 20 + col * (col_w + 20)
+            sy = py + 70 + row * (row_h + 8)
+            rect = pygame.Rect(sx, sy, col_w, row_h)
+            owned = upg["id"] in self.building_upgrades
+            # Easter egg: cavalry ukryte w normalnej grze
+            mystery = upg.get("endless_only") and not self.endless
+            hover = rect.collidepoint(mx, my) and not owned
+            bg_col = (35, 45, 60) if not hover else (50, 65, 90)
+            if owned:
+                bg_col = (30, 60, 40)
+            pygame.draw.rect(self.win, bg_col, rect, border_radius=10)
+            pygame.draw.rect(self.win, (100, 120, 150) if not owned else (80, 200, 120),
+                             rect, 2, border_radius=10)
+            # Ikonka
+            if mystery:
+                # Ciemna sylwetka ze znakiem zapytania
+                q_bg = pygame.Surface((56, 56), pygame.SRCALPHA)
+                pygame.draw.circle(q_bg, (15, 18, 25), (28, 28), 26)
+                pygame.draw.circle(q_bg, (80, 90, 110), (28, 28), 26, 2)
+                q = self.font_p36.render("?", True, (120, 130, 150))
+                q_bg.blit(q, (28 - q.get_width() // 2, 28 - q.get_height() // 2))
+                self.win.blit(q_bg, (sx + 10, sy + (row_h - 56) // 2))
+                name = "???"
+                desc = "Intel locked."
+                price_txt = "???"
+            else:
+                icon = self._building_icons.get(upg["id"])
+                if icon:
+                    self.win.blit(icon, (sx + 10, sy + (row_h - 56) // 2))
+                name = upg["name"]
+                desc = upg["desc"]
+                price_txt = f"${upg['cost']:,}"
+            # Nazwa
+            name_col = (150, 150, 160) if mystery else (240, 240, 240)
+            name_lbl = self.font_btn18.render(name, True, name_col)
+            self.win.blit(name_lbl, (sx + 76, sy + 8))
+            # Opis (max 2 linie, nie nachodzi na cene)
+            desc_col = (110, 115, 125) if mystery else (170, 180, 190)
+            desc_font = self._building_desc_font
+            words = desc.split()
+            lines, cur = [], ""
+            for w_ in words:
+                if len(cur) + len(w_) + 1 > 30:
+                    lines.append(cur)
+                    cur = w_
+                else:
+                    cur = (cur + " " + w_).strip()
+            if cur:
+                lines.append(cur)
+            for li, ln in enumerate(lines[:2]):
+                d_lbl = desc_font.render(ln, True, desc_col)
+                self.win.blit(d_lbl, (sx + 76, sy + 34 + li * 18))
+            # Cena / status (prawy dolny rog, osobna linia)
+            if owned:
+                st = self.font_btn18.render("OWNED", True, (100, 220, 130))
+            elif mystery:
+                st = self.font_btn18.render("???", True, (120, 130, 150))
+            else:
+                afford = self.money >= upg["cost"]
+                st = self.font_btn18.render(price_txt,
+                                            True, (255, 215, 100) if afford else (200, 100, 100))
+            self.win.blit(st, (rect.right - st.get_width() - 12,
+                               rect.bottom - st.get_height() - 10))
+            if not owned:
+                self._building_menu_buttons.append((rect, upg["id"]))
+
+    def draw_building_highlight(self):
+        """Delikatne podswietlenie budynku gdy kursor nad nim (klikany)."""
+        if self._building_menu_open:
+            return
+        mx, my = self._mouse_pos()
+        if self._building_rect.collidepoint(mx, my):
+            hl = pygame.Surface((self._building_rect.w, self._building_rect.h), pygame.SRCALPHA)
+            pygame.draw.rect(hl, (255, 215, 100, 40), hl.get_rect(), border_radius=12)
+            pygame.draw.rect(hl, (255, 215, 100, 120), hl.get_rect(), 2, border_radius=12)
+            self.win.blit(hl, self._building_rect.topleft)
+
+    def draw_repair_drone(self):
+        """Wizualny dron krazacy wokol budynku (po kupnie Repair Drones)."""
+        if "drones" not in self.building_upgrades:
+            return
+        self._drone_angle += 0.03
+        bx, by = 260, 285  # srodek budynku
+        rx, ry = 150, 80
+        dx = bx + rx * math.cos(self._drone_angle)
+        dy = by + ry * math.sin(self._drone_angle)
+        # Korpus drona
+        pygame.draw.ellipse(self.win, (70, 80, 95), (dx - 14, dy - 8, 28, 16))
+        pygame.draw.ellipse(self.win, (40, 200, 255), (dx - 6, dy - 4, 12, 8))
+        # Wirniki
+        for ox, oy in [(-16, -10), (16, -10), (-16, 10), (16, 10)]:
+            pygame.draw.ellipse(self.win, (200, 220, 235, 160),
+                                (dx + ox - 10, dy + oy - 3, 20, 6))
+        # Zielony wskaznik naprawy
+        if int(self._drone_angle * 10) % 30 == 0:
+            self.particles.burst(dx, dy + 10, (100, 255, 150), count=2, speed=1, life=20, size=2)
+
+    def draw_tesla_bolts(self):
+        """Rysuje pioruny Tesli (krotkotrwale)."""
+        if not hasattr(self, '_tesla_bolts') or not self._tesla_bolts:
+            return
+        for bolt in self._tesla_bolts[:]:
+            (x1, y1), (x2, y2), timer = bolt
+            bolt[2] -= 1
+            if bolt[2] <= 0:
+                self._tesla_bolts.remove(bolt)
+                continue
+            # Lamana linia pioruna
+            pts = [(x1, y1)]
+            segs = 6
+            for i in range(1, segs):
+                t = i / segs
+                mx = x1 + (x2 - x1) * t + random.randint(-15, 15)
+                my = y1 + (y2 - y1) * t + random.randint(-15, 15)
+                pts.append((mx, my))
+            pts.append((x2, y2))
+            alpha = int(255 * bolt[2] / 12)
+            for w_, col in ((5, (150, 220, 255)), (2, (255, 255, 255))):
+                s = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+                pygame.draw.lines(s, (*col, alpha), False, [(int(x), int(y)) for x, y in pts], w_)
+                self.win.blit(s, (0, 0))
 
     def draw_ability_dock(self):
         """Nowoczesny pasek 5 umiejetnosci - wieksze czcionki, hover pop, zywe kolory."""

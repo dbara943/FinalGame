@@ -192,12 +192,18 @@ class WoodenTower(Tower):
 
         if first_enemy is not None:
             self.current_target = first_enemy  # R3: zapamietaj cel
-            cooldown_ticks = 60  # 1s
+            # Ammunition Depot: +15% szybkosci strzelania
+            fire_mult = getattr(self, '_fire_rate_mult', 1.0)
+            cooldown_ticks = int(60 / fire_mult)  # 1s bazowo
             if self.attack_cooldown <= 0:
                 self.attack_cooldown = cooldown_ticks
                 shoot_snd.get(type(self).__name__, sound_2).play()
                 # 5: synergia +15% jesli sasiad tego samego typu
                 dmg = int(self.damage * getattr(self, '_synergy', 1.0))
+                # Lucky Charm: 10% szansy na 2x obrazenia krytyczne
+                self._crit = getattr(self, '_lucky_crit', False) and random.random() < 0.10
+                if self._crit:
+                    dmg *= 2
                 splash = getattr(self, 'splash_radius', 0)
                 # Pocisk leci do wroga zamiast natychmiastowego hita.
                 projectiles.append(Projectile(
