@@ -31,6 +31,7 @@ class StartMenu:
         pygame.display.set_caption("Island Defenders")
         self.title_font = pygame.font.SysFont("arial", 76, bold=True)
         self.btn_font = pygame.font.SysFont("arial", 30, bold=True)
+        self.btn_font_small = pygame.font.SysFont("arial", 22, bold=True)
         self.small_font = pygame.font.SysFont("arial", 22)
         self.diff_idx = 1  # domyslnie NORMAL
         self.sound = True
@@ -63,9 +64,53 @@ class StartMenu:
         color = (46, 134, 193) if hover else (28, 90, 135)
         pygame.draw.rect(self.win, color, rect, border_radius=14)
         pygame.draw.rect(self.win, (255, 255, 255), rect, 2, border_radius=14)
-        label = self.btn_font.render(text, True, (255, 255, 255))
+        # Dopasuj czcionke do szerokosci przycisku (DIFFICULTY: NORMAL bylo za dlugie)
+        font = self.btn_font
+        label = font.render(text, True, (255, 255, 255))
+        if label.get_width() > rect.w - 30:
+            font = self.btn_font_small
+            label = font.render(text, True, (255, 255, 255))
         self.win.blit(label, (rect.centerx - label.get_width() // 2,
                               rect.centery - label.get_height() // 2))
+
+    def draw_title_wave(self):
+        """Animowany tytul jak w filmach: fala powiekszajaca literki przechodzi w kolko."""
+        import math
+        t = pygame.time.get_ticks() / 1000.0
+        text = "ISLAND DEFENDERS"
+        base_size = 76
+        # Szerokosci liter przy bazowym rozmiarze (do wycentrowania)
+        base_font = self._title_font(base_size)
+        widths = [base_font.size(ch)[0] for ch in text]
+        total_w = sum(widths)
+        x = self.rw // 2 - total_w // 2
+        y_base = self.rh // 2 - 260
+        for i, ch in enumerate(text):
+            if ch == " ":
+                x += widths[i]
+                continue
+            # Fala: sinus z przesunieciem fazowym na literke, podrozuje w kolko
+            phase = t * 2.2 - i * 0.4
+            s = math.sin(phase)
+            scale = 1.0 + 0.22 * s
+            size = max(20, int(base_size * scale))
+            font = self._title_font(size)
+            # Lekkie unoszenie przy powiekszeniu
+            lift = int(14 * max(0, s))
+            surf = font.render(ch, True, (255, 210, 63))
+            sh = font.render(ch, True, (0, 0, 0))
+            lx = x + (widths[i] - surf.get_width()) // 2
+            ly = y_base + (base_size - surf.get_height()) // 2 - lift
+            self.win.blit(sh, (lx + 3, ly + 3))
+            self.win.blit(surf, (lx, ly))
+            x += widths[i]
+
+    def _title_font(self, size):
+        if not hasattr(self, "_title_font_cache"):
+            self._title_font_cache = {}
+        if size not in self._title_font_cache:
+            self._title_font_cache[size] = pygame.font.SysFont("arial", size, bold=True)
+        return self._title_font_cache[size]
 
     def draw(self, mouse):
         self.win.blit(self.bg, (0, 0))
@@ -73,11 +118,8 @@ class StartMenu:
         shade.fill((5, 10, 25, 150))
         self.win.blit(shade, (0, 0))
 
-        shadow = self.title_font.render("ISLAND DEFENDERS", True, (0, 0, 0))
-        title = self.title_font.render("ISLAND DEFENDERS", True, (255, 210, 63))
-        tx = self.rw // 2 - title.get_width() // 2
-        self.win.blit(shadow, (tx + 4, self.rh // 2 - 256))
-        self.win.blit(title, (tx, self.rh // 2 - 260))
+        # Animowany tytul - fala jak w filmach
+        self.draw_title_wave()
         sub = self.small_font.render("Defend Vancouver Island from the monster-pirates!",
                                       True, (220, 230, 240))
         self.win.blit(sub, (self.rw // 2 - sub.get_width() // 2, self.rh // 2 - 160))
