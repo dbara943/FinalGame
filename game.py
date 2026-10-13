@@ -101,6 +101,8 @@ TENT_UPGRADES = [
      "desc": "Spikes on the road wound passing enemies."},
     {"id": "balloon", "name": "Recon Balloon", "cost": 5500,
      "desc": "Scout balloon drifts overhead. All towers +15% range."},
+    {"id": "sabotage", "name": "Sabotage", "cost": 6000,
+     "desc": "Saboteurs poison enemy supplies. All enemies spawn with -15% HP."},
 ]
 waves = [
     [40,0,0,0,0,0,0,0],
@@ -233,7 +235,8 @@ class Game:
         _tent_icon_files = {"scout": "scout", "drums": "drums", "supply": "supply",
                             "medic": "medic", "guerrilla": "guerrilla",
                             "banner": "veteran", "signal": "signal",
-                            "spikes": "spikes", "balloon": "balloon"}
+                            "spikes": "spikes", "balloon": "balloon",
+                            "sabotage": "sabotage"}
         for uid, fname in _tent_icon_files.items():
             try:
                 img = pygame.image.load(os.path.join("images", "upgrades", "tent_" + fname + ".webp"))
@@ -423,6 +426,11 @@ class Game:
             return
         # Boss czeka na zadokowanie - spawnuj gdy statek w porcie
         if self.pending_boss:
+            # Sabotage: boss tez z -15% HP
+            if "sabotage" in self.tent_upgrades:
+                self.pending_boss.max_health = int(self.pending_boss.max_health * 0.85)
+                self.pending_boss.health = int(self.pending_boss.health * 0.85)
+            self.pending_boss._spawn_time = time.time()
             self.enemies.append(self.pending_boss)
             # A10: intro bossa - dramatyczne wejscie
             self.wave_banner_text = "BOSS"
@@ -467,12 +475,16 @@ class Game:
                     en.make_elite()
                 # Endless: 5x HP bazowo + 5% co fale (compound), minimum +1 HP na fale
                 # Reinforced Docks: wrogowie 15% wolniejsi
+                # Sabotage: wrogowie spawnuja sie z -15% HP
                 if self.endless:
                     scaled = self._endless_hp(en.max_health, self.endless_wave)
                     en.max_health = scaled
                     en.health = scaled
                     # Endless: 5x zlota + 5% co fale (jak HP)
                     en.money = self._endless_gold(en.money, self.endless_wave)
+                if "sabotage" in self.tent_upgrades:
+                    en.max_health = int(en.max_health * 0.85)
+                    en.health = int(en.health * 0.85)
                 if "docks" in self.building_upgrades:
                     en.velocity *= 0.85
                 en._spawn_time = time.time()  # Scout Reports: ambush
