@@ -368,8 +368,28 @@ class Game:
                     en.health = en.max_health
                 self.enemies.append(en)
 
-    def _boss_hp(self):
-        """HP bossa z fal 4/8 wg trudnosci: EASY 200, NORMAL 250, HARD 300."""
+    def _setup_endless_wave(self):
+        """Generuje kolejna fale endless (proceduralnie, rosnace HP)."""
+        self.endless_wave += 1
+        self.wave += 1
+        scale = 1 + self.endless_wave * 0.15
+        self.current_wave = [
+            int(20 * scale), int(15 * scale), int(12 * scale), int(10 * scale),
+            int(8 * scale), int(6 * scale), int(5 * scale), int(3 * scale),
+        ]
+        gold = 200
+        self.money += gold
+        self.gold_notifications.append([f"+{gold} gold (endless wave)", 150])
+        if self.endless_wave % 4 == 0:
+            # Endless boss: 5x HP (2000) - inaczej za latwy
+            self.pending_boss = Boss(hp=2000)
+
+    def _boss_hp(self, wave_num):
+        """HP bossa wg fali i trudnosci.
+        Fala 4: EASY 200, NORMAL 250, HARD 300.
+        Fala 8: EASY 400, NORMAL 500, HARD 600."""
+        if wave_num == 8:
+            return {"EASY": 400, "NORMAL": 500, "HARD": 600}.get(self.difficulty, 500)
         return {"EASY": 200, "NORMAL": 250, "HARD": 300}.get(self.difficulty, 250)
 
     def advance_wave(self):
@@ -396,19 +416,7 @@ class Game:
         sound_fanfare.play()  # 40: fanfara fali
         if self.endless:
             # Tryb endless: generuj fale proceduralnie z rosnacym HP
-            self.endless_wave += 1
-            self.wave += 1
-            scale = 1 + self.endless_wave * 0.15
-            self.current_wave = [
-                int(20 * scale), int(15 * scale), int(12 * scale), int(10 * scale),
-                int(8 * scale), int(6 * scale), int(5 * scale), int(3 * scale),
-            ]
-            gold = 200
-            self.money += gold
-            self.gold_notifications.append([f"+{gold} gold (endless wave)", 150])
-            if self.endless_wave % 4 == 0:
-                # Endless boss: 5x HP (2000) - inaczej za latwy
-                self.pending_boss = Boss(hp=2000)
+            self._setup_endless_wave()
         elif self.wave + 1 >= len(waves):
             self.last_wave_done = True
         else:
@@ -458,7 +466,7 @@ class Game:
             # Boss na falach 4 i 8; fala 10 (ostatnia) to sam boss FINALNY.
             # Boss spawnuje sie dopiero gdy statek zadokuje (pending_boss).
             if (self.wave + 1) % 4 == 0 and self.wave + 1 < 10:
-                self.pending_boss = Boss(hp=self._boss_hp())
+                self.pending_boss = Boss(hp=self._boss_hp(self.wave + 1))
                 self.wave_banner_text = f"WAVE {self.wave + 1} - BOSS!"
             elif self.wave + 1 == 10:
                 self.pending_boss = Boss(final=True)
@@ -917,10 +925,11 @@ class Game:
                 if result == "restart":
                     self.reset_game()
                 elif result == "continue":
-                    # Tryb endless: kontynuuj z proceduralnymi falami
+                    # Tryb endless: od razu fala 11 (bez pustego rejsu statku z fali 10)
                     self.endless = True
                     self.won = False
                     self.last_wave_done = False
+                    self._setup_endless_wave()
                     self.ship.sail_in()
                 else:
                     run = False
