@@ -159,6 +159,16 @@ class Game:
         self.stats_kills = 0
         self.stats_gold = 0
         self.stats_damage = 0
+        self.stats_kills_by_type = {}
+        self.stats_towers_built = 0
+        self.stats_towers_lost = 0
+        self.stats_abilities_used = 0
+        self.stats_gold_spent = 0
+        self.stats_kills_by_type = {}  # nazwa klasy -> liczba zabic
+        self.stats_towers_built = 0
+        self.stats_towers_lost = 0
+        self.stats_abilities_used = 0
+        self.stats_gold_spent = 0
         self.endless = False  # Tryb endless po wygranej
         self.endless_wave = 0
         self.wave_banner_text = ""  # V3: banner fali
@@ -584,6 +594,7 @@ class Game:
                                            tw.y + random.randint(-20, 20),
                                            (139, 90, 43), count=3, speed=4, life=40, size=5)
                     self.towers.remove(tw)
+                    self.stats_towers_lost += 1
                     if self.selected_tower == tw:
                         self.selected_tower = None
                     self.gold_notifications.append(["Tower destroyed!", 150])
@@ -725,12 +736,14 @@ class Game:
                             cost = self.menu.get_item_cost(tower_names[idx])
                             if self.money >= cost:
                                 self.money -= cost
+                                self.stats_gold_spent += cost
                                 self.add_tower(tower_names[idx])
                     # U: upgrade wybranej wiezy, S: sprzedaz
                     if event.key == pygame.K_u and self.selected_tower:
                         cost = self.selected_tower.menu.get_item_cost()
                         if cost != "MAX" and self.money >= cost:
                             self.money -= cost
+                            self.stats_gold_spent += cost
                             self.selected_tower.upgrade(cost)
                             # Q13: zapamietaj do Ctrl+Z
                             self.last_upgrade = (self.selected_tower, cost)
@@ -833,6 +846,7 @@ class Game:
                                         tw.activate_ability(self.enemies, self.projectiles)
                                         activated = True
                                 if activated:
+                                    self.stats_abilities_used += 1
                                     # Unikalny dzwiek dla kazdej umiejetnosci
                                     snd = {"Wooden": sound_ab_rapid, "Metal": sound_ab_frost,
                                            "Golden": sound_ab_gold, "Fire": sound_ab_meteor,
@@ -874,6 +888,7 @@ class Game:
                                     self.money += self.shop_price(self.moving_object.name)  # zwrot, pobierze przy budowie
                                 else:
                                     self.towers.append(self.moving_object)
+                                    self.stats_towers_built += 1
                                     self._recalc_synergy()
                                 # Q7: zapamietaj do Ctrl+Z
                                 self.last_placed = (self.moving_object, self.shop_price(self.moving_object.name))
@@ -891,6 +906,7 @@ class Game:
                         cost = self.menu.get_item_cost(side_menu_button)
                         if self.money >= cost:
                             self.money -= cost
+                            self.stats_gold_spent += cost
                             self.add_tower(side_menu_button)
                     
                     btn_clicked = None                    
@@ -901,6 +917,7 @@ class Game:
                                 cost = self.selected_tower.menu.get_item_cost()
                                 if cost != "MAX" and self.money >= cost:
                                     self.money -= cost
+                                    self.stats_gold_spent += cost
                                     self.selected_tower.upgrade(cost)
                             elif btn_clicked == "Sell":
                                 self.money += self.selected_tower.sell_value()
@@ -996,6 +1013,11 @@ class Game:
         self.stats_kills = 0
         self.stats_gold = 0
         self.stats_damage = 0
+        self.stats_kills_by_type = {}
+        self.stats_towers_built = 0
+        self.stats_towers_lost = 0
+        self.stats_abilities_used = 0
+        self.stats_gold_spent = 0
         self.ship = Ship(os.path.join("images", "ship.png"), dock_x=278, dock_y=669,
                          screen_w=self.width)
         self.ship.sail_in()
@@ -1054,10 +1076,12 @@ class Game:
             cost = self.shop_price(name)
             if self.money >= cost and self.is_valid_placement(gx, gy):
                 self.money -= cost
+                self.stats_gold_spent += cost
                 tower_map = {"t1": WoodenTower, "t2": MetalTower, "t3": GoldenTower,
                              "t4": FireTower, "t5": BlazeTower}
                 tw = tower_map[name](gx, gy)
                 self.towers.append(tw)
+                self.stats_towers_built += 1
                 self._recalc_synergy()
                 self.build_queue.pop(0)
             else:
@@ -1162,6 +1186,9 @@ class Game:
                     d.last_hit_by.kills += 1
                 self.stats_kills += 1
                 self.stats_gold += reward
+                # Zabicia wg typu wroga
+                etype = type(d).__name__
+                self.stats_kills_by_type[etype] = self.stats_kills_by_type.get(etype, 0) + 1
                 # 21: skrzynia skarbow po bossie - usunieta na prosbe gracza
                 # 37: spiker serii zabojstw
                 now = self._now
@@ -1293,6 +1320,86 @@ class Game:
             if dn[3] <= 0:
                 self.damage_numbers.remove(dn)
 
+    def _draw_victory_map(self):
+        """Victory #5: ekran jak stara mapa piratow - 'ISLAND SECURED'."""
+        w, h = self.width, self.height
+        # Pergamin
+        self.win.fill((196, 164, 120))
+        # Przyciemnione krawedzie (winieta)
+        for i in range(60):
+            alpha = int(120 * (i / 60) ** 2)
+            edge = pygame.Surface((w, h), pygame.SRCALPHA)
+            pygame.draw.rect(edge, (101, 67, 33, alpha), (i, i, w - 2*i, h - 2*i), 2)
+            self.win.blit(edge, (0, 0))
+        # Podwojna ramka mapy
+        pygame.draw.rect(self.win, (101, 67, 33), (24, 24, w - 48, h - 48), 4)
+        pygame.draw.rect(self.win, (101, 67, 33), (36, 36, w - 72, h - 72), 2)
+        # Roza wiatrow (prawy gorny rog)
+        cx, cy, r = w - 120, 120, 44
+        for ang in range(0, 360, 45):
+            rad = math.radians(ang)
+            x2, y2 = cx + r * math.cos(rad), cy + r * math.sin(rad)
+            col = (140, 40, 40) if ang % 90 == 0 else (101, 67, 33)
+            pygame.draw.line(self.win, col, (cx, cy), (x2, y2), 3 if ang % 90 == 0 else 2)
+        pygame.draw.circle(self.win, (101, 67, 33), (cx, cy), 6)
+        n_lbl = self.font_btn18.render("N", True, (140, 40, 40))
+        self.win.blit(n_lbl, (cx - n_lbl.get_width()//2, cy - r - 24))
+        # Przerywana sciezka do X
+        path_pts = [(140, h - 160), (300, h - 220), (450, h - 180),
+                    (600, h - 260), (w//2, h//2 + 40)]
+        for i in range(len(path_pts) - 1):
+            x1, y1 = path_pts[i]
+            x2, y2 = path_pts[i + 1]
+            segs = 12
+            for s in range(0, segs, 2):
+                t1, t2 = s / segs, (s + 1) / segs
+                px1, py1 = x1 + (x2 - x1) * t1, y1 + (y2 - y1) * t1
+                px2, py2 = x1 + (x2 - x1) * t2, y1 + (y2 - y1) * t2
+                pygame.draw.line(self.win, (101, 67, 33), (px1, py1), (px2, py2), 3)
+        # Wielki czerwony X na wyspie
+        ix, iy, s = w // 2, h // 2 + 40, 46
+        pygame.draw.line(self.win, (170, 30, 30), (ix - s, iy - s), (ix + s, iy + s), 10)
+        pygame.draw.line(self.win, (170, 30, 30), (ix - s, iy + s), (ix + s, iy - s), 10)
+        # Morskie bazgroly w rogach
+        for sx, sy in [(100, 140), (w - 220, h - 140)]:
+            pygame.draw.arc(self.win, (101, 67, 33), (sx - 30, sy - 14, 60, 28), 0.3, 2.8, 2)
+            pygame.draw.arc(self.win, (101, 67, 33), (sx - 20, sy - 8, 40, 18), 0.3, 2.8, 2)
+
+    def _draw_defeat_minimal(self):
+        """Defeat #10: minimalistyczny ciemny ekran - tylko statystyki i motywujacy napis."""
+        w, h = self.width, self.height
+        # Bardzo ciemne tlo z delikatna winieta
+        self.win.fill((12, 14, 18))
+        for i in range(50):
+            alpha = int(80 * (i / 50) ** 2)
+            edge = pygame.Surface((w, h), pygame.SRCALPHA)
+            pygame.draw.rect(edge, (0, 0, 0, alpha), (i, i, w - 2*i, h - 2*i), 2)
+            self.win.blit(edge, (0, 0))
+        # Cienka linia pod tytulem
+        pygame.draw.line(self.win, (80, 30, 30), (w//2 - 200, h//2 - 60), (w//2 + 200, h//2 - 60), 2)
+
+    def _end_stats_list(self):
+        """Rozszerzone statystyki koncowe: ogolne + zabicia wg typu wroga."""
+        lines = [
+            f"Wave reached: {self.wave + 1} / {len(waves)}",
+            f"Monsters slain: {self.stats_kills}",
+            f"Damage dealt: {self.stats_damage}",
+            f"Gold earned: {self.stats_gold}$   |   Gold spent: {self.stats_gold_spent}$",
+            f"Towers built: {self.stats_towers_built}   |   Towers lost: {self.stats_towers_lost}",
+            f"Abilities used: {self.stats_abilities_used}",
+        ]
+        # Zabicia wg typu (top 5)
+        by_type = sorted(self.stats_kills_by_type.items(), key=lambda kv: -kv[1])[:5]
+        if by_type:
+            lines.append("")
+            lines.append("Kills by type:")
+            for etype, count in by_type:
+                # Ladna nazwa: EvilVillager -> Evil Villager
+                nice = "".join(" " + c if c.isupper() and i else c
+                               for i, c in enumerate(etype)).strip()
+                lines.append(f"  {nice}: {count}")
+        return lines
+
     def show_end_screen(self, won, forfeited=False):
         """Ekran koncowy. Zwraca 'restart', 'continue' (endless), 'menu' lub 'quit'."""
         big_font = self.font_big70
@@ -1300,51 +1407,143 @@ class Game:
         if forfeited:
             title = "RUN FORFEITED"
             color = (255, 180, 80)
+            title_bg = None
+        elif won:
+            title = "ISLAND SECURED!"
+            color = (101, 45, 20)  # ciemny braz na pergaminie
+            title_bg = None
         else:
-            title = "YOU WIN! The island is saved!" if won else "YOU LOSE! The monsters broke through!"
-            color = (60, 200, 90) if won else (220, 60, 60)
-        # Przyciski
+            title = "ISLAND LOST"
+            color = (150, 60, 60)  # przygaszona czerwien na ciemnym tle
+            title_bg = None
+        # Przyciski - wieksze, wyraziste
+        bw, bh = 220, 64
+        by = self.height // 2 + 200
         if won and not forfeited:
-            restart_rect = pygame.Rect(self.width//2 - 430, self.height//2 + 160, 200, 60)
-            continue_rect = pygame.Rect(self.width//2 - 210, self.height//2 + 160, 200, 60)
-            menu_rect = pygame.Rect(self.width//2 + 10, self.height//2 + 160, 200, 60)
-            quit_rect = pygame.Rect(self.width//2 + 230, self.height//2 + 160, 200, 60)
-        elif forfeited:
-            restart_rect = pygame.Rect(self.width//2 - 330, self.height//2 + 160, 200, 60)
-            menu_rect = pygame.Rect(self.width//2 - 100, self.height//2 + 160, 200, 60)
-            quit_rect = pygame.Rect(self.width//2 + 130, self.height//2 + 160, 200, 60)
-            continue_rect = None
+            restart_rect = pygame.Rect(self.width//2 - 460, by, bw, bh)
+            continue_rect = pygame.Rect(self.width//2 - 225, by, bw, bh)
+            menu_rect = pygame.Rect(self.width//2 + 5, by, bw, bh)
+            quit_rect = pygame.Rect(self.width//2 + 240, by, bw, bh)
         else:
-            restart_rect = pygame.Rect(self.width//2 - 330, self.height//2 + 160, 200, 60)
-            menu_rect = pygame.Rect(self.width//2 - 100, self.height//2 + 160, 200, 60)
-            quit_rect = pygame.Rect(self.width//2 + 130, self.height//2 + 160, 200, 60)
+            restart_rect = pygame.Rect(self.width//2 - 345, by, bw, bh)
+            menu_rect = pygame.Rect(self.width//2 - 110, by, bw, bh)
+            quit_rect = pygame.Rect(self.width//2 + 125, by, bw, bh)
             continue_rect = None
-        # Statyczna klatka tla (bez migotania - rysujemy raz)
-        self.win.blit(self.bg, (0, 0))
-        overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 170))
-        self.win.blit(overlay, (0, 0))
+        # Tlo: mapa skarbow (win) / minimalistyczna porazka (lose) / ciemne (forfeit)
+        is_defeat = not won and not forfeited
+        if won and not forfeited:
+            self._draw_victory_map()
+            stat_color = (80, 50, 25)
+            sub_color = (101, 67, 33)
+        elif is_defeat:
+            self._draw_defeat_minimal()
+            stat_color = (160, 170, 185)
+            sub_color = (120, 130, 145)
+        else:
+            self.win.blit(self.bg, (0, 0))
+            overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 170))
+            self.win.blit(overlay, (0, 0))
+            stat_color = (200, 200, 200)
+            sub_color = (255, 255, 255)
         text = big_font.render(title, 1, color)
-        self.win.blit(text, (self.width // 2 - text.get_width() // 2, self.height // 2 - 60))
-        sub = small_font.render("Wave reached: " + str(self.wave + 1) + " / " + str(len(waves)), 1, (255, 255, 255))
-        self.win.blit(sub, (self.width // 2 - sub.get_width() // 2, self.height // 2 + 20))
-        # Statystyki koncowe (R12)
+        # Cien pod tytulem dla czytelnosci
+        shadow = big_font.render(title, 1, (0, 0, 0))
+        tx = self.width // 2 - text.get_width() // 2
+        ty = self.height // 2 - 160
+        self.win.blit(shadow, (tx + 3, ty + 3))
+        self.win.blit(text, (tx, ty))
         stats_font = self.font_stats24
-        stats = [
-            f"Kills: {self.stats_kills}",
-            f"Gold earned: {self.stats_gold}",
-            f"Damage dealt: {self.stats_damage}",
+        def _draw_static():
+            # Tlo
+            if won and not forfeited:
+                self._draw_victory_map()
+            elif is_defeat:
+                self._draw_defeat_minimal()
+            else:
+                self.win.blit(self.bg, (0, 0))
+                ov = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+                ov.fill((0, 0, 0, 170))
+                self.win.blit(ov, (0, 0))
+            # Tytul
+            self.win.blit(shadow, (tx + 3, ty + 3))
+            self.win.blit(text, (tx, ty))
+            # Statystyki
+            if is_defeat:
+                # Dwie kolumny: ogolne (lewa) + zabicia wg typu (prawa)
+                col_y = self.height // 2 - 60
+                left_x = self.width // 2 - 330
+                right_x = self.width // 2 + 30
+                general = [
+                    f"Wave reached: {self.wave + 1} / {len(waves)}",
+                    f"Monsters slain: {self.stats_kills}",
+                    f"Damage dealt: {self.stats_damage}",
+                    f"Gold earned: {self.stats_gold}$",
+                    f"Gold spent: {self.stats_gold_spent}$",
+                    f"Towers built: {self.stats_towers_built} / lost: {self.stats_towers_lost}",
+                    f"Abilities used: {self.stats_abilities_used}",
+                ]
+                for i, s in enumerate(general):
+                    label = stats_font.render(s, True, stat_color)
+                    self.win.blit(label, (left_x, col_y + i * 28))
+                by_type = sorted(self.stats_kills_by_type.items(), key=lambda kv: -kv[1])[:7]
+                if by_type:
+                    hdr = stats_font.render("Kills by type:", True, (130, 140, 155))
+                    self.win.blit(hdr, (right_x, col_y))
+                    for i, (etype, count) in enumerate(by_type):
+                        nice = "".join(" " + c if c.isupper() and j else c
+                                       for j, c in enumerate(etype)).strip()
+                        label = stats_font.render(f"{nice}: {count}", True, stat_color)
+                        self.win.blit(label, (right_x, col_y + (i + 1) * 28))
+                motto = small_font.render("The island still needs you.", True, (100, 110, 125))
+                self.win.blit(motto, (self.width // 2 - motto.get_width() // 2, col_y + 8 * 28))
+            else:
+                sub = small_font.render("Wave reached: " + str(self.wave + 1) + " / " + str(len(waves)), 1, sub_color)
+                self.win.blit(sub, (self.width // 2 - sub.get_width() // 2, self.height // 2 - 30))
+                for i, s in enumerate(stats):
+                    label = stats_font.render(s, True, stat_color)
+                    self.win.blit(label, (self.width // 2 - label.get_width() // 2, self.height // 2 + 5 + i * 32))
+        _draw_static()
+        # Przyciski - rysowane raz, z hover w petli
+        buttons = [
+            (restart_rect, "RESTART", (50, 140, 70)),
+            (menu_rect, "MAIN MENU", (50, 100, 190)),
+            (quit_rect, "QUIT", (170, 50, 50)),
         ]
-        for i, s in enumerate(stats):
-            label = stats_font.render(s, True, (200, 200, 200))
-            self.win.blit(label, (self.width // 2 - label.get_width() // 2, self.height // 2 + 55 + i * 30))
+        if continue_rect:
+            buttons.insert(1, (continue_rect, "CONTINUE", (50, 100, 190)))
+        def _draw_buttons(hover_pos=None):
+            for rect, label_text, btn_color in buttons:
+                hov = hover_pos is not None and rect.collidepoint(hover_pos)
+                # Jasniejszy gdy hover
+                fill = tuple(min(255, c + 40) for c in btn_color) if hov else btn_color
+                pygame.draw.rect(self.win, fill, rect, border_radius=12)
+                pygame.draw.rect(self.win, (255, 255, 255), rect, 3, border_radius=12)
+                if hov:
+                    glow = pygame.Surface((rect.w + 12, rect.h + 12), pygame.SRCALPHA)
+                    pygame.draw.rect(glow, (*btn_color, 60), glow.get_rect(), border_radius=16)
+                    self.win.blit(glow, (rect.x - 6, rect.y - 6))
+                label = small_font.render(label_text, True, (255, 255, 255))
+                # Cien tekstu dla czytelnosci
+                tsh = small_font.render(label_text, True, (0, 0, 0))
+                lx = rect.x + rect.width//2 - label.get_width()//2
+                ly = rect.y + rect.height//2 - label.get_height()//2
+                self.win.blit(tsh, (lx + 2, ly + 2))
+                self.win.blit(label, (lx, ly))
+        _draw_buttons()
         self._present()
-        # Petla czeka na klikniecie przycisku (bez przerysowywania tla - brak migotania)
+        # Petla czeka na klikniecie przycisku
         waiting = True
+        mouse = self._mouse_pos()
         while waiting:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     return "quit"
+                if event.type == pygame.MOUSEMOTION:
+                    mouse = self._mouse_pos()
+                    _draw_static()
+                    _draw_buttons(mouse)
+                    self._present()
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     pos = self._mouse_pos()
                     if restart_rect.collidepoint(pos):
@@ -1355,21 +1554,6 @@ class Game:
                         return "menu"
                     if continue_rect and continue_rect.collidepoint(pos):
                         return "continue"
-            # Rysuj przyciski (tylko przyciski sie odswiezaja)
-            buttons = [
-                (restart_rect, "RESTART", (60, 180, 80)),
-                (menu_rect, "MAIN MENU", (60, 120, 220)),
-                (quit_rect, "QUIT", (180, 60, 60)),
-            ]
-            if continue_rect:
-                buttons.insert(1, (continue_rect, "CONTINUE", (60, 120, 220)))
-            for rect, label_text, btn_color in buttons:
-                pygame.draw.rect(self.win, btn_color, rect, border_radius=10)
-                pygame.draw.rect(self.win, (255, 255, 255), rect, 2, border_radius=10)
-                label = small_font.render(label_text, True, (255, 255, 255))
-                self.win.blit(label, (rect.x + rect.width//2 - label.get_width()//2,
-                                      rect.y + rect.height//2 - label.get_height()//2))
-            self._present()
         return "quit"
         
     def draw(self):
