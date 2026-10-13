@@ -1528,7 +1528,7 @@ class Game:
         # R2: Przycisk "Nastepna fala" - wczesniejsze przywolanie za bonus
         # (gdy statek odplynal ale wrogowie jeszcze sa na mapie, lub awaryjnie gdy fala utknela)
         if self.waiting_for_clear and not self.won and not self.last_wave_done and not self.bombard_active:
-            btn_w, btn_h = 220, 44
+            btn_w, btn_h = 240, 56
             bx = self.width - btn_w - 20
             by = 70
             self.early_wave_rect = pygame.Rect(bx, by, btn_w, btn_h)
@@ -1539,8 +1539,11 @@ class Game:
             pygame.draw.rect(btn_bg, (100, 255, 150, 180), btn_bg.get_rect(), 2, border_radius=12)
             self.win.blit(btn_bg, (bx, by))
             btn_font = self.font_btn18
-            label = btn_font.render(f"NEXT WAVE +{bonus}$", True, (200, 255, 210))
-            self.win.blit(label, (bx + btn_w//2 - label.get_width()//2, by + btn_h//2 - label.get_height()//2))
+            # Wytlumaczenie: co robi przycisk + ile zlota za skip
+            line1 = btn_font.render("SKIP TO NEXT WAVE", True, (200, 255, 210))
+            line2 = btn_font.render(f"FOR +{bonus}$ BONUS", True, (255, 215, 100))
+            self.win.blit(line1, (bx + btn_w//2 - line1.get_width()//2, by + 6))
+            self.win.blit(line2, (bx + btn_w//2 - line2.get_width()//2, by + 28))
         else:
             self.early_wave_rect = None
         
