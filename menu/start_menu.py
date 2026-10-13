@@ -13,16 +13,15 @@ class StartMenu:
     def __init__(self, width, height, bg):
         self.width = width
         self.height = height
-        # Proba FULLSCREEN+SCALED, fallback jesli renderer nie dziala (niektore Windowsy)
+        # FULLSCREEN w natywnej rozdzielczosci, BEZ SCALED (brak czarnych paskow)
         try:
-            self.win = pygame.display.set_mode((width, height), pygame.SCALED | pygame.FULLSCREEN)
+            self.win = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         except pygame.error:
-            try:
-                self.win = pygame.display.set_mode((width, height), pygame.FULLSCREEN)
-            except pygame.error:
-                self.win = pygame.display.set_mode((width, height))
+            self.win = pygame.display.set_mode((width, height))
         pygame.display.set_caption("Island Defenders")
-        self.bg = pygame.transform.scale(bg, (width, height))
+        self.rw, self.rh = self.win.get_size()
+        # Tlo na caly ekran (cover - wypelnia, przycina nadmiar)
+        self.bg = self._cover_scale(bg, self.rw, self.rh)
         # Dzwiek klikniecia w menu
         try:
             pygame.mixer.init()
@@ -30,7 +29,6 @@ class StartMenu:
         except:
             self.click_sound = None
         pygame.display.set_caption("Island Defenders")
-        self.bg = pygame.transform.scale(bg, (width, height))
         self.title_font = pygame.font.SysFont("arial", 76, bold=True)
         self.btn_font = pygame.font.SysFont("arial", 30, bold=True)
         self.small_font = pygame.font.SysFont("arial", 22)
@@ -40,8 +38,8 @@ class StartMenu:
         self.clock = pygame.time.Clock()
 
         bw, bh, gap = 360, 60, 14
-        x = width // 2 - bw // 2
-        y0 = 320
+        x = self.rw // 2 - bw // 2
+        y0 = self.rh // 2 - 40
         self.buttons = {
             "start": pygame.Rect(x, y0, bw, bh),
             "diff": pygame.Rect(x, y0 + (bh + gap), bw, bh),
@@ -49,6 +47,17 @@ class StartMenu:
             "help": pygame.Rect(x, y0 + 3 * (bh + gap), bw, bh),
             "quit": pygame.Rect(x, y0 + 4 * (bh + gap), bw, bh),
         }
+
+    def _cover_scale(self, img, tw, th):
+        """Skaluje obraz zeby pokryc caly ekran (jak CSS background-size: cover).
+        Wypelnia bez czarnych paskow, nadmiar przycina ze srodka."""
+        iw, ih = img.get_size()
+        scale = max(tw / iw, th / ih)
+        nw, nh = max(1, int(iw * scale)), max(1, int(ih * scale))
+        scaled = pygame.transform.smoothscale(img, (nw, nh))
+        x = (nw - tw) // 2
+        y = (nh - th) // 2
+        return scaled.subsurface((x, y, tw, th)).copy()
 
     def draw_button(self, rect, text, hover):
         color = (46, 134, 193) if hover else (28, 90, 135)
@@ -60,18 +69,18 @@ class StartMenu:
 
     def draw(self, mouse):
         self.win.blit(self.bg, (0, 0))
-        shade = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        shade = pygame.Surface((self.rw, self.rh), pygame.SRCALPHA)
         shade.fill((5, 10, 25, 150))
         self.win.blit(shade, (0, 0))
 
         shadow = self.title_font.render("ISLAND DEFENDERS", True, (0, 0, 0))
         title = self.title_font.render("ISLAND DEFENDERS", True, (255, 210, 63))
-        tx = self.width // 2 - title.get_width() // 2
-        self.win.blit(shadow, (tx + 4, 104))
-        self.win.blit(title, (tx, 100))
+        tx = self.rw // 2 - title.get_width() // 2
+        self.win.blit(shadow, (tx + 4, self.rh // 2 - 256))
+        self.win.blit(title, (tx, self.rh // 2 - 260))
         sub = self.small_font.render("Defend Vancouver Island from the monster-pirates!",
                                       True, (220, 230, 240))
-        self.win.blit(sub, (self.width // 2 - sub.get_width() // 2, 200))
+        self.win.blit(sub, (self.rw // 2 - sub.get_width() // 2, self.rh // 2 - 160))
 
         diff_name = DIFFICULTIES[self.diff_idx][0]
         labels = {
@@ -89,7 +98,7 @@ class StartMenu:
         pygame.display.update()
 
     def draw_help(self):
-        panel = pygame.Rect(self.width // 2 - 360, self.height // 2 - 280, 720, 560)
+        panel = pygame.Rect(self.rw // 2 - 360, self.rh // 2 - 280, 720, 560)
         pygame.draw.rect(self.win, (12, 24, 44), panel, border_radius=16)
         pygame.draw.rect(self.win, (255, 255, 255), panel, 2, border_radius=16)
         lines = [
