@@ -122,6 +122,7 @@ class Game:
         self._fullscreen = True
         self.show_menu = False  # menu ESC
         self._show_help = False  # pod-ekran "How to Play"
+        self._forfeit = False  # rezygnacja z gry (ESC -> Forfeit Run)
         self._menu_buttons = []  # [rect, action] - budowane w draw_menu
         # Strefy stawiania wiez (narysowane przez gracza)
         self._placement_zones = [
@@ -927,11 +928,23 @@ class Game:
                         logic_acc = 0
                         break
 
-            if self.lives <= 0:
+            if self._forfeit:
+                self._forfeit = False
+                sound_lose.play()
+                result = self.show_end_screen(False, forfeited=True)
+                if result == "restart":
+                    self.reset_game()
+                elif result == "menu":
+                    return "menu"
+                else:
+                    run = False
+            elif self.lives <= 0:
                 sound_lose.play()
                 result = self.show_end_screen(False)
                 if result == "restart":
                     self.reset_game()
+                elif result == "menu":
+                    return "menu"
                 else:
                     run = False
             elif self.won:
@@ -939,6 +952,8 @@ class Game:
                 result = self.show_end_screen(True)
                 if result == "restart":
                     self.reset_game()
+                elif result == "menu":
+                    return "menu"
                 elif result == "continue":
                     # Tryb endless: od razu fala 11 (bez pustego rejsu statku z fali 10)
                     self.endless = True
@@ -1278,20 +1293,31 @@ class Game:
             if dn[3] <= 0:
                 self.damage_numbers.remove(dn)
 
-    def show_end_screen(self, won):
-        """Ekran koncowy. Zwraca 'restart', 'continue' (endless), lub 'quit'."""
+    def show_end_screen(self, won, forfeited=False):
+        """Ekran koncowy. Zwraca 'restart', 'continue' (endless), 'menu' lub 'quit'."""
         big_font = self.font_big70
         small_font = self.font_small30
-        title = "YOU WIN! The island is saved!" if won else "YOU LOSE! The monsters broke through!"
-        color = (60, 200, 90) if won else (220, 60, 60)
-        # Przyciski
-        if won:
-            restart_rect = pygame.Rect(self.width//2 - 330, self.height//2 + 160, 200, 60)
-            continue_rect = pygame.Rect(self.width//2 - 100, self.height//2 + 160, 200, 60)
-            quit_rect = pygame.Rect(self.width//2 + 130, self.height//2 + 160, 200, 60)
+        if forfeited:
+            title = "RUN FORFEITED"
+            color = (255, 180, 80)
         else:
-            restart_rect = pygame.Rect(self.width//2 - 220, self.height//2 + 160, 200, 60)
-            quit_rect = pygame.Rect(self.width//2 + 20, self.height//2 + 160, 200, 60)
+            title = "YOU WIN! The island is saved!" if won else "YOU LOSE! The monsters broke through!"
+            color = (60, 200, 90) if won else (220, 60, 60)
+        # Przyciski
+        if won and not forfeited:
+            restart_rect = pygame.Rect(self.width//2 - 430, self.height//2 + 160, 200, 60)
+            continue_rect = pygame.Rect(self.width//2 - 210, self.height//2 + 160, 200, 60)
+            menu_rect = pygame.Rect(self.width//2 + 10, self.height//2 + 160, 200, 60)
+            quit_rect = pygame.Rect(self.width//2 + 230, self.height//2 + 160, 200, 60)
+        elif forfeited:
+            restart_rect = pygame.Rect(self.width//2 - 330, self.height//2 + 160, 200, 60)
+            menu_rect = pygame.Rect(self.width//2 - 100, self.height//2 + 160, 200, 60)
+            quit_rect = pygame.Rect(self.width//2 + 130, self.height//2 + 160, 200, 60)
+            continue_rect = None
+        else:
+            restart_rect = pygame.Rect(self.width//2 - 330, self.height//2 + 160, 200, 60)
+            menu_rect = pygame.Rect(self.width//2 - 100, self.height//2 + 160, 200, 60)
+            quit_rect = pygame.Rect(self.width//2 + 130, self.height//2 + 160, 200, 60)
             continue_rect = None
         # Statyczna klatka tla (bez migotania - rysujemy raz)
         self.win.blit(self.bg, (0, 0))
@@ -1325,11 +1351,14 @@ class Game:
                         return "restart"
                     if quit_rect.collidepoint(pos):
                         return "quit"
+                    if menu_rect.collidepoint(pos):
+                        return "menu"
                     if continue_rect and continue_rect.collidepoint(pos):
                         return "continue"
             # Rysuj przyciski (tylko przyciski sie odswiezaja)
             buttons = [
                 (restart_rect, "RESTART", (60, 180, 80)),
+                (menu_rect, "MAIN MENU", (60, 120, 220)),
                 (quit_rect, "QUIT", (180, 60, 60)),
             ]
             if continue_rect:
@@ -1736,6 +1765,11 @@ class Game:
         elif action == "restart":
             self.show_menu = False
             self.reset_game()
+        elif action == "forfeit":
+            # Rezygnacja: zamknij menu, pokaz podsumowanie ze statystykami
+            self.show_menu = False
+            self.paused = False
+            self._forfeit = True
         elif action == "help":
             self._show_help = True
         elif action == "music":
@@ -1769,13 +1803,13 @@ class Game:
             raise SystemExit
 
     def draw_pause_menu(self):
-        """Menu pauzy (ESC): wznow, restart, pomoc, dzwiek, fullscreen, predkosc, wyjscie."""
+        """Menu pauzy (ESC): wznow, restart, pomoc, dzwiek, fullscreen, predkosc, rezygnacja, wyjscie."""
         # Przyciemnienie tla
         dim = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         dim.fill((0, 0, 0, 140))
         self.win.blit(dim, (0, 0))
         # Panel
-        pw, ph = 340, 460
+        pw, ph = 340, 520
         px, py = (self.width - pw) // 2, (self.height - ph) // 2
         pygame.draw.rect(self.win, (25, 30, 38), (px, py, pw, ph), border_radius=16)
         pygame.draw.rect(self.win, (70, 80, 95), (px, py, pw, ph), 2, border_radius=16)
@@ -1787,6 +1821,7 @@ class Game:
         items = [
             ("Resume", "resume"),
             ("Restart Game", "restart"),
+            ("Forfeit Run", "forfeit"),
             ("How to Play", "help"),
             ("Music", "music", not self.music_muted),
             ("Sound Effects", "sfx", not self.sfx_muted),
@@ -2578,10 +2613,14 @@ class Game:
     
 if __name__ == "__main__":
     from menu.start_menu import StartMenu
-    start_menu = StartMenu(1124, 720, pygame.image.load(os.path.join("images", "bg.png")))
-    settings = start_menu.run()
-    if settings is not None:
+    while True:
+        start_menu = StartMenu(1124, 720, pygame.image.load(os.path.join("images", "bg.png")))
+        settings = start_menu.run()
+        if settings is None:
+            break
         g = Game(lives=settings["lives"], money=settings["money"], sound=settings["sound"],
                  difficulty=settings["difficulty"])
-        g.run()
+        # run() zwraca "menu" gdy gracz chce wrocic do menu glownego
+        if g.run() != "menu":
+            break
     pygame.quit()
