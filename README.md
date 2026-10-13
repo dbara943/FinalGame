@@ -92,8 +92,8 @@ Requires **Python 3.12** and **Pygame 2.6+**.
 ```bash
 git clone https://github.com/dbara943/FinalGame.git
 cd FinalGame
-pip install pygame
-py -3.12 game.py
+pip install -r requirements.txt
+py game.py
 ```
 
 ---
