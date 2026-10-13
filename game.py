@@ -1454,6 +1454,12 @@ class Game:
         self.win.blit(shadow, (tx + 3, ty + 3))
         self.win.blit(text, (tx, ty))
         stats_font = self.font_stats24
+        # Proste statystyki dla victory/forfeit (porazka ma wlasny uklad w _draw_static)
+        stats = [
+            f"Kills: {self.stats_kills}",
+            f"Gold earned: {self.stats_gold}",
+            f"Damage dealt: {self.stats_damage}",
+        ]
         def _draw_static():
             # Tlo
             if won and not forfeited:
