@@ -1450,17 +1450,22 @@ class Game:
             color = (150, 60, 60)  # przygaszona czerwien na ciemnym tle
             title_bg = None
         # Przyciski - wieksze, wyraziste
-        bw, bh = 220, 64
+        bw, bh = 170, 52
         by = self.height // 2 + 200
+        gap = 20
         if won and not forfeited:
-            restart_rect = pygame.Rect(self.width//2 - 460, by, bw, bh)
-            continue_rect = pygame.Rect(self.width//2 - 225, by, bw, bh)
-            menu_rect = pygame.Rect(self.width//2 + 5, by, bw, bh)
-            quit_rect = pygame.Rect(self.width//2 + 240, by, bw, bh)
+            total = 4 * bw + 3 * gap
+            x0 = self.width // 2 - total // 2
+            restart_rect = pygame.Rect(x0, by, bw, bh)
+            continue_rect = pygame.Rect(x0 + (bw + gap), by, bw, bh)
+            menu_rect = pygame.Rect(x0 + 2 * (bw + gap), by, bw, bh)
+            quit_rect = pygame.Rect(x0 + 3 * (bw + gap), by, bw, bh)
         else:
-            restart_rect = pygame.Rect(self.width//2 - 345, by, bw, bh)
-            menu_rect = pygame.Rect(self.width//2 - 110, by, bw, bh)
-            quit_rect = pygame.Rect(self.width//2 + 125, by, bw, bh)
+            total = 3 * bw + 2 * gap
+            x0 = self.width // 2 - total // 2
+            restart_rect = pygame.Rect(x0, by, bw, bh)
+            menu_rect = pygame.Rect(x0 + (bw + gap), by, bw, bh)
+            quit_rect = pygame.Rect(x0 + 2 * (bw + gap), by, bw, bh)
             continue_rect = None
         # Tlo: mapa skarbow (win) / minimalistyczna porazka (lose) / ciemne (forfeit)
         is_defeat = not won and not forfeited
