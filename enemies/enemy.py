@@ -79,6 +79,22 @@ class Enemy:
         tinted.blit(shine, (0, 0), special_flags=pygame.BLEND_ADD)
         return tinted
 
+    def apply_golden(self):
+        """Golden Touch: zamienia sprite'y na zlote odmiany (TEN SAM rozmiar, bez skalowania).
+        Wrog jest wtedy faktycznie widoczny jako zloto. Zloto za niego x2 (flaga _gold_marked)."""
+        if getattr(self, '_gold_applied', False) or self.elite:
+            return
+        self._gold_applied = True
+        # Kopie list (nie modyfikuj wspoldzielonych!)
+        self.imgs = self.imgs[:]
+        self.die_imgs = self.die_imgs[:]
+        self.hurt_imgs = self.hurt_imgs[:]
+        if self.attack_imgs:
+            self.attack_imgs = self.attack_imgs[:]
+        for lst in (self.imgs, self.die_imgs, self.hurt_imgs, self.attack_imgs):
+            for i, img in enumerate(lst):
+                lst[i] = self._apply_gold_filter(img)
+
     def make_elite(self):
         """6: Zamienia w elitarnego (3x HP, 5x zlota, wiekszy zlociutki model)."""
         if not self.elite:
@@ -126,27 +142,8 @@ class Enemy:
         if self.x < -80 or self.x > 1204 or self.y < -80 or self.y > 800:
             return
         # 6: elitarni maja juz zloty filtr nalozony w make_elite() (pre-render)
-        # _gold_marked (Golden Touch): tymczasowy tint
-        is_golden = getattr(self, '_gold_marked', False) and not self.elite
-        if is_golden:
-            _gc = getattr(self, '_gold_cache', None)
-            if not _gc or _gc.get('img') is not self.img:
-                # Prawdziwy filtr zlota: grayscale -> pokoloruj na zloto
-                # (jak posag ze zlota, nie tylko tint)
-                gray = pygame.transform.grayscale(self.img)
-                tinted = gray.copy()
-                # Zlota paleta: ciemne -> braz, jasne -> jasne zloto
-                gold = pygame.Surface(self.img.get_size())
-                gold.fill((255, 190, 50))
-                tinted.blit(gold, (0, 0), special_flags=pygame.BLEND_MULT)
-                # Polysk
-                shine = pygame.Surface(self.img.get_size())
-                shine.fill((40, 25, 0))
-                tinted.blit(shine, (0, 0), special_flags=pygame.BLEND_ADD)
-                self._gold_cache = {'img': self.img, 'surf': tinted}
-            img_to_draw = self._gold_cache['surf']
-        else:
-            img_to_draw = self.img
+        # Golden Touch: sprite'y zamienione na zlote w apply_golden() (pre-render)
+        img_to_draw = self.img
         # Slad lodu za spowolnionymi
         if self.slow_timer > 0 and random.random() < 0.2:
             # (rysowane przez game.py particles)

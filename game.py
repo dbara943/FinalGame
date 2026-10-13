@@ -1237,8 +1237,11 @@ class Game:
                     self.shockwaves.append(Shockwave(hit_enemy.x, hit_enemy.y, max_r=150, color=(200, 100, 255)))
                     self.screen_shake = 12
                 elif proj.special == "golden":
-                    # Golden: oznaczenie podwojnej kasy
-                    hit_enemy._gold_marked = True
+                    # Golden Touch: zamiana sprite'ow na zlote + podwojna kasa.
+                    # Elitarni (juz zloci, 5x kasy) dostaja tylko obrazenia - bez extra zlota.
+                    if not hit_enemy.elite:
+                        hit_enemy.apply_golden()
+                        hit_enemy._gold_marked = True
                     dmg = proj.damage * hit_enemy.get_damage_mult(proj.damage_type)
                     hit_enemy.hit(dmg)
                     self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 40, str(int(dmg)), 30, (255, 215, 0)])
@@ -1390,8 +1393,12 @@ class Game:
                 if type(tw).__name__.startswith(self.tower_filter):
                     tw.draw(self.win)
         if self.moving_object:
+            # Tint modelu na zielono/czerwono wg poprawnosci miejsca (zamiast kolka)
+            self.moving_object._placement_valid = self.is_valid_placement(
+                self.moving_object.x, self.moving_object.y)
             self.moving_object.draw(self.win)
             self.moving_object.draw_radius(self.win)
+            self.moving_object._placement_valid = None
         # Trupy pod wrogami (znikaja stopniowo)
         for img, x, y, timer in self.corpses:
             alpha = min(255, timer * 2)
@@ -2384,15 +2391,7 @@ class Game:
             self.win.blit(t3, (cx - t3.get_width()//2, draw_y + 54))
 
     def draw_placement_grid(self, win, mx, my):
-        """Podswietlenie poprawnosci miejsca (bez siatki)."""
-        valid = self.is_valid_placement(mx, my)
-        color = (80, 220, 100, 130) if valid else (220, 80, 80, 130)
-        # Okrag podswietlenia w miejscu kursora
-        r = 35
-        hl = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
-        pygame.draw.circle(hl, color, (r, r), r)
-        pygame.draw.circle(hl, (255, 255, 255, 180), (r, r), r, 2)
-        win.blit(hl, (mx - r, my - r))
+        """Podswietlenie poprawnosci miejsca (bez kolka - sam model wiezy jest tintowany)."""
         # Okrag zasiegu w miejscu stawiania
         if hasattr(self.moving_object, 'range'):
             rg = self.moving_object.range

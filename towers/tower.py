@@ -58,6 +58,14 @@ class Tower:
     def draw(self, win):
         img = self.get_level_img()
         # Cien usuniety na prosbe gracza
+        # Tint przy stawianiu: lekko zielony (OK) / czerwony (zle miejsce) zamiast kolka
+        placement = getattr(self, '_placement_valid', None)
+        if placement is not None:
+            tinted = img.copy()
+            wash = pygame.Surface(img.get_size(), pygame.SRCALPHA)
+            wash.fill((80, 220, 100, 90) if placement else (220, 80, 80, 90))
+            tinted.blit(wash, (0, 0))
+            img = tinted
         win.blit(img, (self.x-img.get_width()//2, self.y-img.get_height()//2))
         # U7: gwiazdki poziomu nad wieza
         for i in range(self.level):
