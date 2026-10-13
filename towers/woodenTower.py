@@ -74,7 +74,7 @@ class WoodenTower(Tower):
         Kazdy zadaje obrazenia podstawowego ataku wiezy (skaluje sie z levelem)."""
         if self.ability_cooldown > 0:
             return False
-        self.ability_cooldown = self.ability_max_cooldown
+        self.ability_cooldown = int(self.ability_max_cooldown * getattr(self, '_ability_cd_mult', 1.0))
         targets = self._random_enemies(enemies, 3)
         if not targets:
             return False
@@ -149,7 +149,8 @@ class WoodenTower(Tower):
         shot_fired = False
 
         # 7: deszcz zmniejsza zasieg (liczone raz, nie w petli)
-        eff_range = self.range * self._rain_mod
+        # Recon Balloon: +15% zasiegu
+        eff_range = self.range * self._rain_mod * getattr(self, '_range_mult', 1.0)
         eff_range_sq = eff_range * eff_range
         # Kandydaci: z siatki przestrzennej (tylko pobliskie komorki) lub wszyscy
         # Margines na hitboxy: sprite (np. boss 160px) moze wystawac poza
@@ -200,6 +201,8 @@ class WoodenTower(Tower):
                 shoot_snd.get(type(self).__name__, sound_2).play()
                 # 5: synergia +15% jesli sasiad tego samego typu
                 dmg = int(self.damage * getattr(self, '_synergy', 1.0))
+                # Honor Banner: +10% obrazen globalnie
+                dmg = int(dmg * getattr(self, '_dmg_mult', 1.0))
                 # Lucky Charm: 10% szansy na 2x obrazenia krytyczne
                 self._crit = getattr(self, '_lucky_crit', False) and random.random() < 0.10
                 if self._crit:
@@ -263,7 +266,7 @@ class MetalTower(WoodenTower):
         """Frost Nova: lodowy pocisk w losowego wroga na mapie - spowalnia wszystkich w zasiegu wybuchu."""
         if self.ability_cooldown > 0:
             return False
-        self.ability_cooldown = self.ability_max_cooldown
+        self.ability_cooldown = int(self.ability_max_cooldown * getattr(self, '_ability_cd_mult', 1.0))
         targets = self._random_enemies(enemies, 1)
         if not targets:
             return False
@@ -324,7 +327,7 @@ class GoldenTower(WoodenTower):
         """Golden Touch: zlote pociski oznaczaja do 5 LOSOWYCH wrogow na mapie (2x kasa)."""
         if self.ability_cooldown > 0:
             return False
-        self.ability_cooldown = self.ability_max_cooldown
+        self.ability_cooldown = int(self.ability_max_cooldown * getattr(self, '_ability_cd_mult', 1.0))
         # Losowi wrogowie z calej mapy (bez limitu zasiegu)
         alive = [en for en in enemies
                  if not en.dying and not en.dead and not en.reached_end]
@@ -378,7 +381,7 @@ class FireTower(WoodenTower):
         """Meteor: ogromny meteor w LOSOWEGO wroga na mapie (3x obrazen, duzy splash)."""
         if self.ability_cooldown > 0:
             return False
-        self.ability_cooldown = self.ability_max_cooldown
+        self.ability_cooldown = int(self.ability_max_cooldown * getattr(self, '_ability_cd_mult', 1.0))
         targets = self._random_enemies(enemies, 1)
         if not targets:
             return False
@@ -426,7 +429,7 @@ class BlazeTower(WoodenTower):
         """Armageddon: pocisk zaglady w losowego wroga - rani WSZYSTKICH wrogow na mapie."""
         if self.ability_cooldown > 0:
             return False
-        self.ability_cooldown = self.ability_max_cooldown
+        self.ability_cooldown = int(self.ability_max_cooldown * getattr(self, '_ability_cd_mult', 1.0))
         targets = self._random_enemies(enemies, 1)
         if not targets:
             return False

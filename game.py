@@ -81,6 +81,27 @@ BUILDING_UPGRADES = [
      "desc": "An allied ship cripples the pirate ship, then bombards enemies.",
      "endless_only": True},
 ]
+# Upgrady klikalnego namiotu (jednorazowe na run)
+TENT_UPGRADES = [
+    {"id": "scout", "name": "Scout Reports", "cost": 2000,
+     "desc": "Ambush: +25% damage to enemies in first 4s after spawning."},
+    {"id": "drums", "name": "War Drums", "cost": 3000,
+     "desc": "Tower abilities recharge 30% faster."},
+    {"id": "supply", "name": "Supply Lines", "cost": 2500,
+     "desc": "Towers cost 15% less (buy and upgrade)."},
+    {"id": "medic", "name": "Field Medic", "cost": 3500,
+     "desc": "Bombardment destroys towers half as often (50% -> 25%)."},
+    {"id": "guerrilla", "name": "Guerrilla Training", "cost": 4000,
+     "desc": "+35% damage against slowed enemies."},
+    {"id": "banner", "name": "Honor Banner", "cost": 4000,
+     "desc": "A war banner rises by the tent. All towers +10% damage."},
+    {"id": "signal", "name": "Signal Fire", "cost": 3500,
+     "desc": "Burning beacon by the tent. Nearby towers +12% fire rate."},
+    {"id": "spikes", "name": "Spike Barricade", "cost": 4500,
+     "desc": "Spikes on the road wound passing enemies."},
+    {"id": "balloon", "name": "Recon Balloon", "cost": 5500,
+     "desc": "Scout balloon drifts overhead. All towers +15% range."},
+]
 waves = [
     [40,0,0,0,0,0,0,0],
     [30,10,0,0,0,0,0,0],
@@ -203,6 +224,26 @@ class Game:
             except:
                 self._building_icons[uid] = None
         self._building_desc_font = pygame.font.SysFont("arial", 16)
+        # Upgrady namiotu (klikany namiot tipi)
+        self.tent_upgrades = set()  # id kupionych upgradow
+        self._tent_menu_open = False
+        self._tent_menu_buttons = []
+        self._tent_rect = pygame.Rect(725, 255, 163, 150)  # tipi na tle
+        self._tent_icons = {}
+        _tent_icon_files = {"scout": "scout", "drums": "drums", "supply": "supply",
+                            "medic": "medic", "guerrilla": "guerrilla",
+                            "banner": "veteran", "signal": "signal",
+                            "spikes": "spikes", "balloon": "balloon"}
+        for uid, fname in _tent_icon_files.items():
+            try:
+                img = pygame.image.load(os.path.join("images", "upgrades", "tent_" + fname + ".webp"))
+                self._tent_icons[uid] = pygame.transform.smoothscale(img, (56, 56))
+            except:
+                self._tent_icons[uid] = None
+        # Wizualne efekty namiotu
+        self._balloon_x = -100  # balon zwiadowczy
+        self._spike_pos = []  # pozycje kolcow na drodze
+        self._banner_phase = 0.0  # animacja choragwi
         # Dron naprawczy (wizualny)
         self._drone_angle = 0.0
         # Tesla Coil
@@ -434,6 +475,7 @@ class Game:
                     en.money = self._endless_gold(en.money, self.endless_wave)
                 if "docks" in self.building_upgrades:
                     en.velocity *= 0.85
+                en._spawn_time = time.time()  # Scout Reports: ambush
                 self.enemies.append(en)
                 # Call the Cavalry: licz rozladowanych, sojusznik wplywa w 1. polowie fali
                 if self._ally_strike_at is not None:
@@ -719,8 +761,94 @@ class Game:
             # Plomien
             pygame.draw.circle(self.win, (255, 200, 80, 200), (int(x) - 6, int(y) + 4), 5)
 
-    def _update_bombardment(self):
-        """Cinematic bombardowania - fazy."""
+    def _tent_damage_mult(self, en):
+        """Mnoznik obrazen z upgradow namiotu (Scout, Guerrilla)."""
+        mult = 1.0
+        # Scout Reports: +25% w pierwsze 4s po spawnie (zasadzka)
+        if "scout" in self.tent_upgrades:
+            if time.time() - getattr(en, "_spawn_time", 0) < 4.0:
+                mult *= 1.25
+        # Guerrilla Training: +35% vs spowolnionych
+        if "guerrilla" in self.tent_upgrades:
+            if getattr(en, "slow_timer", 0) > 0:
+                mult *= 1.35
+        return mult
+
+    def _place_spikes(self):
+        """Rozstawia kolce na drodze (3 punkty na sciezce wrogow)."""
+        # Punkty na drodze (srodek mapy)
+        base_pts = [(696, 570), (944, 477), (448, 414)]
+        self._spike_pos = [(x + random.randint(-20, 20), y + random.randint(-10, 10))
+                           for x, y in base_pts]
+
+    def _update_spikes(self):
+        """Kolce rania przechodzacych wrogow (30 dmg/s)."""
+        if "spikes" not in self.tent_upgrades or not self._spike_pos:
+            return
+        for sx, sy in self._spike_pos:
+            for en in self.enemies:
+                if en.dying or en.dead or en.reached_end:
+                    continue
+                if (en.x - sx) ** 2 + (en.y - sy) ** 2 < 40 ** 2:
+                    en.health -= 0.5  # 30/s przy 60 FPS
+                    self.stats_damage += 0.5
+                    if random.random() < 0.1:
+                        self.damage_numbers.append([en.x, en.y - 40, "30", 30])
+
+    def draw_tent_visuals(self):
+        """Wizualne efekty upgradow namiotu: choragiew, ognisko, kolce, balon."""
+        # Honor Banner: choragiew przy namiocie
+        if "banner" in self.tent_upgrades:
+            self._banner_phase += 0.08
+            bx, by = 880, 300
+            # Maszt
+            pygame.draw.line(self.win, (101, 67, 33), (bx, by), (bx, by - 90), 6)
+            # Choragiew (falujaca)
+            wave = [ (bx + i * 8, by - 90 + 12 * math.sin(self._banner_phase + i * 0.5) + i * 1.5)
+                     for i in range(9) ]
+            wave += [(bx, by - 50)]
+            pygame.draw.polygon(self.win, (200, 170, 50), wave)
+            pygame.draw.polygon(self.win, (150, 120, 30), wave, 2)
+        # Signal Fire: plonace ognisko przy namiocie
+        if "signal" in self.tent_upgrades:
+            sx, sy = 810, 480
+            # Glow
+            glow = pygame.Surface((120, 120), pygame.SRCALPHA)
+            pygame.draw.circle(glow, (255, 150, 50, 60), (60, 60), 55)
+            self.win.blit(glow, (sx - 60, sy - 60))
+            # Polana
+            pygame.draw.ellipse(self.win, (101, 67, 33), (sx - 25, sy - 8, 50, 16))
+            # Plomienie
+            for _ in range(3):
+                fx = sx + random.randint(-12, 12)
+                fy = sy - 10 - random.randint(0, 20)
+                self.particles.burst(fx, fy, (255, 120, 30), count=1, speed=1, life=20, size=4, gravity=-0.1)
+            # Aura: okrag zasiegu
+            if random.random() < 0.05:
+                pygame.draw.circle(self.win, (255, 200, 100, 40), (sx, sy), 350, 2)
+        # Spike Barricade: kolce na drodze
+        if "spikes" in self.tent_upgrades:
+            for sx, sy in self._spike_pos:
+                for i in range(5):
+                    px = sx - 20 + i * 10
+                    pygame.draw.polygon(self.win, (139, 90, 43),
+                                        [(px - 5, sy + 8), (px + 5, sy + 8), (px, sy - 14)])
+                    pygame.draw.polygon(self.win, (90, 60, 30),
+                                        [(px - 5, sy + 8), (px + 5, sy + 8), (px, sy - 14)], 1)
+        # Recon Balloon: balon dryfujacy nad mapa
+        if "balloon" in self.tent_upgrades:
+            self._balloon_x += 0.5
+            if self._balloon_x > self.width + 100:
+                self._balloon_x = -100
+            bx = self._balloon_x
+            by = 120 + 15 * math.sin(self._balloon_x * 0.01)
+            # Balon
+            pygame.draw.ellipse(self.win, (200, 80, 80), (bx - 30, by - 40, 60, 50))
+            pygame.draw.ellipse(self.win, (220, 120, 120), (bx - 20, by - 35, 40, 40))
+            # Kosz
+            pygame.draw.rect(self.win, (101, 67, 33), (bx - 12, by + 15, 24, 18))
+            pygame.draw.line(self.win, (80, 50, 25), (bx - 20, by + 10), (bx - 12, by + 15), 2)
+            pygame.draw.line(self.win, (80, 50, 25), (bx + 20, by + 10), (bx + 12, by + 15), 2)
         if not self.bombard_active:
             return
         self.bombard_timer += 1
@@ -850,8 +978,9 @@ class Game:
                 # Eksplozja
                 self.particles.burst(cb["tx"], cb["ty"], (255, 150, 50), count=20, speed=5, life=30, size=4)
                 self.screen_shake = 8
-                # 50% szans na zniszczenie wiezy
-                if random.random() < 0.5 and tw in self.towers:
+                # 50% szans na zniszczenie wiezy (Field Medic: 25%)
+                destroy_chance = 0.25 if "medic" in self.tent_upgrades else 0.5
+                if random.random() < destroy_chance and tw in self.towers:
                     # Wieza rozpada sie na kawalki
                     for _ in range(15):
                         self.particles.burst(tw.x + random.randint(-20, 20),
@@ -1009,6 +1138,8 @@ class Game:
                     # U: upgrade wybranej wiezy, S: sprzedaz
                     if event.key == pygame.K_u and self.selected_tower:
                         cost = self.selected_tower.menu.get_item_cost()
+                        if cost != "MAX" and "supply" in self.tent_upgrades:
+                            cost = int(cost * 0.85)
                         if cost != "MAX" and self.money >= cost:
                             self.money -= cost
                             self.stats_gold_spent += cost
@@ -1156,6 +1287,19 @@ class Game:
                     if self._building_rect.collidepoint(pos):
                         self._building_menu_open = True
                         continue
+                    # Menu upgradow namiotu - klik na namiot lub w otwarte menu
+                    if self._tent_menu_open:
+                        if self._tent_menu_close_rect.collidepoint(pos):
+                            self._tent_menu_open = False
+                            continue
+                        for rect, uid in self._tent_menu_buttons:
+                            if rect.collidepoint(pos):
+                                self._buy_tent_upgrade(uid)
+                                break
+                        continue
+                    if self._tent_rect.collidepoint(pos):
+                        self._tent_menu_open = True
+                        continue
                     if self.moving_object:
                         if self.moving_object.name in towers_names:
                             # Swobodne stawianie (bez przyciagania do siatki)
@@ -1197,6 +1341,8 @@ class Game:
                         if btn_clicked:
                             if btn_clicked == "Upgrade":
                                 cost = self.selected_tower.menu.get_item_cost()
+                                if cost != "MAX" and "supply" in self.tent_upgrades:
+                                    cost = int(cost * 0.85)
                                 if cost != "MAX" and self.money >= cost:
                                     self.money -= cost
                                     self.stats_gold_spent += cost
@@ -1312,6 +1458,12 @@ class Game:
         self._ally_fire_timer = 0
         self.mortar_shots = []
         self._storm_extra = False
+        # Reset upgradow namiotu
+        self.tent_upgrades = set()
+        self._tent_menu_open = False
+        self._balloon_x = -100
+        self._spike_pos = []
+        self._banner_phase = 0.0
         self.ship = Ship(os.path.join("images", "ship.png"), dock_x=278, dock_y=669,
                          screen_w=self.width)
         self.ship.sail_in()
@@ -1367,6 +1519,8 @@ class Game:
             if self._tesla_cooldown <= 0:
                 self._tesla_cooldown = 180  # 3s przy 60 FPS
                 self._tesla_zap()
+        # Spike Barricade: kolce rania wrogow
+        self._update_spikes()
         # Powiadomienia o zlocie
         for gn in self.gold_notifications[:]:
             gn[1] -= 1
@@ -1637,6 +1791,7 @@ class Game:
                             continue
                         if en.hitbox_in_radius(hit_enemy.x, hit_enemy.y, proj.splash_radius):
                             dmg = proj.damage * crit_mult * en.get_damage_mult(proj.damage_type)
+                            dmg *= self._tent_damage_mult(en)
                             if en.hit(dmg):
                                 tower_sound_3.play()
                             dmg_text = str(int(dmg)) + ("!" if is_crit else "")
@@ -1645,6 +1800,7 @@ class Game:
                             self.stats_damage += int(dmg)
                 else:
                     dmg = proj.damage * crit_mult * hit_enemy.get_damage_mult(proj.damage_type)
+                    dmg *= self._tent_damage_mult(hit_enemy)
                     if hit_enemy.hit(dmg):
                         tower_sound_3.play()
                     dmg_text = str(int(dmg)) + ("!" if is_crit else "")
@@ -2160,9 +2316,12 @@ class Game:
 
         # Podswietlenie klikalnego budynku + dron + menu upgradow
         self.draw_building_highlight()
+        self.draw_tent_highlight()
         self.draw_repair_drone()
         self.draw_tesla_bolts()
+        self.draw_tent_visuals()
         self.draw_building_menu()
+        self.draw_tent_menu()
 
         # Przyciemnienie przy wejsciu bossa (dramatyczny efekt)
         if self.boss_intro_dark > 0:
@@ -2912,8 +3071,16 @@ class Game:
 
     def _buy_building_upgrade(self, uid):
         """Kupno upgradu budynku."""
-        upg = next((u for u in BUILDING_UPGRADES if u["id"] == uid), None)
-        if not upg or uid in self.building_upgrades:
+        self._buy_upgrade(BUILDING_UPGRADES, self.building_upgrades, uid, "building")
+
+    def _buy_tent_upgrade(self, uid):
+        """Kupno upgradu namiotu."""
+        self._buy_upgrade(TENT_UPGRADES, self.tent_upgrades, uid, "tent")
+
+    def _buy_upgrade(self, upg_list, owned_set, uid, kind):
+        """Generyczne kupno upgradu."""
+        upg = next((u for u in upg_list if u["id"] == uid), None)
+        if not upg or uid in owned_set:
             return
         # Cavalry: tylko w endless (easter egg w normalnej grze)
         if upg.get("endless_only") and not self.endless:
@@ -2929,24 +3096,57 @@ class Game:
             return
         self.money -= upg["cost"]
         self.stats_gold_spent += upg["cost"]
-        self.building_upgrades.add(uid)
+        owned_set.add(uid)
         self.gold_notifications.append([f"{upg['name']} acquired!", 200])
-        # Natychmiastowe efekty
+        # Natychmiastowe efekty budynku
         if uid == "walls":
             self._start_lives += 5
             self.lives += 5
         elif uid in ("ammo", "lucky"):
             for tw in self.towers:
                 self._apply_tower_upgrade_flags(tw)
+        # Natychmiastowe efekty namiotu
+        if uid == "spikes":
+            self._place_spikes()
+        elif uid in ("drums", "banner", "signal", "balloon"):
+            for tw in self.towers:
+                self._apply_tower_upgrade_flags(tw)
 
     def _apply_tower_upgrade_flags(self, tw):
-        """Ustawia flagi upgradow budynku na wiezy."""
-        tw._fire_rate_mult = 1.15 if "ammo" in self.building_upgrades else 1.0
+        """Ustawia flagi upgradow (budynek + namiot) na wiezy."""
+        tw._fire_rate_mult = 1.0
+        if "ammo" in self.building_upgrades:
+            tw._fire_rate_mult *= 1.15
+        # Signal Fire: +12% fire rate dla wiez w zasiegu 350px od ogniska
+        if "signal" in self.tent_upgrades:
+            sx, sy = 810, 480  # ognisko przy namiocie
+            if (tw.x - sx) ** 2 + (tw.y - sy) ** 2 < 350 ** 2:
+                tw._fire_rate_mult *= 1.12
         tw._lucky_crit = "lucky" in self.building_upgrades
+        tw._dmg_mult = 1.0
+        if "banner" in self.tent_upgrades:
+            tw._dmg_mult *= 1.10  # Honor Banner: +10% dmg globalnie
+        tw._ability_cd_mult = 0.7 if "drums" in self.tent_upgrades else 1.0
+        tw._range_mult = 1.15 if "balloon" in self.tent_upgrades else 1.0
 
     def draw_building_menu(self):
-        """Menu upgradow budynku (10 slotow, 2 kolumny x 5 rzedow)."""
-        if not self._building_menu_open:
+        """Menu upgradow budynku."""
+        self._draw_upgrade_menu("BUILDING UPGRADES", BUILDING_UPGRADES,
+                                self.building_upgrades, self._building_icons,
+                                "_building_menu_open", "_building_menu_buttons",
+                                "_building_menu_close_rect")
+
+    def draw_tent_menu(self):
+        """Menu upgradow namiotu."""
+        self._draw_upgrade_menu("TENT UPGRADES", TENT_UPGRADES,
+                                self.tent_upgrades, self._tent_icons,
+                                "_tent_menu_open", "_tent_menu_buttons",
+                                "_tent_menu_close_rect")
+
+    def _draw_upgrade_menu(self, title_text, upg_list, owned_set, icons,
+                           open_attr, buttons_attr, close_attr):
+        """Generyczne menu upgradow (2 kolumny)."""
+        if not getattr(self, open_attr):
             return
         # Przyciemnienie
         dim = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -2957,27 +3157,28 @@ class Game:
         px, py = (self.width - pw) // 2, (self.height - ph) // 2
         pygame.draw.rect(self.win, (22, 28, 38), (px, py, pw, ph), border_radius=16)
         pygame.draw.rect(self.win, (90, 110, 140), (px, py, pw, ph), 2, border_radius=16)
-        title = self.font_p36.render("BUILDING UPGRADES", True, (255, 215, 100))
+        title = self.font_p36.render(title_text, True, (255, 215, 100))
         self.win.blit(title, (px + (pw - title.get_width()) // 2, py + 18))
         # Przycisk zamkniecia
-        self._building_menu_close_rect = pygame.Rect(px + pw - 46, py + 12, 34, 34)
+        setattr(self, close_attr, pygame.Rect(px + pw - 46, py + 12, 34, 34))
+        _close_rect = getattr(self, close_attr)
         pygame.draw.rect(self.win, (150, 60, 60),
-                         self._building_menu_close_rect, border_radius=8)
+                         _close_rect, border_radius=8)
         x_lbl = self.font_btn18.render("X", True, (255, 255, 255))
-        self.win.blit(x_lbl, (self._building_menu_close_rect.centerx - x_lbl.get_width() // 2,
-                              self._building_menu_close_rect.centery - x_lbl.get_height() // 2))
+        self.win.blit(x_lbl, (_close_rect.centerx - x_lbl.get_width() // 2,
+                              _close_rect.centery - x_lbl.get_height() // 2))
         # Sloty
-        self._building_menu_buttons = []
+        setattr(self, buttons_attr, [])
         mx, my = self._mouse_pos()
         col_w = (pw - 60) // 2
         row_h = 100
-        for i, upg in enumerate(BUILDING_UPGRADES):
+        for i, upg in enumerate(upg_list):
             col = i % 2
             row = i // 2
             sx = px + 20 + col * (col_w + 20)
             sy = py + 70 + row * (row_h + 8)
             rect = pygame.Rect(sx, sy, col_w, row_h)
-            owned = upg["id"] in self.building_upgrades
+            owned = upg["id"] in owned_set
             # Easter egg: cavalry ukryte w normalnej grze
             mystery = upg.get("endless_only") and not self.endless
             hover = rect.collidepoint(mx, my) and not owned
@@ -3000,7 +3201,7 @@ class Game:
                 desc = "Intel locked."
                 price_txt = "???"
             else:
-                icon = self._building_icons.get(upg["id"])
+                icon = icons.get(upg["id"])
                 if icon:
                     self.win.blit(icon, (sx + 10, sy + (row_h - 56) // 2))
                 name = upg["name"]
@@ -3038,7 +3239,7 @@ class Game:
             self.win.blit(st, (rect.right - st.get_width() - 12,
                                rect.bottom - st.get_height() - 10))
             if not owned:
-                self._building_menu_buttons.append((rect, upg["id"]))
+                getattr(self, buttons_attr).append((rect, upg["id"]))
 
     def draw_building_highlight(self):
         """Delikatne podswietlenie budynku gdy kursor nad nim (klikany)."""
@@ -3050,6 +3251,17 @@ class Game:
             pygame.draw.rect(hl, (255, 215, 100, 40), hl.get_rect(), border_radius=12)
             pygame.draw.rect(hl, (255, 215, 100, 120), hl.get_rect(), 2, border_radius=12)
             self.win.blit(hl, self._building_rect.topleft)
+
+    def draw_tent_highlight(self):
+        """Delikatne podswietlenie namiotu gdy kursor nad nim (klikany)."""
+        if self._tent_menu_open:
+            return
+        mx, my = self._mouse_pos()
+        if self._tent_rect.collidepoint(mx, my):
+            hl = pygame.Surface((self._tent_rect.w, self._tent_rect.h), pygame.SRCALPHA)
+            pygame.draw.rect(hl, (255, 215, 100, 40), hl.get_rect(), border_radius=12)
+            pygame.draw.rect(hl, (255, 215, 100, 120), hl.get_rect(), 2, border_radius=12)
+            self.win.blit(hl, self._tent_rect.topleft)
 
     def draw_repair_drone(self):
         """Wizualny dron krazacy wokol budynku (po kupnie Repair Drones)."""
@@ -3199,8 +3411,12 @@ class Game:
             win.blit(surf, (mx - rg, my - rg))
 
     def shop_price(self, tower_name):
-        """Cena wiezy w sklepie. Mapuje nazwe klasy (woodenTower) na przycisk (t1)."""
-        return self.menu.get_item_cost(tower_shop_names.get(tower_name, tower_name))
+        """Cena wiezy w sklepie. Mapuje nazwe klasy (woodenTower) na przycisk (t1).
+        Supply Lines: -15%."""
+        base = self.menu.get_item_cost(tower_shop_names.get(tower_name, tower_name))
+        if "supply" in self.tent_upgrades:
+            base = int(base * 0.85)
+        return base
 
     def _point_in_poly(self, x, y, poly):
         """Test punkt-w-wielokacie (ray casting)."""
