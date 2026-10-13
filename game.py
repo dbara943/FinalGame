@@ -788,21 +788,25 @@ class Game:
             if self.bombard_timer == 30:
                 self._ally_broadside_at_pirate()
             if self.bombard_timer >= 150:
-                # Pirat okaleczony na stale!
+                # Pirat okaleczony - UCIEKA w prawo, sojusznik GONI!
                 self.pirate_crippled = True
                 self.wave_banner_text = "PIRATE SHIP CRIPPLED!"
                 self.wave_banner_timer = 200
-                self.ship.sail_out_from_bombard()
+                # Pirat ucieka w prawo (szybciej niz zwykle)
+                self.ship.state = Ship.OUT
+                self.ship.from_left = False  # w prawo
+                self.ship.speed = 5.0
                 if self.ally_ship:
-                    self.ally_ship.sail_out()
+                    self.ally_ship.chase()
                 self.bombard_phase = 12
                 self.bombard_timer = 0
         elif self.bombard_phase == 12:
-            # Czekamy az oba statki odplyna
+            # Poscig: oba statki w prawo. Odblokowanie dopiero jak oba znikna.
             ally_gone = not self.ally_ship or self.ally_ship.state == AllyShip.AWAY
             if self.ship.state == Ship.AWAY and ally_gone:
                 self.bombard_active = False
                 self.bombard_phase = 0
+                self.ship.speed = 3.5  # przywroc normalna predkosc
                 self.ally_ship = None
 
     def _ally_broadside_at_pirate(self):

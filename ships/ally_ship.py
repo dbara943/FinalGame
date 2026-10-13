@@ -34,6 +34,11 @@ class AllyShip:
         if self.state in (AllyShip.IN, AllyShip.FIRING):
             self.state = AllyShip.OUT
 
+    def chase(self):
+        """Poscig za piratem: szybko w prawo, poza ekran."""
+        self.speed = 6.0
+        self.state = AllyShip.OUT
+
     def update(self):
         if self.cannon_flash > 0:
             self.cannon_flash -= 1
