@@ -111,14 +111,10 @@ class Menu():
         is_max = tw.level >= tw.max_level
         if not is_max:
             up_cost = self.item_cost[tw.level - 1]
-            # 5: wyszarzony przycisk + brakujaca kwota na czerwono gdy nie stac
+            # Wyszarzony gdy nie stac, ale zawsze widoczny koszt (bez -$)
             affordable = money is not None and money >= up_cost
-            if affordable:
-                self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "UPGRADE", f"${up_cost}", holo, False)
-            else:
-                missing = up_cost - (money or 0)
-                self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "UPGRADE",
-                                    f"-${missing}", (255, 90, 90), True, sub_color=(255, 90, 90))
+            self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "UPGRADE", f"${up_cost}",
+                                holo, not affordable)
         else:
             self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "MAX LEVEL", "", (100, 110, 120), True)
         sell_val = tw.sell_value()

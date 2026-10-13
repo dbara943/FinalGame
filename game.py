@@ -339,14 +339,19 @@ class Game:
                 self.waiting_for_clear = True
                 self._clear_timer = 0
                 # Bombardowanie: fala 4 (index 3) przy max zyciach, fala 8 (index 7) przy >polowy zyc
+                # Endless: CO FALE w 2 losowe wieze, bez warunkow zyciowych
                 wave_num = self.wave + 1
                 should_bombard = False
-                if wave_num == 4 and self.lives >= self._start_lives:
+                bombard_targets = 3
+                if self.endless:
+                    should_bombard = True
+                    bombard_targets = 2
+                elif wave_num == 4 and self.lives >= self._start_lives:
                     should_bombard = True
                 elif wave_num == 8 and self.lives > self._start_lives // 2:
                     should_bombard = True
                 if should_bombard and not self.bombard_active:
-                    self._start_bombardment()
+                    self._start_bombardment(num_targets=bombard_targets)
                 else:
                     self.ship.sail_out()
         else:
@@ -362,10 +367,11 @@ class Game:
                 # 6: 8% szansy na elitarnego (nie boss)
                 if not isinstance(en, Boss) and random.random() < 0.08:
                     en.make_elite()
-                # Endless: 5x HP od startu (za latwe inaczej)
+                # Endless: 5x HP bazowo + 5% co fale (compound), minimum +1 HP na fale
                 if self.endless:
-                    en.max_health *= 5
-                    en.health = en.max_health
+                    scaled = self._endless_hp(en.max_health, self.endless_wave)
+                    en.max_health = scaled
+                    en.health = scaled
                 self.enemies.append(en)
 
     def _setup_endless_wave(self):
@@ -381,8 +387,17 @@ class Game:
         self.money += gold
         self.gold_notifications.append([f"+{gold} gold (endless wave)", 150])
         if self.endless_wave % 4 == 0:
-            # Endless boss: 5x HP (2000) - inaczej za latwy
-            self.pending_boss = Boss(hp=2000)
+            # Endless boss: 5x HP + 5% co fale (jak zwykli wrogowie)
+            self.pending_boss = Boss(hp=self._endless_hp(400, self.endless_wave))
+
+    def _endless_hp(self, base, endless_wave):
+        """HP w endless: 5x bazowo od fali 11, potem +5% co fale (compound).
+        Jesli 5% nie daje ani 1 HP, to +1."""
+        hp = int(base * 5)
+        for _ in range(1, endless_wave):
+            bonus = int(hp * 0.05)
+            hp += bonus if bonus >= 1 else 1
+        return hp
 
     def _boss_hp(self, wave_num):
         """HP bossa wg fali i trudnosci.
@@ -472,15 +487,15 @@ class Game:
                 self.pending_boss = Boss(final=True)
                 self.wave_banner_text = "FINALNA FALA - BOSS!"
         self.waiting_for_clear = False
-    def _start_bombardment(self):
+    def _start_bombardment(self, num_targets=3):
         """Rozpoczyna cinematic bombardowania: statek plynie na srodek oceanu."""
         self.bombard_active = True
         self.bombard_phase = 0  # 0: statek plynie na srodek
         self.bombard_timer = 0
         self.bombard_index = 0
-        # Wybierz do 3 losowych wiez
+        # Wybierz losowe wieze (domyslnie do 3, w endless 2)
         if self.towers:
-            self.bombard_targets = random.sample(self.towers, min(3, len(self.towers)))
+            self.bombard_targets = random.sample(self.towers, min(num_targets, len(self.towers)))
         else:
             self.bombard_targets = []
         self.wave_banner_text = "CANNON BARRAGE!"
