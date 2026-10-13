@@ -1344,9 +1344,9 @@ class Game:
         pygame.draw.circle(self.win, (101, 67, 33), (cx, cy), 6)
         n_lbl = self.font_btn18.render("N", True, (140, 40, 40))
         self.win.blit(n_lbl, (cx - n_lbl.get_width()//2, cy - r - 24))
-        # Przerywana sciezka do X
+        # Przerywana sciezka do X (po lewej stronie, nie zachodzi na statystyki)
         path_pts = [(140, h - 160), (300, h - 220), (450, h - 180),
-                    (600, h - 260), (w//2, h//2 + 40)]
+                    (600, h - 260), (w - 260, h//2 + 60)]
         for i in range(len(path_pts) - 1):
             x1, y1 = path_pts[i]
             x2, y2 = path_pts[i + 1]
@@ -1356,8 +1356,8 @@ class Game:
                 px1, py1 = x1 + (x2 - x1) * t1, y1 + (y2 - y1) * t1
                 px2, py2 = x1 + (x2 - x1) * t2, y1 + (y2 - y1) * t2
                 pygame.draw.line(self.win, (101, 67, 33), (px1, py1), (px2, py2), 3)
-        # Wielki czerwony X na wyspie
-        ix, iy, s = w // 2, h // 2 + 40, 46
+        # Wielki czerwony X na wyspie (z boku, poza statystyki)
+        ix, iy, s = w - 260, h // 2 + 60, 46
         pygame.draw.line(self.win, (170, 30, 30), (ix - s, iy - s), (ix + s, iy + s), 10)
         pygame.draw.line(self.win, (170, 30, 30), (ix - s, iy + s), (ix + s, iy - s), 10)
         # Morskie bazgroly w rogach
@@ -1375,8 +1375,8 @@ class Game:
             edge = pygame.Surface((w, h), pygame.SRCALPHA)
             pygame.draw.rect(edge, (0, 0, 0, alpha), (i, i, w - 2*i, h - 2*i), 2)
             self.win.blit(edge, (0, 0))
-        # Cienka linia pod tytulem
-        pygame.draw.line(self.win, (80, 30, 30), (w//2 - 200, h//2 - 60), (w//2 + 200, h//2 - 60), 2)
+        # Cienka linia pod tytulem (tytul jest na h//2 - 160)
+        pygame.draw.line(self.win, (80, 30, 30), (w//2 - 200, h//2 - 70), (w//2 + 200, h//2 - 70), 2)
 
     def _end_stats_list(self):
         """Rozszerzone statystyki koncowe: ogolne + zabicia wg typu wroga."""
