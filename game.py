@@ -873,12 +873,15 @@ class Game:
                                 self._recalc_synergy()
                                 self.selected_tower = None
                     if not (btn_clicked):    
+                        clicked_tower = None
                         for tw in self.towers:
                             if tw.click(pos[0], pos[1]):
                                 tw.selected = True
-                                self.selected_tower = tw
+                                clicked_tower = tw
                             else:
-                                tw.selected = False     
+                                tw.selected = False
+                        # Klik w puste miejsce = odznacz (menu znika jak kiedys)
+                        self.selected_tower = clicked_tower
             # Logika gry w tempie 100Hz (akumulator) - pauza pomija, predkosc mnozy
             # Cap 5 tickow/klatke: zapobiega spirali smierci i skokom po stallu
             if not self.paused:
@@ -1341,9 +1344,6 @@ class Game:
                                                (tw.x, tw.y - 20), (tw2.x, tw2.y - 20), 2)
         for tw in self.towers:
             tw.draw(self.win)  # draw() rysuje tez okrag zasiegu (bez duplikatu)
-        # Menu wybranej wiezy NA SAMYM WIERZCHU - zadna wieza go nie przykryje
-        if self.selected_tower is not None and self.selected_tower in self.towers:
-            self.selected_tower.menu.draw(self.win)
         # Q15: przyciemnij odfiltrowane
         if self.tower_filter:
             dim = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -1671,6 +1671,9 @@ class Game:
             self.draw_pause_menu()
         # Cinematic bombardowania - zoom na wieze
         self._draw_bombard_zoom()
+        # Menu wybranej wiezy NA SAMYM KONCU - nad wrogami, pociskami, HUDem, wszystkim
+        if self.selected_tower is not None and self.selected_tower in self.towers:
+            self.selected_tower.menu.draw(self.win)
 
         self._present()
 
