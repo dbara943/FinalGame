@@ -62,8 +62,9 @@ class Menu():
     def get_item_cost(self):
         return self.item_cost[self.tower.level - 1]
         
-    def draw(self, win, money=None):
+    def draw(self, win, money=None, discount=1.0):
         # Hologram HUD (wariant D) - kolor zalezny od typu wiezy
+        # discount: Supply Lines 0.85 - pokazuje przekreslenie
         tw = self.tower
         tname = type(tw).__name__
         colors = {
@@ -112,9 +113,16 @@ class Menu():
         if not is_max:
             up_cost = self.item_cost[tw.level - 1]
             # Wyszarzony gdy nie stac, ale zawsze widoczny koszt (bez -$)
-            affordable = money is not None and money >= up_cost
-            self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "UPGRADE", f"${up_cost}",
-                                holo, not affordable)
+            # Supply Lines: przekreslona oryginalna + nowa cena
+            if discount < 1.0:
+                disc_cost = int(up_cost * discount)
+                affordable = money is not None and money >= disc_cost
+                self._draw_holo_btn_sale(win, px + 12, btn_y, 106, btn_h, "UPGRADE",
+                                         up_cost, disc_cost, holo, not affordable)
+            else:
+                affordable = money is not None and money >= up_cost
+                self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "UPGRADE", f"${up_cost}",
+                                    holo, not affordable)
         else:
             self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "MAX LEVEL", "", (100, 110, 120), True)
         sell_val = tw.sell_value()
@@ -148,6 +156,31 @@ class Menu():
             scol = sub_color if sub_color else tcol
             s = sfont.render(str(sub), True, scol)
             win.blit(s, (x + w//2 - s.get_width()//2, y + 28))
+
+    def _draw_holo_btn_sale(self, win, x, y, w, h, title, orig_price, sale_price, color, disabled):
+        """Przycisk z przekreslona cena (Costco style)."""
+        btn = pygame.Surface((w, h), pygame.SRCALPHA)
+        r, g, b = color[0], color[1], color[2]
+        if disabled:
+            pygame.draw.rect(btn, (40, 45, 55, 180), btn.get_rect(), border_radius=6)
+        else:
+            pygame.draw.rect(btn, (r, g, b, 40), btn.get_rect(), border_radius=6)
+            pygame.draw.rect(btn, (r, g, b, 255), btn.get_rect(), 2, border_radius=6)
+        win.blit(btn, (x, y))
+        tfont = pygame.font.SysFont("consolas, monospace", 13, bold=True)
+        sfont = pygame.font.SysFont("consolas, monospace", 11)
+        tcol = (120, 130, 140) if disabled else (r, g, b)
+        t = tfont.render(title, True, tcol)
+        win.blit(t, (x + w//2 - t.get_width()//2, y + 6))
+        # Przekreslona oryginalna
+        o = sfont.render(f"${orig_price}", True, (120, 120, 120))
+        ox = x + w//2 - o.get_width()//2
+        oy = y + 24
+        win.blit(o, (ox, oy))
+        pygame.draw.line(win, (200, 80, 80), (ox, oy + 6), (ox + o.get_width(), oy + 6), 2)
+        # Nowa cena
+        s = sfont.render(f"${sale_price}", True, (255, 215, 0))
+        win.blit(s, (x + w//2 - s.get_width()//2, y + 36))
 
             
     def get_clicked(self, X, Y):
@@ -196,7 +229,8 @@ class VerticalMenu(Menu):
         panel_h = len(self.buttons) * 78 + 50
         return pygame.Rect(self.x - panel_w // 2, self.y - 140, panel_w, panel_h)
 
-    def draw(self, win, mouse_pos=None):
+    def draw(self, win, mouse_pos=None, discount=1.0):
+        """Rysuje sklep. discount: mnoznik ceny (Supply Lines: 0.85) - pokazuje przekreslenie."""
         # Nowoczesny sklep: ciemny panel, wyrownane ceny, bez niebieskiego tła
         # mouse_pos w wspolrzednych gry (po przeskalowaniu) - do hovera
         if mouse_pos is None:
@@ -248,8 +282,23 @@ class VerticalMenu(Menu):
             surf.blit(nm, (tx, by + 6 - py))
             dm = dfont.render(f"DMG {item.damage}", True, (170, 180, 190))
             surf.blit(dm, (tx, by + 26 - py))
-            pt = pfont.render(f"$ {item.cost}", True, (255, 215, 0))
-            surf.blit(pt, (tx, by + 44 - py))
+            # Cena: z discountem pokazuje przekreslona oryginalna + nowa (Costco style)
+            if discount < 1.0:
+                orig = item.cost
+                new_price = int(orig * discount)
+                # Przekreslona oryginalna (szara)
+                pt_orig = pfont.render(f"$ {orig}", True, (120, 120, 120))
+                surf.blit(pt_orig, (tx, by + 44 - py))
+                # Linia przekreslenia
+                lx1, ly = tx, by + 44 - py + pt_orig.get_height() // 2
+                lx2 = tx + pt_orig.get_width()
+                pygame.draw.line(surf, (200, 80, 80), (lx1, ly), (lx2, ly), 2)
+                # Nowa cena (zolota, obok)
+                pt_new = pfont.render(f"$ {new_price}", True, (255, 215, 0))
+                surf.blit(pt_new, (tx + pt_orig.get_width() + 8, by + 44 - py))
+            else:
+                pt = pfont.render(f"$ {item.cost}", True, (255, 215, 0))
+                surf.blit(pt, (tx, by + 44 - py))
             # Aktualizuj pozycje klikalna (wspolrzedne ekranu)
             item.x, item.y = bx, by
             item.width, item.height = panel_w - 30, 68

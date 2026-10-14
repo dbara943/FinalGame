@@ -59,24 +59,24 @@ tower_shop_names = {"woodenTower": "t1", "metalTower": "t2", "goldenTower": "t3"
                     "fireTower": "t4", "blazeTower": "t5"}
 # Upgrady klikalnego budynku (jednorazowe na run)
 BUILDING_UPGRADES = [
-    {"id": "walls", "name": "Reinforced Walls", "cost": 3500,
-     "desc": "+5 max lives for the building."},
-    {"id": "drones", "name": "Repair Drones", "cost": 5000,
-     "desc": "+1 life every 2 waves. A drone orbits the building."},
-    {"id": "tesla", "name": "Tesla Coil", "cost": 6500,
-     "desc": "Zaps the nearest enemy every few seconds. Stronger in storms."},
     {"id": "treasury", "name": "War Treasury", "cost": 1200,
      "desc": "+25% gold from all kills, permanently."},
     {"id": "bounty", "name": "Bounty Board", "cost": 1500,
      "desc": "Bosses and elite enemies give +50% gold."},
-    {"id": "ammo", "name": "Ammunition Depot", "cost": 4000,
-     "desc": "All towers shoot 15% faster."},
     {"id": "lucky", "name": "Lucky Charm", "cost": 2000,
      "desc": "Towers have 10% chance to deal 2x critical damage."},
-    {"id": "storm", "name": "Storm Caller", "cost": 3000,
-     "desc": "Storms last longer and give +25% gold (instead of +15%)."},
     {"id": "docks", "name": "Reinforced Docks", "cost": 2500,
      "desc": "Enemies move 15% slower."},
+    {"id": "storm", "name": "Storm Caller", "cost": 3000,
+     "desc": "Storms last longer and give +25% gold (instead of +15%)."},
+    {"id": "walls", "name": "Reinforced Walls", "cost": 3500,
+     "desc": "+5 max lives for the building."},
+    {"id": "ammo", "name": "Ammunition Depot", "cost": 4000,
+     "desc": "All towers shoot 15% faster."},
+    {"id": "drones", "name": "Repair Drones", "cost": 5000,
+     "desc": "+1 life every 2 waves. A drone orbits the building."},
+    {"id": "tesla", "name": "Tesla Coil", "cost": 6500,
+     "desc": "Zaps the nearest enemy every few seconds. Stronger in storms."},
     {"id": "cavalry", "name": "Call the Cavalry", "cost": 10000,
      "desc": "An allied ship cripples the pirate ship, then bombards enemies.",
      "endless_only": True},
@@ -85,18 +85,18 @@ BUILDING_UPGRADES = [
 TENT_UPGRADES = [
     {"id": "scout", "name": "Scout Reports", "cost": 2000,
      "desc": "Ambush: +25% damage to enemies in first 4s after spawning."},
-    {"id": "drums", "name": "War Drums", "cost": 3000,
-     "desc": "Tower abilities recharge 30% faster."},
     {"id": "supply", "name": "Supply Lines", "cost": 2500,
      "desc": "Towers cost 15% less (buy and upgrade)."},
+    {"id": "drums", "name": "War Drums", "cost": 3000,
+     "desc": "Tower abilities recharge 30% faster."},
     {"id": "medic", "name": "Field Medic", "cost": 3500,
      "desc": "Bombardment destroys towers half as often (50% -> 25%)."},
+    {"id": "signal", "name": "Signal Fire", "cost": 3500,
+     "desc": "Campfire grows 2x. Dancers guard the building with bows."},
     {"id": "guerrilla", "name": "Guerrilla Training", "cost": 4000,
      "desc": "+35% damage against slowed enemies."},
     {"id": "banner", "name": "Honor Banner", "cost": 4000,
      "desc": "A war banner rises by the tent. All towers +10% damage."},
-    {"id": "signal", "name": "Signal Fire", "cost": 3500,
-     "desc": "Burning beacon by the tent. Nearby towers +12% fire rate."},
     {"id": "spikes", "name": "Spike Barricade", "cost": 4500,
      "desc": "Spikes on the road wound passing enemies."},
     {"id": "balloon", "name": "Recon Balloon", "cost": 5500,
@@ -533,9 +533,10 @@ class Game:
             int(20 * scale), int(15 * scale), int(12 * scale), int(10 * scale),
             int(8 * scale), int(6 * scale), int(5 * scale), int(3 * scale),
         ]
-        gold = 500 + self.endless_wave * 25
+        # Bonus: numer fali x $100 (fala 11 = $1100)
+        gold = self.wave * 100
         self.money += gold
-        self.gold_notifications.append([f"+{gold} gold (endless wave)", 150])
+        self.gold_notifications.append([f"+{gold} gold (wave {self.wave})", 150])
         if self.endless_wave % 4 == 0:
             # Endless boss: 5x HP + 5% co fale (jak zwykli wrogowie)
             self.pending_boss = Boss(hp=self._endless_hp(400, self.endless_wave))
@@ -2204,7 +2205,7 @@ class Game:
             (quit_rect, "QUIT", (255, 100, 100)),
         ]
         if continue_rect:
-            buttons.insert(1, (continue_rect, "CONTINUE", (90, 160, 255)))
+            buttons.insert(1, (continue_rect, "ENDLESS MODE", (255, 180, 50)))
         def _draw_buttons(hover_pos=None):
             for rect, label_text, glow_color in buttons:
                 hov = hover_pos is not None and rect.collidepoint(hover_pos)
@@ -2627,7 +2628,8 @@ class Game:
         if not self.waiting_for_clear:
             self._boss_warned = False
         
-        self.menu.draw(self.win, self._mouse_pos())
+        discount = 0.85 if "supply" in self.tent_upgrades else 1.0
+        self.menu.draw(self.win, self._mouse_pos(), discount=discount)
         self.draw_hud()
         # Menu ESC (na wierzchu)
         if self.show_menu:
@@ -2636,7 +2638,8 @@ class Game:
         self._draw_bombard_zoom()
         # Menu wybranej wiezy NA SAMYM KONCU - nad wrogami, pociskami, HUDem, wszystkim
         if self.selected_tower is not None and self.selected_tower in self.towers:
-            self.selected_tower.menu.draw(self.win, self.money)
+            discount = 0.85 if "supply" in self.tent_upgrades else 1.0
+            self.selected_tower.menu.draw(self.win, self.money, discount=discount)
 
         self._present()
 
