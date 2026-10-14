@@ -89,7 +89,7 @@ TENT_UPGRADES = [
      "desc": "Towers cost 15% less (buy and upgrade)."},
     {"id": "drums", "name": "War Drums", "cost": 3000,
      "desc": "Tower abilities recharge 30% faster."},
-    {"id": "medic", "name": "Field Medic", "cost": 3500,
+    {"id": "medic", "name": "Field Medic", "cost": 1500,
      "desc": "Bombardment destroys towers half as often (50% -> 25%)."},
     {"id": "signal", "name": "Signal Fire", "cost": 3500,
      "desc": "Campfire grows 2x. Dancers guard the building with bows."},
