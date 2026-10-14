@@ -1691,8 +1691,8 @@ class Game:
 
     def _tesla_zap(self):
         """Tesla Coil: piorun w najblizszego wroga. W burze: 2x dmg + lancuch."""
-        bx, by = 260, 285  # srodek budynku
-        best, best_d2 = None, 450 ** 2
+        bx, by = 308, 123  # electrode ball (z drag tool, 2026-10-14) - zasieg od kuli
+        best, best_d2 = None, 400 ** 2  # radius z drag tool (bylo 450 od srodka budynku)
         for en in self.enemies:
             if en.dying or en.dead or en.reached_end:
                 continue
