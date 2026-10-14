@@ -243,6 +243,16 @@ class Game:
                 self._tent_icons[uid] = pygame.transform.smoothscale(img, (56, 56))
             except:
                 self._tent_icons[uid] = None
+        # Wizualne efekty namiotu (init)
+        self._balloon_x = -100
+        self._balloon_bomb_cd = 0
+        self._balloon_bombs = []
+        self._spike_pos = []
+        self._banner_phase = 0.0
+        self._dancers = [
+            {"x": 180, "y": 420, "alive": True, "sex": "m", "cd": 0},
+            {"x": 340, "y": 420, "alive": True, "sex": "f", "cd": 0},
+        ]
         # Achievements
         from achievements import AchievementManager
         self.ach_mgr = AchievementManager()
