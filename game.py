@@ -953,6 +953,25 @@ class Game:
         self.win.blit(t1, (px + 68, py + 10))
         self.win.blit(t2, (px + 68, py + 35))
 
+    # Linia zrzutu bomb balonu (narysowana przez gracza, 2026-10-14):
+    # bomby spadaja PIONOWO z balonu na linie, wprost ponizej balonu.
+    _BALLOON_LINE = [(338, 654), (377, 641), (431, 625), (485, 599), (506, 590),
+                     (615, 574), (724, 563), (834, 551), (929, 540), (987, 531),
+                     (1019, 527), (1046, 505)]
+
+    def _balloon_line_y(self, x):
+        """Y linii zrzutu dla danego x (interpolacja). None jesli x poza linia."""
+        pts = self._BALLOON_LINE
+        if x < pts[0][0] or x > pts[-1][0]:
+            return None
+        for (x1, y1), (x2, y2) in zip(pts, pts[1:]):
+            if x1 <= x <= x2:
+                if x2 == x1:
+                    return y1
+                t = (x - x1) / (x2 - x1)
+                return y1 + (y2 - y1) * t
+        return pts[-1][1]
+
     def draw_tent_visuals(self):
         """Wizualne efekty upgradow namiotu: ognisko, kolce, balon. (Choragiew usunieta.)"""
         # Tesla Coil: widoczna cewka na budynku (musi byc przed innymi)
@@ -977,19 +996,13 @@ class Game:
         bx = self._balloon_x
         by = 120 + 15 * math.sin(self._balloon_x * 0.01)
         if "balloon" in self.tent_upgrades:
-            # Zrzut bomby co 3s (na najblizszego wroga pod balonem)
-            self._balloon_bomb_cd -= 1
-            if self._balloon_bomb_cd <= 0:
-                # Cel: wrog najblizej pionu balonu
-                best, best_dx = None, 200
-                for en in self.enemies:
-                    if en.dying or en.dead or en.reached_end:
-                        continue
-                    dx = abs(en.x - bx)
-                    if dx < best_dx:
-                        best, best_dx = en, dx
-                if best:
-                    self._balloon_bombs.append({"x": bx, "y": by + 55, "tx": best.x, "ty": best.y - 10, "target": best})
+            # Zrzut bomby co 3s, PIONOWO na narysowana linie (wprost ponizej balonu).
+            # Timer liczy tylko gdy balon jest nad linia (od punktu 1). Bez celowania we wrogow.
+            line_y = self._balloon_line_y(bx)
+            if line_y is not None:
+                self._balloon_bomb_cd -= 1
+                if self._balloon_bomb_cd <= 0:
+                    self._balloon_bombs.append({"x": bx, "y": by + 55, "vy": 2.0, "land_y": line_y})
                     self._balloon_bomb_cd = 180  # 3s
         # Balon: model z zakladki upgradow (obrazek), fallback do rysowanego gdy brak pliku
         if getattr(self, "_balloon_img", None) is not None:
@@ -1000,21 +1013,16 @@ class Game:
             pygame.draw.rect(self.win, (101, 67, 33), (bx - 12, by + 15, 24, 18))
             pygame.draw.line(self.win, (80, 50, 25), (bx - 20, by + 10), (bx - 12, by + 15), 2)
             pygame.draw.line(self.win, (80, 50, 25), (bx + 20, by + 10), (bx + 12, by + 15), 2)
-        # Bomby z balonu: leca DO celu (na drodze), nie na stale y=640 gdzie nikt nie chodzi.
-        # Namiar: pozycja celu w chwili zrzutu; jesli cel zyje, bomba podaza za nim.
+        # Bomby z balonu: spadaja PIONOWO na linie (wprost ponizej miejsca zrzutu).
         for bomb in self._balloon_bombs[:]:
-            tgt = bomb.get("target")
-            if tgt is not None and not getattr(tgt, "dying", False) and not getattr(tgt, "dead", False):
-                tx, ty = tgt.x, tgt.y - 10
-                bomb["tx"], bomb["ty"] = tx, ty
-            else:
-                tx, ty = bomb.get("tx", bomb["x"]), bomb.get("ty", 500)
-            dx, dy = tx - bomb["x"], ty - bomb["y"]
-            dist = math.hypot(dx, dy) or 1.0
-            step = 4.0  # predkosc bomby
-            if dist <= step + 12:
-                # Trafienie: wybuch W CELU (na drodze)
-                ex, ey = bomb["x"], bomb["y"]
+            bomb["vy"] += 0.15  # grawitacja
+            bomb["y"] += bomb["vy"]
+            # Rysuj bombe
+            pygame.draw.circle(self.win, (50, 50, 60), (int(bomb["x"]), int(bomb["y"])), 8)
+            pygame.draw.rect(self.win, (100, 100, 110), (int(bomb["x"]) - 3, int(bomb["y"]) - 12, 6, 5))
+            # Wybuch na linii (land_y), nie na stalym y=640
+            if bomb["y"] >= bomb["land_y"]:
+                ex, ey = bomb["x"], bomb["land_y"]
                 self._balloon_bombs.remove(bomb)
                 self.particles.burst(ex, ey, (255, 150, 50), count=25, speed=5, life=35, size=6)
                 self.particles.burst(ex, ey, (100, 100, 100), count=15, speed=3, life=50, size=8)
@@ -1031,12 +1039,6 @@ class Game:
                                 en.dying = True
                         self.stats_damage += 150
                         self.damage_numbers.append([en.x, en.y - 40, "150", 60])
-            else:
-                bomb["x"] += dx / dist * step
-                bomb["y"] += dy / dist * step
-                # Rysuj bombe
-                pygame.draw.circle(self.win, (50, 50, 60), (int(bomb["x"]), int(bomb["y"])), 8)
-                pygame.draw.rect(self.win, (100, 100, 110), (int(bomb["x"]) - 3, int(bomb["y"]) - 12, 6, 5))
 
     def _update_bombardment(self):
         """Cinematic bombardowania - fazy."""
