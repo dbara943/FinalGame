@@ -249,19 +249,29 @@ class StartMenu:
                 nm = self.btn_font_small.render(name, True, tcol)
                 self.win.blit(nm, (cx + 88, y + 14))
                 dcol = (190, 165, 130) if is_unlocked else (95, 85, 70)
+                # Wrap po szerokosci w pikselach - 38 znakow przy 22px wychodzilo poza karte
+                max_desc_w = col_w - 88 - 12
                 words = desc.split()
-                line1, line2 = "", ""
+                lines, cur = [], ""
                 for w in words:
-                    if len(line1) + len(w) < 38:
-                        line1 += w + " "
+                    test = (cur + " " + w).strip()
+                    if cur and self.small_font.size(test)[0] > max_desc_w:
+                        lines.append(cur)
+                        cur = w
                     else:
-                        line2 += w + " "
-                        if len(line2) > 38:
-                            break
-                d1 = self.small_font.render(line1.strip(), True, dcol)
-                self.win.blit(d1, (cx + 88, y + 40))
-                if line2.strip():
-                    d2 = self.small_font.render(line2.strip()[:38], True, dcol)
+                        cur = test
+                if cur:
+                    lines.append(cur)
+                if len(lines) > 2:
+                    lines = lines[:2]
+                    while len(lines) > 1 and self.small_font.size(lines[1] + "…")[0] > max_desc_w and len(lines[1]) > 1:
+                        lines[1] = lines[1][:-1].rstrip()
+                    lines[1] = lines[1] + "…"
+                if len(lines) >= 1:
+                    d1 = self.small_font.render(lines[0], True, dcol)
+                    self.win.blit(d1, (cx + 88, y + 40))
+                if len(lines) >= 2:
+                    d2 = self.small_font.render(lines[1], True, dcol)
                     self.win.blit(d2, (cx + 88, y + 60))
             y += row_h + 12
         self.win.set_clip(None)

@@ -3696,19 +3696,27 @@ class Game:
             name_col = (150, 150, 160) if mystery else (240, 240, 240)
             name_lbl = self.font_btn18.render(name, True, name_col)
             self.win.blit(name_lbl, (sx + 76, sy + 8))
-            # Opis (max 2 linie, nie nachodzi na cene)
+            # Opis: wrap po szerokosci w pikselach (nie po liczbie znakow) - nic nie ucina
             desc_col = (110, 115, 125) if mystery else (170, 180, 190)
             desc_font = self._building_desc_font
+            max_desc_w = col_w - 76 - 12 - 4  # tekst od sx+76 do prawej krawedzi karty
             words = desc.split()
             lines, cur = [], ""
             for w_ in words:
-                if len(cur) + len(w_) + 1 > 30:
+                test = (cur + " " + w_).strip()
+                if cur and desc_font.size(test)[0] > max_desc_w:
                     lines.append(cur)
                     cur = w_
                 else:
-                    cur = (cur + " " + w_).strip()
+                    cur = test
             if cur:
                 lines.append(cur)
+            if len(lines) > 2:
+                # Awaryjnie: 2 linie + wielokropek (obecne opisy mieszcza sie w 2)
+                lines = lines[:2]
+                while len(lines) > 1 and desc_font.size(lines[1] + "…")[0] > max_desc_w and len(lines[1]) > 1:
+                    lines[1] = lines[1][:-1].rstrip()
+                lines[1] = lines[1] + "…"
             for li, ln in enumerate(lines[:2]):
                 d_lbl = desc_font.render(ln, True, desc_col)
                 self.win.blit(d_lbl, (sx + 76, sy + 34 + li * 18))
