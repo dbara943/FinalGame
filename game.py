@@ -1419,9 +1419,6 @@ class Game:
                                 self._buy_building_upgrade(uid)
                                 break
                         continue
-                    if self._building_rect.collidepoint(pos):
-                        self._building_menu_open = True
-                        continue
                     # Menu upgradow namiotu - klik na namiot lub w otwarte menu
                     if self._tent_menu_open:
                         if self._tent_menu_close_rect.collidepoint(pos):
@@ -1431,9 +1428,6 @@ class Game:
                             if rect.collidepoint(pos):
                                 self._buy_tent_upgrade(uid)
                                 break
-                        continue
-                    if self._tent_rect.collidepoint(pos):
-                        self._tent_menu_open = True
                         continue
                     if self.moving_object:
                         if self.moving_object.name in towers_names:
@@ -1459,7 +1453,8 @@ class Game:
                                 cost = self.shop_price(self.moving_object.name)
                                 self.money += cost
                         self.moving_object.moving = False
-                        self.moving_object = None      
+                        self.moving_object = None
+                        continue  # A: stawianie zjada klik - budynek/namiot nie kradna go
                     else:
                         pass
                     side_menu_button = self.menu.get_clicked(pos[0], pos[1])
@@ -1497,6 +1492,14 @@ class Game:
                                 tw.selected = False
                         # Klik w puste miejsce = odznacz (menu znika jak kiedys)
                         self.selected_tower = clicked_tower
+                    # C: budynek/namiot otwieraja sie OSTATNIE - wieze, ich menu i stawianie wygrywaja
+                    # (wczesniej kradly klikniecia przy stawianiu/upgradowaniu wiez)
+                    if self._building_rect.collidepoint(pos):
+                        self._building_menu_open = True
+                        continue
+                    if self._tent_rect.collidepoint(pos):
+                        self._tent_menu_open = True
+                        continue
             # Logika gry w tempie 100Hz (akumulator) - pauza pomija, predkosc mnozy
             # Cap 5 tickow/klatke: zapobiega spirali smierci i skokom po stallu
             if not self.paused:
@@ -3659,6 +3662,8 @@ class Game:
         """Podswietlenie obrysu budynku (nie prostokat)."""
         if self._building_menu_open:
             return
+        if getattr(self, "moving_object", None) is not None:
+            return  # A: podczas przecigania wiezy budynek nie podswietla sie
         mx, my = self._mouse_pos()
         if self._building_rect.collidepoint(mx, my):
             # Przybblizony obrys szklanego budynku (kopula + bryla)
@@ -3674,6 +3679,8 @@ class Game:
         """Podswietlenie obrysu namiotu (trojkat tipi)."""
         if self._tent_menu_open:
             return
+        if getattr(self, "moving_object", None) is not None:
+            return  # A: podczas przecigania wiezy namiot nie podswietla sie
         mx, my = self._mouse_pos()
         if self._tent_rect.collidepoint(mx, my):
             # Obrys tipi (trojkat)
@@ -3822,8 +3829,15 @@ class Game:
             self.win.blit(t3, (cx - t3.get_width()//2, draw_y + 54))
 
     def draw_placement_grid(self, win, mx, my):
-        """Podswietlenie poprawnosci miejsca (bez kolka - sam model wiezy jest tintowany)."""
-        # Okrag zasiegu w miejscu stawiania
+        """Warcraft-style: mocny wash + kolo na ziemi. Okrag zasiegu bez zmian."""
+        valid = self.is_valid_placement(mx, my)
+        col = (0, 255, 0) if valid else (255, 0, 0)
+        # Kolo na ziemi pod wieza (footprint) - ten sam kolor co wash
+        foot = pygame.Surface((80, 30), pygame.SRCALPHA)
+        pygame.draw.ellipse(foot, (*col, 70), foot.get_rect())
+        pygame.draw.ellipse(foot, (*col, 200), foot.get_rect(), 2)
+        win.blit(foot, (mx - 40, my - 8))
+        # Okrag zasiegu w miejscu stawiania (bez zmian - nie ruszamy zasiegu)
         if hasattr(self.moving_object, 'range'):
             rg = self.moving_object.range
             surf = pygame.Surface((rg*2, rg*2), pygame.SRCALPHA)

@@ -63,7 +63,7 @@ class Tower:
         if placement is not None:
             tinted = img.copy()
             wash = pygame.Surface(img.get_size(), pygame.SRCALPHA)
-            wash.fill((80, 220, 100, 90) if placement else (220, 80, 80, 90))
+            wash.fill((0, 255, 0, 150) if placement else (255, 0, 0, 150))  # Warcraft: mocny wash
             tinted.blit(wash, (0, 0))
             img = tinted
         win.blit(img, (self.x-img.get_width()//2, self.y-img.get_height()//2))
