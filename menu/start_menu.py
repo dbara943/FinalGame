@@ -173,16 +173,18 @@ class StartMenu:
         pygame.display.update()
 
     def draw_achievements(self):
-        """Panel achievementow (50)."""
+        """Panel achievementow (50) - scrollowana lista."""
         from achievements import AchievementManager
         if not hasattr(self, "_ach_mgr"):
             self._ach_mgr = AchievementManager()
+        if not hasattr(self, "_ach_scroll"):
+            self._ach_scroll = 0
         # Przyciemnienie
         dim = pygame.Surface((self.rw, self.rh), pygame.SRCALPHA)
         dim.fill((0, 0, 0, 180))
         self.win.blit(dim, (0, 0))
         # Panel
-        pw, ph = 900, 600
+        pw, ph = 700, 600
         px, py = (self.rw - pw) // 2, (self.rh - ph) // 2
         pygame.draw.rect(self.win, (25, 30, 40), (px, py, pw, ph), border_radius=15)
         pygame.draw.rect(self.win, (255, 215, 100), (px, py, pw, ph), 2, border_radius=15)
@@ -191,31 +193,52 @@ class StartMenu:
         unlocked = len(self._ach_mgr.unlocked)
         sub = self.small_font.render(f"{unlocked}/50 unlocked", True, (200, 200, 200))
         self.win.blit(sub, (px + (pw - sub.get_width()) // 2, py + 55))
-        # Siatka 5x10
+        # Obszar listy (clip)
+        list_y0 = py + 95
+        list_h = ph - 140
+        clip = pygame.Rect(px + 20, list_y0, pw - 40, list_h)
+        self.win.set_clip(clip)
         all_ach = self._ach_mgr.get_all()
-        cols, icon_sz, gap = 5, 64, 20
-        sx = px + (pw - (cols * (icon_sz + gap))) // 2
-        sy = py + 100
-        for i, (aid, name, desc, icon_cat, is_unlocked) in enumerate(all_ach):
-            col, row = i % cols, i // cols
-            ix = sx + col * (icon_sz + gap)
-            iy = sy + row * (icon_sz + gap + 18)
+        row_h = 70
+        y = list_y0 - self._ach_scroll
+        for aid, name, desc, icon_cat, is_unlocked in all_ach:
+            if y + row_h < list_y0 or y > list_y0 + list_h:
+                y += row_h
+                continue
+            # Tlo wiersza
+            bg_col = (35, 42, 55) if is_unlocked else (25, 28, 35)
+            pygame.draw.rect(self.win, bg_col, (px + 25, y, pw - 50, row_h - 8), border_radius=8)
+            if is_unlocked:
+                pygame.draw.rect(self.win, (255, 215, 100, 80), (px + 25, y, pw - 50, row_h - 8), 1, border_radius=8)
+            # Ikona
             icon = self._ach_mgr.icons.get(icon_cat)
             if icon:
-                ic = pygame.transform.smoothscale(icon, (icon_sz, icon_sz))
+                ic = pygame.transform.smoothscale(icon, (48, 48))
                 if not is_unlocked:
-                    # Szare dla zablokowanych
-                    gray = pygame.Surface((icon_sz, icon_sz), pygame.SRCALPHA)
-                    gray.fill((100, 100, 100, 150))
+                    gray = pygame.Surface((48, 48), pygame.SRCALPHA)
+                    gray.fill((100, 100, 100, 160))
                     ic.blit(gray, (0, 0))
-                self.win.blit(ic, (ix, iy))
-            # Nazwa (skrocona)
-            nm = name[:12]
-            lbl = self.btn_font_small.render(nm, True, (255, 255, 255) if is_unlocked else (120, 120, 120))
-            self.win.blit(lbl, (ix + (icon_sz - lbl.get_width()) // 2, iy + icon_sz + 2))
-        # Zamknij
-        hint = self.small_font.render("Click anywhere to close", True, (150, 150, 150))
-        self.win.blit(hint, (px + (pw - hint.get_width()) // 2, py + ph - 35))
+                self.win.blit(ic, (px + 35, y + 7))
+            # Nazwa i opis
+            ncol = (255, 255, 255) if is_unlocked else (130, 130, 130)
+            nm = self.btn_font_small.render(name, True, ncol)
+            self.win.blit(nm, (px + 95, y + 8))
+            # Opis (mniejsza czcionka, zawijanie niepotrzebne - krotkie)
+            ds = self.small_font.render(desc[:60], True, (150, 150, 150) if is_unlocked else (100, 100, 100))
+            self.win.blit(ds, (px + 95, y + 32))
+            y += row_h
+        self.win.set_clip(None)
+        # Scrollbar
+        total_h = len(all_ach) * row_h
+        if total_h > list_h:
+            bar_h = max(40, int(list_h * list_h / total_h))
+            bar_y = list_y0 + int(self._ach_scroll * (list_h - bar_h) / (total_h - list_h))
+            pygame.draw.rect(self.win, (80, 90, 100), (px + pw - 18, bar_y, 8, bar_h), border_radius=4)
+        # Hint
+        hint = self.small_font.render("Scroll with mouse wheel - click outside to close", True, (150, 150, 150))
+        self.win.blit(hint, (px + (pw - hint.get_width()) // 2, py + ph - 32))
+        # Zapisz max scroll
+        self._ach_max_scroll = max(0, total_h - list_h)
 
     def draw_resolution(self):
         """Panel wyboru rozdzielczosci."""
@@ -305,6 +328,12 @@ class StartMenu:
                 if event.type == pygame.QUIT:
                     pygame.mixer.music.stop()
                     return None
+                # Scroll w achievementach
+                if event.type == pygame.MOUSEWHEEL and self.show_achievements:
+                    if hasattr(self, "_ach_max_scroll"):
+                        self._ach_scroll = max(0, min(self._ach_max_scroll,
+                                                      self._ach_scroll - event.y * 40))
+                    continue
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if self.click_sound and self.sound:
                         self.click_sound.play()
