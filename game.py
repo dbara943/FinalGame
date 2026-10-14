@@ -3901,14 +3901,18 @@ class Game:
         x_lbl = self.font_btn18.render("X", True, (255, 255, 255))
         self.win.blit(x_lbl, (_close_rect.centerx - x_lbl.get_width() // 2,
                               _close_rect.centery - x_lbl.get_height() // 2))
-        # Sloty
+        # Sloty: sortowanie po cenie + uklad KOLUMNOWY (najpierw cala lewa kolumna z gory na dol,
+        # potem prawa) - nie wierszowy (lewo-prawo, lewo-prawo).
+        ordered = sorted(upg_list, key=lambda u: u["cost"])
+        n = len(ordered)
+        rows = (n + 1) // 2  # 10 upgradow -> 5 wierszy na kolumne
         setattr(self, buttons_attr, [])
         mx, my = self._mouse_pos()
         col_w = (pw - 60) // 2
         row_h = 100
-        for i, upg in enumerate(upg_list):
-            col = i % 2
-            row = i // 2
+        for i, upg in enumerate(ordered):
+            col = i // rows
+            row = i % rows
             sx = px + 20 + col * (col_w + 20)
             sy = py + 70 + row * (row_h + 8)
             rect = pygame.Rect(sx, sy, col_w, row_h)
