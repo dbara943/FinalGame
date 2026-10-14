@@ -1294,13 +1294,14 @@ class Game:
                         elif getattr(self, 'menu_dragging', False):
                             self.menu_dragging = False
                         elif getattr(self, 'show_menu', False):
+                            # Esc w menu = zamknij menu i kontynuuj gre (takze podczas barazu)
                             self.show_menu = False
                             self.paused = False
-                        elif not self.bombard_active:
-                            # Nic do anulowania - dopiero wtedy otworz menu pauzy
+                        else:
+                            # Nic do anulowania - otworz menu pauzy (takze podczas barazu:
+                            # pauza zamraza cinematic, drugie Esc wznawia gre)
                             self.show_menu = True
                             self.paused = True
-                        # Podczas cinematic nic wiecej nie robimy (menu juz zamkniete na starcie)
                         continue
                     # Blokada wszystkich klawiszy podczas cinematic
                     if self.bombard_active:
@@ -1407,11 +1408,8 @@ class Game:
                         self._recalc_synergy()
                         self.selected_tower = None
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    # Blokada inputu podczas cinematic bombardowania
-                    if self.bombard_active:
-                        continue
                     pos = self._mouse_pos()
-                    # Menu ESC ma pierwszenstwo
+                    # Menu ESC ma pierwszenstwo - takze podczas barazu (pauza musi byc klikalna)
                     if self.show_menu:
                         if self._show_help:
                             self._show_help = False
@@ -1420,6 +1418,9 @@ class Game:
                                 if rect.collidepoint(pos):
                                     self._menu_action(action)
                                     break
+                        continue
+                    # Blokada inputu podczas cinematic bombardowania (poza menu pauzy)
+                    if self.bombard_active:
                         continue
                     # Przeciganie sklepu: klik na panel (poza przyciskami) = drag
                     if self.menu.get_rect().collidepoint(pos):
