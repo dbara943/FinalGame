@@ -856,7 +856,7 @@ class Game:
 
     def draw_tesla_coil(self):
         """Widoczna cewka Tesli na budynku - stad strzela piorun."""
-        tx, ty = 260, 180  # na dachu budynku
+        tx, ty = 308, 198  # na dachu budynku (z drag tool, 2026-10-14)
         # Podstawa
         pygame.draw.rect(self.win, (60, 65, 75), (tx - 20, ty, 40, 12))
         # Cewka (uzwojenie)
@@ -1712,7 +1712,7 @@ class Game:
                  and (en.x - best.x) ** 2 + (en.y - best.y) ** 2 < 200 ** 2),
                 key=lambda e: (e.x - best.x) ** 2 + (e.y - best.y) ** 2)[:3]
             targets.extend(near)
-        prev = (bx, by - 100)
+        prev = (308, 123)  # zap origin z drag tool (electrode ball: coil 308,198 - 75)
         for tgt in targets:
             tgt.health -= dmg
             self.stats_damage += dmg
