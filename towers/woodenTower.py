@@ -149,8 +149,7 @@ class WoodenTower(Tower):
         shot_fired = False
 
         # 7: deszcz zmniejsza zasieg (liczone raz, nie w petli)
-        # Recon Balloon: +15% zasiegu
-        eff_range = self.range * self._rain_mod * getattr(self, '_range_mult', 1.0)
+        eff_range = self.range * self._rain_mod
         eff_range_sq = eff_range * eff_range
         # Kandydaci: z siatki przestrzennej (tylko pobliskie komorki) lub wszyscy
         # Margines na hitboxy: sprite (np. boss 160px) moze wystawac poza

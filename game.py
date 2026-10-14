@@ -100,7 +100,7 @@ TENT_UPGRADES = [
     {"id": "spikes", "name": "Spike Barricade", "cost": 4500,
      "desc": "Spikes on the road wound passing enemies."},
     {"id": "balloon", "name": "Recon Balloon", "cost": 5500,
-     "desc": "Scout balloon drifts overhead. All towers +15% range."},
+     "desc": "Scout balloon drifts overhead, dropping bombs on enemies."},
     {"id": "sabotage", "name": "Sabotage", "cost": 6000,
      "desc": "Saboteurs poison enemy supplies. All enemies spawn with -15% HP."},
 ]
@@ -894,13 +894,27 @@ class Game:
                                         [(px - 5, sy + 8), (px + 5, sy + 8), (px, sy - 14)])
                     pygame.draw.polygon(self.win, (90, 60, 30),
                                         [(px - 5, sy + 8), (px + 5, sy + 8), (px, sy - 14)], 1)
-        # Recon Balloon: balon dryfujacy nad mapa
+        # Recon Balloon: balon dryfujacy nad mapa + zrzut bomb
         if "balloon" in self.tent_upgrades:
             self._balloon_x += 0.5
             if self._balloon_x > self.width + 100:
                 self._balloon_x = -100
             bx = self._balloon_x
             by = 120 + 15 * math.sin(self._balloon_x * 0.01)
+            # Zrzut bomby co 3s (na najblizszego wroga pod balonem)
+            self._balloon_bomb_cd -= 1
+            if self._balloon_bomb_cd <= 0:
+                # Cel: wrog najblizej pionu balonu
+                best, best_dx = None, 200
+                for en in self.enemies:
+                    if en.dying or en.dead or en.reached_end:
+                        continue
+                    dx = abs(en.x - bx)
+                    if dx < best_dx:
+                        best, best_dx = en, dx
+                if best:
+                    self._balloon_bombs.append({"x": bx, "y": by + 25, "vy": 2.0, "tx": best.x})
+                    self._balloon_bomb_cd = 180  # 3s
             # Balon
             pygame.draw.ellipse(self.win, (200, 80, 80), (bx - 30, by - 40, 60, 50))
             pygame.draw.ellipse(self.win, (220, 120, 120), (bx - 20, by - 35, 40, 40))
@@ -908,6 +922,29 @@ class Game:
             pygame.draw.rect(self.win, (101, 67, 33), (bx - 12, by + 15, 24, 18))
             pygame.draw.line(self.win, (80, 50, 25), (bx - 20, by + 10), (bx - 12, by + 15), 2)
             pygame.draw.line(self.win, (80, 50, 25), (bx + 20, by + 10), (bx + 12, by + 15), 2)
+        # Bomby z balonu: spadaja i wybuchaja
+        for bomb in self._balloon_bombs[:]:
+            bomb["vy"] += 0.15  # grawitacja
+            bomb["y"] += bomb["vy"]
+            # Rysuj bombe
+            pygame.draw.circle(self.win, (50, 50, 60), (int(bomb["x"]), int(bomb["y"])), 8)
+            pygame.draw.rect(self.win, (100, 100, 110), (int(bomb["x"]) - 3, int(bomb["y"]) - 12, 6, 5))
+            # Wybuch na ziemi (y ~ 650) lub przy celu
+            if bomb["y"] >= 640:
+                self._balloon_bombs.remove(bomb)
+                # Eksplozja: 150 dmg w promieniu 90
+                self.particles.burst(bomb["x"], 630, (255, 150, 50), count=25, speed=5, life=35, size=6)
+                self.particles.burst(bomb["x"], 630, (100, 100, 100), count=15, speed=3, life=50, size=8)
+                self.shockwaves.append(Shockwave(bomb["x"], 630, max_r=90, color=(255, 150, 50)))
+                for en in self.enemies:
+                    if en.dying or en.dead or en.reached_end:
+                        continue
+                    if (en.x - bomb["x"]) ** 2 + (en.y - 630) ** 2 < 90 ** 2:
+                        en.health -= 150
+                        self.stats_damage += 150
+                        self.damage_numbers.append([en.x, en.y - 40, "150", 60])
+                        if en.health <= 0 and not en.dying:
+                            self._ach_stats["kills"] += 1
 
     def _update_bombardment(self):
         """Cinematic bombardowania - fazy."""
@@ -1545,6 +1582,8 @@ class Game:
         self.tent_upgrades = set()
         self._tent_menu_open = False
         self._balloon_x = -100
+        self._balloon_bomb_cd = 0
+        self._balloon_bombs = []
         self._spike_pos = []
         self._banner_phase = 0.0
         self._dancers = [
@@ -3319,7 +3358,6 @@ class Game:
         if "banner" in self.tent_upgrades:
             tw._dmg_mult *= 1.10  # Honor Banner: +10% dmg globalnie
         tw._ability_cd_mult = 0.7 if "drums" in self.tent_upgrades else 1.0
-        tw._range_mult = 1.15 if "balloon" in self.tent_upgrades else 1.0
 
     def draw_building_menu(self):
         """Menu upgradow budynku."""
