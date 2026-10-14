@@ -173,32 +173,38 @@ class StartMenu:
         pygame.display.update()
 
     def draw_achievements(self):
-        """Panel achievementow (50) - karty w stylu CS2, piracki klimat."""
+        """Panel achievementow (50) - karty w stylu CS2, PIRACKI klimat."""
         from achievements import AchievementManager
         if not hasattr(self, "_ach_mgr"):
             self._ach_mgr = AchievementManager()
         if not hasattr(self, "_ach_scroll"):
             self._ach_scroll = 0
-        # Tlo: ciemny morski granat (jak kabina okretu)
-        self.win.fill((18, 24, 38))
-        # Dekoracyjna fala na gorze
-        for i in range(0, self.rw, 40):
-            pygame.draw.arc(self.win, (30, 40, 60), (i, -15, 40, 30), 3.14, 6.28, 2)
-        # Tytul
-        title = self.btn_font.render("ACHIEVEMENTS", True, (255, 215, 100))
+        # Tlo: ciemne drewno okretowe
+        self.win.fill((28, 20, 14))
+        # Deski (poziome linie)
+        for y in range(0, self.rh, 60):
+            pygame.draw.line(self.win, (20, 14, 10), (0, y), (self.rw, y), 2)
+        # Lina dekoracyjna na gorze (falista)
+        for i in range(0, self.rw, 30):
+            pygame.draw.circle(self.win, (101, 80, 50), (i, 8), 4)
+        # Tytul: jak na mapie skarbow
+        title = self.btn_font.render("PIRATE ACHIEVEMENTS", True, (255, 215, 100))
         self.win.blit(title, (self.rw // 2 - title.get_width() // 2, 25))
         unlocked = len(self._ach_mgr.unlocked)
-        sub = self.small_font.render(f"{unlocked} / 50 unlocked", True, (150, 160, 175))
+        sub = self.small_font.render(f"{unlocked} / 50 treasures found", True, (180, 150, 110))
         self.win.blit(sub, (self.rw // 2 - sub.get_width() // 2, 65))
-        # Zlota linia pod tytulem
-        pygame.draw.line(self.win, (255, 215, 100), (self.rw//2 - 150, 95), (self.rw//2 + 150, 95), 2)
+        # Monety po bokach tytulu
+        pygame.draw.circle(self.win, (255, 215, 100), (self.rw//2 - 220, 50), 12)
+        pygame.draw.circle(self.win, (200, 160, 70), (self.rw//2 - 220, 50), 12, 2)
+        pygame.draw.circle(self.win, (255, 215, 100), (self.rw//2 + 220, 50), 12)
+        pygame.draw.circle(self.win, (200, 160, 70), (self.rw//2 + 220, 50), 12, 2)
         # Obszar listy
-        list_y0 = 115
-        list_h = self.rh - 170
+        list_y0 = 110
+        list_h = self.rh - 165
         clip = pygame.Rect(0, list_y0, self.rw, list_h)
         self.win.set_clip(clip)
         all_ach = self._ach_mgr.get_all()
-        # Dwie kolumny kart (jak na screenie)
+        # Dwie kolumny kart
         col_w = 480
         gap = 20
         total_w = col_w * 2 + gap
@@ -215,31 +221,34 @@ class StartMenu:
                     break
                 aid, name, desc, icon_cat, is_unlocked = all_ach[idx]
                 cx = sx + col * (col_w + gap)
-                # Karta
+                # Karta: pergamin/skrzynia
                 card = pygame.Rect(cx, y, col_w, row_h)
                 if is_unlocked:
-                    pygame.draw.rect(self.win, (28, 34, 50), card, border_radius=10)
-                    pygame.draw.rect(self.win, (255, 215, 100, 120), card, 1, border_radius=10)
+                    # Zlota skrzynia skarbow
+                    pygame.draw.rect(self.win, (52, 38, 24), card, border_radius=10)
+                    pygame.draw.rect(self.win, (255, 215, 100), card, 2, border_radius=10)
+                    # Nity w rogach (jak skrzynia)
+                    for nx, ny in [(cx+8, y+8), (cx+col_w-8, y+8), (cx+8, y+row_h-8), (cx+col_w-8, y+row_h-8)]:
+                        pygame.draw.circle(self.win, (180, 150, 90), (nx, ny), 3)
                 else:
-                    pygame.draw.rect(self.win, (22, 27, 40), card, border_radius=10)
-                    pygame.draw.rect(self.win, (60, 70, 85), card, 1, border_radius=10)
-                # Ikona (kwadrat z lewej)
+                    # Zamknieta skrzynia
+                    pygame.draw.rect(self.win, (38, 28, 18), card, border_radius=10)
+                    pygame.draw.rect(self.win, (90, 70, 45), card, 1, border_radius=10)
+                # Ikona
                 icon = self._ach_mgr.icons.get(icon_cat)
                 if icon:
                     ic = pygame.transform.smoothscale(icon, (64, 64))
                     if not is_unlocked:
                         gray = pygame.Surface((64, 64), pygame.SRCALPHA)
-                        gray.fill((80, 80, 80, 170))
+                        gray.fill((60, 60, 60, 170))
                         ic.blit(gray, (0, 0))
-                    # Ramka ikony
-                    pygame.draw.rect(self.win, (15, 20, 30), (cx + 11, y + 11, 64, 64), border_radius=6)
+                    pygame.draw.rect(self.win, (20, 14, 10), (cx + 11, y + 11, 64, 64), border_radius=6)
                     self.win.blit(ic, (cx + 11, y + 11))
                 # Tytul i opis
-                tcol = (255, 255, 255) if is_unlocked else (110, 115, 125)
+                tcol = (255, 230, 170) if is_unlocked else (120, 105, 85)
                 nm = self.btn_font_small.render(name, True, tcol)
                 self.win.blit(nm, (cx + 88, y + 14))
-                dcol = (150, 155, 165) if is_unlocked else (85, 90, 100)
-                # Opis (max 2 linie)
+                dcol = (190, 165, 130) if is_unlocked else (95, 85, 70)
                 words = desc.split()
                 line1, line2 = "", ""
                 for w in words:
@@ -256,14 +265,14 @@ class StartMenu:
                     self.win.blit(d2, (cx + 88, y + 60))
             y += row_h + 12
         self.win.set_clip(None)
-        # Scrollbar
+        # Scrollbar: lina
         total_h = (len(all_ach) // 2) * (row_h + 12)
         if total_h > list_h:
             bar_h = max(40, int(list_h * list_h / total_h))
             bar_y = list_y0 + int(self._ach_scroll * (list_h - bar_h) / max(1, total_h - list_h))
-            pygame.draw.rect(self.win, (60, 70, 85), (self.rw - 18, bar_y, 8, bar_h), border_radius=4)
+            pygame.draw.rect(self.win, (101, 80, 50), (self.rw - 18, bar_y, 8, bar_h), border_radius=4)
         # Dolny hint
-        hint = self.small_font.render("Scroll with mouse wheel - click anywhere to close", True, (100, 110, 125))
+        hint = self.small_font.render("Scroll with mouse wheel - click anywhere to close", True, (140, 120, 90))
         self.win.blit(hint, (self.rw // 2 - hint.get_width() // 2, self.rh - 35))
         self._ach_max_scroll = max(0, total_h - list_h)
 
