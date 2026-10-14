@@ -243,8 +243,26 @@ class Game:
                 self._tent_icons[uid] = pygame.transform.smoothscale(img, (56, 56))
             except:
                 self._tent_icons[uid] = None
-        # Wizualne efekty namiotu
-        self._balloon_x = -100  # balon zwiadowczy
+        # Achievements
+        from achievements import AchievementManager
+        self.ach_mgr = AchievementManager()
+        self._ach_stats = {
+            "kills": 0, "boss_kills": 0, "elite_kills": 0,
+            "max_wave": 0, "wins": 0, "flawless_waves": 0,
+            "perfect_wins": 0, "comeback_wins": 0,
+            "endless_entered": 0, "max_endless_wave": 0,
+            "gold_earned": 0, "max_gold_held": 0, "gold_spent": 0,
+            "towers_built": 0, "max_level_towers": 0, "max_level_at_once": 0,
+            "fire_towers": 0, "golden_towers": 0, "abilities_used": 0,
+            "building_upgrades": 0, "tent_upgrades": 0,
+            "cavalry_bought": 0, "sabotage_bought": 0, "balloon_bought": 0,
+            "drums_bought": 0, "medic_bought": 0,
+            "storm_fights": 0, "crits": 0, "pirate_crippled": 0,
+            "dancers_sacrificed": 0, "tesla_kills": 0,
+            "towers_lost_bombard": 0, "full_lives_wave8": 0, "dancer_kills": 0,
+        }
+        self._ach_popup = None  # (name, desc, icon, timer)
+        self._ach_popup_timer = 0
         self._spike_pos = []  # pozycje kolcow na drodze
         self._banner_phase = 0.0  # animacja choragwi
         # Tancerze-straznicy (Signal Fire)
@@ -509,6 +527,7 @@ class Game:
         """Generuje kolejna fale endless (proceduralnie, rosnace HP)."""
         self.endless_wave += 1
         self.wave += 1
+        self._ach_stats['max_wave'] = max(self._ach_stats['max_wave'], self.wave)
         scale = 1 + self.endless_wave * 0.15
         self.current_wave = [
             int(20 * scale), int(15 * scale), int(12 * scale), int(10 * scale),
@@ -824,6 +843,29 @@ class Game:
                     self.stats_damage += 0.5
                     if random.random() < 0.1:
                         self.damage_numbers.append([en.x, en.y - 40, "30", 30])
+
+    def draw_achievement_popup(self):
+        """Popup odblokowanego achievementu (prawy gorny rog)."""
+        if not self._ach_popup:
+            return
+        name, desc, icon_cat = self._ach_popup
+        pw, ph = 320, 80
+        px = self.width - pw - 20
+        py = 90
+        # Tlo
+        s = pygame.Surface((pw, ph), pygame.SRCALPHA)
+        s.fill((20, 25, 35, 220))
+        pygame.draw.rect(s, (255, 215, 100, 200), s.get_rect(), 2, border_radius=10)
+        self.win.blit(s, (px, py))
+        # Ikona
+        icon = self.ach_mgr.icons.get(icon_cat)
+        if icon:
+            self.win.blit(icon, (px + 10, py + 16))
+        # Tekst
+        t1 = self.font_btn18.render("ACHIEVEMENT UNLOCKED!", True, (255, 215, 100))
+        t2 = self.small_font.render(name, True, (255, 255, 255))
+        self.win.blit(t1, (px + 68, py + 10))
+        self.win.blit(t2, (px + 68, py + 35))
 
     def draw_tent_visuals(self):
         """Wizualne efekty upgradow namiotu: choragiew, ognisko, kolce, balon."""
@@ -1460,6 +1502,10 @@ class Game:
         self.projectiles = []
         self.cannonballs = []
         self.damage_numbers = []
+        # Reset statystyk achievementow (na run)
+        if hasattr(self, "_ach_stats"):
+            for k in self._ach_stats:
+                self._ach_stats[k] = 0
         self.lives = self._start_lives
         self.money = self._start_money
         self.wave = 0
@@ -1564,6 +1610,18 @@ class Game:
         self._update_spikes()
         # Straznicy przy budynku strzelaja z lukow
         self._update_guard_dancers()
+        # Achievements: sprawdzanie co 60 tickow
+        if self._now % 60 == 0:
+            self.ach_mgr.check(self._ach_stats)
+            popup = self.ach_mgr.pop_popup()
+            if popup:
+                self._ach_popup = popup
+                self._ach_popup_timer = 300  # 5s
+        # Popup achievementu
+        if self._ach_popup:
+            self._ach_popup_timer -= 1
+            if self._ach_popup_timer <= 0:
+                self._ach_popup = None
         # Powiadomienia o zlocie
         for gn in self.gold_notifications[:]:
             gn[1] -= 1
@@ -1728,7 +1786,14 @@ class Game:
                 if d.last_hit_by:
                     d.last_hit_by.kills += 1
                 self.stats_kills += 1
+                self._ach_stats["kills"] += 1
+                if isinstance(d, Boss):
+                    self._ach_stats["boss_kills"] += 1
+                if getattr(d, "elite", False):
+                    self._ach_stats["elite_kills"] += 1
                 self.stats_gold += reward
+                self._ach_stats["gold_earned"] += reward
+                self._ach_stats["max_gold_held"] = max(self._ach_stats["max_gold_held"], self.money)
                 # Zabicia wg typu wroga
                 etype = type(d).__name__
                 self.stats_kills_by_type[etype] = self.stats_kills_by_type.get(etype, 0) + 1
@@ -2368,6 +2433,7 @@ class Game:
         self.draw_tent_visuals()
         self.draw_building_menu()
         self.draw_tent_menu()
+        self.draw_achievement_popup()
 
         # Przyciemnienie przy wejsciu bossa (dramatyczny efekt)
         if self.boss_intro_dark > 0:

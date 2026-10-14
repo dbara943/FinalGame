@@ -1,5 +1,6 @@
 import pygame
 import os
+import json
 
 DIFFICULTIES = [
     ("EASY", 30, 300),
@@ -36,18 +37,42 @@ class StartMenu:
         self.diff_idx = 1  # domyslnie NORMAL
         self.sound = True
         self.show_help = False
+        self.show_achievements = False
+        self.show_resolution = False
         self.clock = pygame.time.Clock()
+        # Rozdzielczosc (zapisywana)
+        self.resolutions = [(1124, 720), (1280, 720), (1600, 900), (1920, 1080), ("Native", "Fullscreen")]
+        self.res_idx = 4  # domyslnie natywny fullscreen
+        self._load_resolution()
 
-        bw, bh, gap = 360, 60, 14
+        bw, bh, gap = 360, 54, 10
         x = self.rw // 2 - bw // 2
-        y0 = self.rh // 2 - 40
+        y0 = self.rh // 2 - 80
         self.buttons = {
             "start": pygame.Rect(x, y0, bw, bh),
             "diff": pygame.Rect(x, y0 + (bh + gap), bw, bh),
             "sound": pygame.Rect(x, y0 + 2 * (bh + gap), bw, bh),
-            "help": pygame.Rect(x, y0 + 3 * (bh + gap), bw, bh),
-            "quit": pygame.Rect(x, y0 + 4 * (bh + gap), bw, bh),
+            "achievements": pygame.Rect(x, y0 + 3 * (bh + gap), bw, bh),
+            "resolution": pygame.Rect(x, y0 + 4 * (bh + gap), bw, bh),
+            "help": pygame.Rect(x, y0 + 5 * (bh + gap), bw, bh),
+            "quit": pygame.Rect(x, y0 + 6 * (bh + gap), bw, bh),
         }
+
+    def _load_resolution(self):
+        """Wczytuje zapisana rozdzielczosc."""
+        try:
+            if os.path.exists("resolution.json"):
+                with open("resolution.json") as f:
+                    self.res_idx = json.load(f).get("res_idx", 4)
+        except:
+            pass
+
+    def _save_resolution(self):
+        try:
+            with open("resolution.json", "w") as f:
+                json.dump({"res_idx": self.res_idx}, f)
+        except:
+            pass
 
     def _cover_scale(self, img, tw, th):
         """Skaluje obraz zeby pokryc caly ekran (jak CSS background-size: cover).
@@ -125,10 +150,14 @@ class StartMenu:
         self.win.blit(sub, (self.rw // 2 - sub.get_width() // 2, self.rh // 2 - 160))
 
         diff_name = DIFFICULTIES[self.diff_idx][0]
+        res = self.resolutions[self.res_idx]
+        res_name = f"{res[0]}x{res[1]}" if isinstance(res[0], int) else "NATIVE"
         labels = {
             "start": "START GAME",
             "diff": "DIFFICULTY: " + diff_name,
             "sound": "SOUND: " + ("ON" if self.sound else "OFF"),
+            "achievements": "ACHIEVEMENTS",
+            "resolution": "RESOLUTION: " + res_name,
             "help": "HOW TO PLAY",
             "quit": "QUIT",
         }
@@ -137,7 +166,82 @@ class StartMenu:
 
         if self.show_help:
             self.draw_help()
+        if self.show_achievements:
+            self.draw_achievements()
+        if self.show_resolution:
+            self.draw_resolution()
         pygame.display.update()
+
+    def draw_achievements(self):
+        """Panel achievementow (50)."""
+        from achievements import AchievementManager
+        if not hasattr(self, "_ach_mgr"):
+            self._ach_mgr = AchievementManager()
+        # Przyciemnienie
+        dim = pygame.Surface((self.rw, self.rh), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 180))
+        self.win.blit(dim, (0, 0))
+        # Panel
+        pw, ph = 900, 600
+        px, py = (self.rw - pw) // 2, (self.rh - ph) // 2
+        pygame.draw.rect(self.win, (25, 30, 40), (px, py, pw, ph), border_radius=15)
+        pygame.draw.rect(self.win, (255, 215, 100), (px, py, pw, ph), 2, border_radius=15)
+        title = self.btn_font.render("ACHIEVEMENTS", True, (255, 215, 100))
+        self.win.blit(title, (px + (pw - title.get_width()) // 2, py + 15))
+        unlocked = len(self._ach_mgr.unlocked)
+        sub = self.small_font.render(f"{unlocked}/50 unlocked", True, (200, 200, 200))
+        self.win.blit(sub, (px + (pw - sub.get_width()) // 2, py + 55))
+        # Siatka 5x10
+        all_ach = self._ach_mgr.get_all()
+        cols, icon_sz, gap = 5, 64, 20
+        sx = px + (pw - (cols * (icon_sz + gap))) // 2
+        sy = py + 100
+        for i, (aid, name, desc, icon_cat, is_unlocked) in enumerate(all_ach):
+            col, row = i % cols, i // cols
+            ix = sx + col * (icon_sz + gap)
+            iy = sy + row * (icon_sz + gap + 18)
+            icon = self._ach_mgr.icons.get(icon_cat)
+            if icon:
+                ic = pygame.transform.smoothscale(icon, (icon_sz, icon_sz))
+                if not is_unlocked:
+                    # Szare dla zablokowanych
+                    gray = pygame.Surface((icon_sz, icon_sz), pygame.SRCALPHA)
+                    gray.fill((100, 100, 100, 150))
+                    ic.blit(gray, (0, 0))
+                self.win.blit(ic, (ix, iy))
+            # Nazwa (skrocona)
+            nm = name[:12]
+            lbl = self.btn_font_small.render(nm, True, (255, 255, 255) if is_unlocked else (120, 120, 120))
+            self.win.blit(lbl, (ix + (icon_sz - lbl.get_width()) // 2, iy + icon_sz + 2))
+        # Zamknij
+        hint = self.small_font.render("Click anywhere to close", True, (150, 150, 150))
+        self.win.blit(hint, (px + (pw - hint.get_width()) // 2, py + ph - 35))
+
+    def draw_resolution(self):
+        """Panel wyboru rozdzielczosci."""
+        dim = pygame.Surface((self.rw, self.rh), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 180))
+        self.win.blit(dim, (0, 0))
+        pw, ph = 500, 400
+        px, py = (self.rw - pw) // 2, (self.rh - ph) // 2
+        pygame.draw.rect(self.win, (25, 30, 40), (px, py, pw, ph), border_radius=15)
+        pygame.draw.rect(self.win, (100, 200, 255), (px, py, pw, ph), 2, border_radius=15)
+        title = self.btn_font.render("RESOLUTION", True, (100, 200, 255))
+        self.win.blit(title, (px + (pw - title.get_width()) // 2, py + 20))
+        # Opcje
+        self._res_buttons = []
+        for i, res in enumerate(self.resolutions):
+            name = f"{res[0]}x{res[1]}" if isinstance(res[0], int) else "NATIVE FULLSCREEN"
+            bw, bh = 320, 44
+            bx, by = px + (pw - bw) // 2, py + 80 + i * 56
+            rect = pygame.Rect(bx, by, bw, bh)
+            self._res_buttons.append((rect, i))
+            col = (255, 215, 100) if i == self.res_idx else (80, 90, 100)
+            pygame.draw.rect(self.win, col, rect, 3 if i == self.res_idx else 1, border_radius=8)
+            lbl = self.btn_font_small.render(name, True, (255, 255, 255))
+            self.win.blit(lbl, (bx + (bw - lbl.get_width()) // 2, by + 12))
+        hint = self.small_font.render("Applies on next game start", True, (150, 150, 150))
+        self.win.blit(hint, (px + (pw - hint.get_width()) // 2, py + ph - 35))
 
     def draw_help(self):
         panel = pygame.Rect(self.rw // 2 - 360, self.rh // 2 - 280, 720, 560)
@@ -204,15 +308,28 @@ class StartMenu:
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if self.click_sound and self.sound:
                         self.click_sound.play()
-                    if self.show_help:
+                    if self.show_resolution and hasattr(self, "_res_buttons"):
+                        pos = event.pos
+                        for rect, idx in self._res_buttons:
+                            if rect.collidepoint(pos):
+                                self.res_idx = idx
+                                self._save_resolution()
+                                break
+                        else:
+                            self.show_resolution = False
+                        continue
+                    if self.show_help or self.show_achievements or self.show_resolution:
                         self.show_help = False
+                        self.show_achievements = False
+                        self.show_resolution = False
                         continue
                     pos = event.pos
                     if self.buttons["start"].collidepoint(pos):
                         pygame.mixer.music.stop()
                         name, lives, money = DIFFICULTIES[self.diff_idx]
                         return {"difficulty": name, "lives": lives,
-                                "money": money, "sound": self.sound}
+                                "money": money, "sound": self.sound,
+                                "res_idx": self.res_idx}
                     elif self.buttons["diff"].collidepoint(pos):
                         self.diff_idx = (self.diff_idx + 1) % len(DIFFICULTIES)
                     elif self.buttons["sound"].collidepoint(pos):
@@ -225,6 +342,10 @@ class StartMenu:
                                 pygame.mixer.music.stop()
                         except:
                             pass
+                    elif self.buttons["achievements"].collidepoint(pos):
+                        self.show_achievements = True
+                    elif self.buttons["resolution"].collidepoint(pos):
+                        self.show_resolution = True
                     elif self.buttons["help"].collidepoint(pos):
                         self.show_help = True
                     elif self.buttons["quit"].collidepoint(pos):
