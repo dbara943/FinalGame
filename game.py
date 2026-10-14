@@ -272,7 +272,7 @@ class Game:
             "drums_bought": 0, "medic_bought": 0,
             "storm_fights": 0, "crits": 0, "pirate_crippled": 0,
             "dancers_sacrificed": 0, "tesla_kills": 0,
-            "towers_lost_bombard": 0, "full_lives_wave8": 0, "dancer_kills": 0,
+            "full_lives_wave8": 0, "dancer_kills": 0,
         }
         # Skumulowane statystyki z poprzednich runow (achievements.json) - nie zeruj
         _saved = dict(getattr(self.ach_mgr, "stats", {}) or {})
@@ -1188,7 +1188,6 @@ class Game:
                                            (139, 90, 43), count=3, speed=4, life=40, size=5)
                     self.towers.remove(tw)
                     self.stats_towers_lost += 1
-                    self._ach_stats["towers_lost_bombard"] = self._ach_stats.get("towers_lost_bombard", 0) + 1
                     if self.selected_tower == tw:
                         self.selected_tower = None
                     self.gold_notifications.append(["Tower destroyed!", 150])
