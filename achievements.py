@@ -99,8 +99,6 @@ ACHIEVEMENTS = [
      lambda s: s.get("dancers_sacrificed", 0) >= 2),
     ("tesla_master", "Tesla Master", "Kill 25 enemies with Tesla Coil.", "combat",
      lambda s: s.get("tesla_kills", 0) >= 25),
-    ("demolitionist", "Demolitionist", "Lose 5 towers to bombardment.", "defense",
-     lambda s: s.get("towers_lost_bombard", 0) >= 5),
     ("untouchable", "Untouchable", "Reach wave 8 with full lives.", "defense",
      lambda s: s.get("full_lives_wave8", 0) >= 1),
     ("sharpshooter", "Sharpshooter", "Dancers kill 20 enemies.", "combat",
