@@ -77,6 +77,9 @@ BUILDING_UPGRADES = [
      "desc": "+1 life every 2 waves. A drone orbits the building."},
     {"id": "tesla", "name": "Tesla Coil", "cost": 6500,
      "desc": "Zaps the nearest enemy every few seconds. Stronger in storms."},
+    {"id": "facility", "name": "Drone Launch Facility", "cost": 8000,
+     "desc": "Launches a combat drone: minigun strafes enemies, then kamikazes with a huge splash. Rearms in 3 min.",
+     "requires": "drones"},
     {"id": "cavalry", "name": "Call the Cavalry", "cost": 10000,
      "desc": "An allied ship cripples the pirate ship, then bombards enemies.",
      "endless_only": True},
@@ -225,6 +228,8 @@ class Game:
                 self._building_icons[uid] = pygame.transform.smoothscale(img, (56, 56))
             except:
                 self._building_icons[uid] = None
+        # Facility uses the same icon as Repair Drones (same icon, second tier)
+        self._building_icons["facility"] = self._building_icons.get("drones")
         self._building_desc_font = pygame.font.SysFont("arial", 16)
         # Upgrady namiotu (klikany namiot tipi)
         self.tent_upgrades = set()  # id kupionych upgradow
@@ -302,6 +307,11 @@ class Game:
         self._drone_angle = 0.0
         # Tesla Coil
         self._tesla_cooldown = 0
+        # Combat drone (Drone Launch Facility) - 100Hz logic ticks
+        self._combat_drone = None
+        self._facility_rearm = 0
+        self._facility_tracers = []
+        self._facility_blasts = []
         # Statek sojuszniczy (Call the Cavalry)
         self.pirate_crippled = False
         self.ally_ship = None
@@ -1713,6 +1723,11 @@ class Game:
         self._building_menu_open = False
         self._drone_angle = 0.0
         self._tesla_cooldown = 0
+        # Combat drone (Drone Launch Facility) - 100Hz logic ticks
+        self._combat_drone = None
+        self._facility_rearm = 0
+        self._facility_tracers = []
+        self._facility_blasts = []
         self.pirate_crippled = False
         self.ally_ship = None
         self._ally_strike_at = None
@@ -1796,6 +1811,8 @@ class Game:
         # Straznicy przy budynku strzelaja z lukow
         self._update_guard_dancers()
         self._update_guard_arrows()
+        # Combat drone (Drone Launch Facility)
+        self._update_combat_drone()
         # Achievements: max_gold_held = szczyt kasy (nie tylko przy zabojstwach)
         self._ach_stats["max_gold_held"] = max(self._ach_stats.get("max_gold_held", 0), self.money)
         # Achievements: sprawdzanie co 60 tickow + zapis postepu (kumulatywnie)
@@ -2660,6 +2677,8 @@ class Game:
         self.draw_tent_highlight()
         self.draw_tent_visuals()
         self.draw_repair_drone()
+        self.draw_facility()
+        self.draw_combat_drone()
         self.draw_tesla_bolts()
         self.draw_building_menu()
         self.draw_tent_menu()
@@ -3858,6 +3877,12 @@ class Game:
         upg = next((u for u in upg_list if u["id"] == uid), None)
         if not upg or uid in owned_set:
             return
+        # Prerequisite (np. Drone Launch Facility wymaga Repair Drones)
+        if upg.get("requires") and upg["requires"] not in owned_set:
+            _req = next((u for u in upg_list if u["id"] == upg["requires"]), None)
+            _req_name = _req["name"] if _req else upg["requires"]
+            self.gold_notifications.append([f"Requires {_req_name} first.", 200])
+            return
         # Cavalry: tylko w endless (easter egg w normalnej grze)
         if upg.get("endless_only") and not self.endless:
             if self.money >= upg["cost"]:
@@ -3890,6 +3915,8 @@ class Game:
                 self._ach_stats["medic_bought"] = 1
         self.gold_notifications.append([f"{upg['name']} acquired!", 200])
         # Natychmiastowe efekty budynku
+        if uid == "facility":
+            self._facility_rearm = 30  # first drone emerges almost immediately
         if uid == "walls":
             self._start_lives += 5
             self.lives += 5
@@ -3944,8 +3971,9 @@ class Game:
         dim = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         dim.fill((0, 0, 0, 120))
         self.win.blit(dim, (0, 0))
-        # Panel
-        pw, ph = 820, 620
+        # Panel (wyzszy przy 6 wierszach) - rows policzone z gory, bo panel od niego zalezy
+        rows = (len(upg_list) + 1) // 2
+        pw, ph = 820, 620 if rows <= 5 else 660
         px, py = (self.width - pw) // 2, (self.height - ph) // 2
         pygame.draw.rect(self.win, (22, 28, 38), (px, py, pw, ph), border_radius=16)
         pygame.draw.rect(self.win, (90, 110, 140), (px, py, pw, ph), 2, border_radius=16)
@@ -3963,24 +3991,36 @@ class Game:
         # potem prawa) - nie wierszowy (lewo-prawo, lewo-prawo).
         ordered = sorted(upg_list, key=lambda u: u["cost"])
         n = len(ordered)
-        rows = (n + 1) // 2  # 10 upgradow -> 5 wierszy na kolumne
+        # rows policzone wyzej (przed panelem)
+        # 11+ upgradow (Facility) -> 6 wierszy: kompaktowy uklad, inaczej panel by nie pomiescil
+        row_h = 100 if rows <= 5 else 84
+        gap_y = 8 if rows <= 5 else 6
+        name_y = 8 if rows <= 5 else 6
+        desc_y0 = 34 if rows <= 5 else 26
+        desc_step = 18 if rows <= 5 else 15
+        price_dy = 10 if rows <= 5 else 6
         setattr(self, buttons_attr, [])
         mx, my = self._mouse_pos()
         col_w = (pw - 60) // 2
-        row_h = 100
         for i, upg in enumerate(ordered):
             col = i // rows
             row = i % rows
             sx = px + 20 + col * (col_w + 20)
-            sy = py + 70 + row * (row_h + 8)
+            sy = py + 70 + row * (row_h + gap_y)
             rect = pygame.Rect(sx, sy, col_w, row_h)
             owned = upg["id"] in owned_set
             # Easter egg: cavalry ukryte w normalnej grze
             mystery = upg.get("endless_only") and not self.endless
-            hover = rect.collidepoint(mx, my) and not owned
+            # Locked: wymaga innego upgradu (Facility wymaga Repair Drones)
+            _req_id = upg.get("requires")
+            locked = bool(_req_id) and _req_id not in owned_set
+            _req_name = next((u["name"] for u in upg_list if u["id"] == _req_id), _req_id) if _req_id else ""
+            hover = rect.collidepoint(mx, my) and not owned and not locked
             bg_col = (35, 45, 60) if not hover else (50, 65, 90)
             if owned:
                 bg_col = (30, 60, 40)
+            if locked:
+                bg_col = (28, 30, 38)
             pygame.draw.rect(self.win, bg_col, rect, border_radius=10)
             pygame.draw.rect(self.win, (100, 120, 150) if not owned else (80, 200, 120),
                              rect, 2, border_radius=10)
@@ -4001,12 +4041,12 @@ class Game:
                 if icon:
                     self.win.blit(icon, (sx + 10, sy + (row_h - 56) // 2))
                 name = upg["name"]
-                desc = upg["desc"]
-                price_txt = f"${upg['cost']:,}"
+                desc = f"Requires {_req_name}." if locked else upg["desc"]
+                price_txt = "LOCKED" if locked else f"${upg['cost']:,}"
             # Nazwa
             name_col = (150, 150, 160) if mystery else (240, 240, 240)
             name_lbl = self.font_btn18.render(name, True, name_col)
-            self.win.blit(name_lbl, (sx + 76, sy + 8))
+            self.win.blit(name_lbl, (sx + 76, sy + name_y))
             # Opis: wrap po szerokosci w pikselach (nie po liczbie znakow) - nic nie ucina
             desc_col = (110, 115, 125) if mystery else (170, 180, 190)
             desc_font = self._building_desc_font
@@ -4030,19 +4070,21 @@ class Game:
                 lines[1] = lines[1] + "…"
             for li, ln in enumerate(lines[:2]):
                 d_lbl = desc_font.render(ln, True, desc_col)
-                self.win.blit(d_lbl, (sx + 76, sy + 34 + li * 18))
+                self.win.blit(d_lbl, (sx + 76, sy + desc_y0 + li * desc_step))
             # Cena / status (prawy dolny rog, osobna linia)
             if owned:
                 st = self.font_btn18.render("OWNED", True, (100, 220, 130))
             elif mystery:
                 st = self.font_btn18.render("???", True, (120, 130, 150))
+            elif locked:
+                st = self.font_btn18.render("LOCKED", True, (130, 130, 140))
             else:
                 afford = self.money >= upg["cost"]
                 st = self.font_btn18.render(price_txt,
                                             True, (255, 215, 100) if afford else (200, 100, 100))
             self.win.blit(st, (rect.right - st.get_width() - 12,
-                               rect.bottom - st.get_height() - 10))
-            if not owned:
+                               rect.bottom - st.get_height() - price_dy))
+            if not owned and not locked:
                 getattr(self, buttons_attr).append((rect, upg["id"]))
 
     def _scale_poly(self, pts, factor):
@@ -4120,6 +4162,268 @@ class Game:
         # Zielony wskaznik naprawy
         if int(self._drone_angle * 10) % 30 == 0:
             self.particles.burst(dx, dy + 10, (100, 255, 150), count=2, speed=1, life=20, size=2)
+
+    # ---- Combat drone (Drone Launch Facility) ----
+    # Logika w tickach 100Hz (update_game_logic): 2-4 min zycia = 12000-24000,
+    # rearm 3 min = 18000, minigun 0.15s = 15 tickow.
+    _FACILITY_POS = (165, 198)  # flat rectangle dock, placed via drag tool
+    _DRONE_LIFE = (12000, 24000)
+    _DRONE_REARM = 18000
+    _DRONE_FIRE_CD = 15
+    _DRONE_SPEED = 4.0
+    _DRONE_DIVE = 9.0
+    _DRONE_MINIGUN = 8
+    _DRONE_KAMIKAZE_DMG = 400
+    _DRONE_KAMIKAZE_R = 140
+
+    def _spawn_combat_drone(self):
+        """Drone emerges from the facility box."""
+        fx, fy = self._FACILITY_POS
+        self._combat_drone = {
+            "x": float(fx), "y": float(fy), "state": "emerge", "emerge_t": 40,
+            "life": random.randint(*self._DRONE_LIFE), "target": None,
+            "wp": None, "fire_cd": 0, "engage_t": 0,
+            "kamikaze_target": None, "kamikaze_pos": None,
+            "spin": 0.0, "barrel": 0.0, "flash": 0,
+        }
+        self.gold_notifications.append(["Combat drone launched!", 150])
+
+    def _drone_fly_toward(self, d, tx, ty, speed):
+        """Fly toward (tx, ty) with a zigzag wobble. True on arrival (within 20px)."""
+        vx, vy = tx - d["x"], ty - d["y"]
+        dist = math.hypot(vx, vy)
+        if dist < 20:
+            return True
+        if dist > 0:
+            px, py = -vy / dist, vx / dist
+            wob = math.sin(d.get("spin", 0) * 0.35) * 1.6
+            d["x"] += vx / dist * speed + px * wob
+            d["y"] += vy / dist * speed + py * wob
+            d["x"] = max(20, min(1104, d["x"]))
+            d["y"] = max(40, min(700, d["y"]))
+        return False
+
+    def _drone_living_enemies(self):
+        return [e for e in self.enemies if not getattr(e, "dying", False)
+                and not getattr(e, "dead", False) and not getattr(e, "reached_end", False)]
+
+    def _update_combat_drone(self):
+        # Tracers / blasts decay even when no drone is flying
+        for tr in list(getattr(self, "_facility_tracers", [])):
+            tr[4] -= 1
+            if tr[4] <= 0:
+                self._facility_tracers.remove(tr)
+        for bl in list(getattr(self, "_facility_blasts", [])):
+            bl["ttl"] -= 1
+            if bl["ttl"] <= 0:
+                self._facility_blasts.remove(bl)
+        if "facility" not in self.building_upgrades:
+            return
+        d = self._combat_drone
+        if d is None:
+            if self._facility_rearm > 0:
+                self._facility_rearm -= 1
+                if self._facility_rearm <= 0:
+                    self._spawn_combat_drone()
+            return
+        d["spin"] += 0.6
+        if d["flash"] > 0:
+            d["flash"] -= 1
+        state = d["state"]
+        if state == "emerge":
+            d["emerge_t"] -= 1
+            d["y"] -= 0.45  # rises out of the box
+            if d["emerge_t"] <= 0:
+                d["state"] = "wander"
+                d["wp"] = (random.uniform(60, 1060), random.uniform(120, 660))
+            return
+        # Lifetime ticks down in wander/engage (kamikaze is already committed)
+        if state in ("wander", "engage"):
+            d["life"] -= 1
+            if d["life"] <= 0:
+                d["state"] = "kamikaze"
+                d["kamikaze_target"] = None
+                d["kamikaze_pos"] = None
+                d["target"] = None
+                state = "kamikaze"
+        if state == "wander":
+            wx, wy = d["wp"] or (d["x"], d["y"])
+            if self._drone_fly_toward(d, wx, wy, self._DRONE_SPEED):
+                living = self._drone_living_enemies()
+                if living and random.random() < 0.55:
+                    d["target"] = random.choice(living)
+                    d["state"] = "engage"
+                    d["engage_t"] = 0
+                else:
+                    # Sometimes it just flies somewhere (idle zigzag, no shooting)
+                    d["wp"] = (random.uniform(60, 1060), random.uniform(120, 660))
+        elif state == "engage":
+            tgt = d.get("target")
+            if tgt is None or getattr(tgt, "dying", False) or getattr(tgt, "dead", False) or getattr(tgt, "reached_end", False):
+                living = self._drone_living_enemies()
+                if living:
+                    d["target"] = random.choice(living)
+                    tgt = d["target"]
+                    d["engage_t"] = 0
+                else:
+                    d["state"] = "wander"
+                    d["wp"] = (random.uniform(60, 1060), random.uniform(120, 660))
+                    d["target"] = None
+                    return
+            d["engage_t"] += 1
+            self._drone_fly_toward(d, tgt.x, tgt.y - 20, self._DRONE_SPEED)
+            # Animated minigun: rotating barrels + tracer + muzzle flash
+            d["fire_cd"] -= 1
+            if d["fire_cd"] <= 0:
+                d["fire_cd"] = self._DRONE_FIRE_CD
+                d["barrel"] += 1.1
+                d["flash"] = 4
+                if tgt is not None and not getattr(tgt, "dying", False) and not getattr(tgt, "dead", False):
+                    self._facility_tracers.append([d["x"], d["y"] - 18, tgt.x, tgt.y - 20, 6])
+                    try:
+                        tgt.hit(self._DRONE_MINIGUN)
+                    except Exception:
+                        tgt.health -= self._DRONE_MINIGUN
+                        if tgt.health <= 0 and not tgt.dying:
+                            tgt.dying = True
+                    self.stats_damage += self._DRONE_MINIGUN
+                    self.damage_numbers.append([tgt.x, tgt.y - 40, str(self._DRONE_MINIGUN), 40])
+            # Sometimes break off and just fly somewhere (zigzag idle feel)
+            if d["engage_t"] > random.randint(300, 600):
+                d["state"] = "wander"
+                d["wp"] = (random.uniform(60, 1060), random.uniform(120, 660))
+                d["target"] = None
+        elif state == "kamikaze":
+            tgt = d.get("kamikaze_target")
+            if tgt is None:
+                living = self._drone_living_enemies()
+                if living:
+                    tgt = random.choice(living)
+                    d["kamikaze_target"] = tgt
+                    d["kamikaze_pos"] = (tgt.x, tgt.y - 20)
+                else:
+                    # No enemies: keep flying until one spawns, then dive at it
+                    if d.get("wp") is None:
+                        d["wp"] = (random.uniform(60, 1060), random.uniform(120, 660))
+                    if self._drone_fly_toward(d, d["wp"][0], d["wp"][1], self._DRONE_SPEED):
+                        d["wp"] = None
+                    return
+            if tgt is not None:
+                # Track the target while alive; if it dies mid-dive, detonate
+                # at its last position anyway (Daniel: "regardless of whether
+                # the enemy has died before that").
+                if not getattr(tgt, "dying", False) and not getattr(tgt, "dead", False) and not getattr(tgt, "reached_end", False):
+                    d["kamikaze_pos"] = (tgt.x, tgt.y - 20)
+                tx, ty = d["kamikaze_pos"]
+                if self._drone_fly_toward(d, tx, ty, self._DRONE_DIVE):
+                    self._detonate_drone()
+
+    def _detonate_drone(self):
+        """Kamikaze splash: 400 dmg in 140px, then the 3-min rearm starts."""
+        d = self._combat_drone
+        if d is None:
+            return
+        x, y = d["x"], d["y"] - 18
+        self._facility_blasts.append({"x": x, "y": y, "ttl": 30, "max": 30})
+        self.particles.burst(x, y, (255, 150, 50), count=40, speed=6, life=40, size=4)
+        self.particles.burst(x, y, (255, 220, 120), count=25, speed=4, life=30, size=3)
+        for en in list(self.enemies):
+            if getattr(en, "dying", False) or getattr(en, "dead", False) or getattr(en, "reached_end", False):
+                continue
+            if (en.x - x) ** 2 + (en.y - y) ** 2 <= self._DRONE_KAMIKAZE_R ** 2:
+                try:
+                    en.hit(self._DRONE_KAMIKAZE_DMG)
+                except Exception:
+                    en.health -= self._DRONE_KAMIKAZE_DMG
+                    if en.health <= 0 and not en.dying:
+                        en.dying = True
+                self.stats_damage += self._DRONE_KAMIKAZE_DMG
+                self.damage_numbers.append([en.x, en.y - 40, str(self._DRONE_KAMIKAZE_DMG), 60])
+        self._combat_drone = None
+        self._facility_rearm = self._DRONE_REARM
+        self.gold_notifications.append(["Drone down - rearming (3:00)...", 200])
+
+    def draw_facility(self):
+        """Flat rectangular dock on the building roof (165, 198).
+        No name on it - only the countdown: KAMIKAZE while the drone flies,
+        NEXT DRONE while rearming."""
+        if "facility" not in self.building_upgrades:
+            return
+        fx, fy = self._FACILITY_POS
+        w, h = 72, 34
+        rect = pygame.Rect(fx - w // 2, fy - h // 2, w, h)
+        # Flat metal box
+        pygame.draw.rect(self.win, (70, 78, 88), rect, border_radius=6)
+        pygame.draw.rect(self.win, (40, 46, 54), rect, 2, border_radius=6)
+        # Glowing LED strip along the front edge (like the reference image)
+        pygame.draw.rect(self.win, (255, 170, 60), (fx - w // 2 + 4, fy + h // 2 - 5, w - 8, 3), border_radius=1)
+        d = self._combat_drone
+        if d is not None:
+            label, secs = "KAMIKAZE", max(0, d["life"] // 100)
+            lab_col, time_col = (255, 120, 120), (255, 220, 200)
+        else:
+            label, secs = "NEXT DRONE", max(0, self._facility_rearm // 100)
+            lab_col, time_col = (255, 210, 120), (255, 240, 190)
+        time_txt = f"{secs // 60}:{secs % 60:02d}"
+        lab_font = self._tomb_fonts[6]
+        for s in (8, 7, 6):
+            if self._tomb_fonts[s].size(label)[0] <= w - 8:
+                lab_font = self._tomb_fonts[s]
+                break
+        time_font = self._tomb_fonts[13]
+        for s in (13, 11, 10, 9, 8):
+            if self._tomb_fonts[s].size(time_txt)[0] <= w - 8:
+                time_font = self._tomb_fonts[s]
+                break
+        lab = lab_font.render(label, True, lab_col)
+        tlab = time_font.render(time_txt, True, time_col)
+        self.win.blit(lab, (fx - lab.get_width() // 2, fy - 14))
+        self.win.blit(tlab, (fx - tlab.get_width() // 2, fy - 3))
+
+    def draw_combat_drone(self):
+        """Flying drone + minigun tracers + kamikaze blast rings."""
+        for tr in getattr(self, "_facility_tracers", []):
+            a = max(0, min(255, int(255 * tr[4] / 6)))
+            s = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            pygame.draw.line(s, (255, 220, 120, a), (tr[0], tr[1]), (tr[2], tr[3]), 2)
+            self.win.blit(s, (0, 0))
+        for bl in getattr(self, "_facility_blasts", []):
+            prog = 1.0 - bl["ttl"] / bl["max"]
+            r = int(30 + prog * 130)
+            a = int(220 * (1 - prog))
+            s = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            pygame.draw.circle(s, (255, 150, 50, a), (int(bl["x"]), int(bl["y"])), r, 4)
+            pygame.draw.circle(s, (255, 220, 120, a), (int(bl["x"]), int(bl["y"])), int(r * 0.6), 3)
+            self.win.blit(s, (0, 0))
+        d = self._combat_drone
+        if d is None:
+            return
+        x, y = d["x"], d["y"] - 18
+        # Ground shadow
+        pygame.draw.ellipse(self.win, (50, 50, 50), (d["x"] - 14, d["y"] + 8, 28, 8))
+        # Spinning rotors
+        spin = d.get("spin", 0)
+        for ox, oy in [(-16, -10), (16, -10), (-16, 10), (16, 10)]:
+            rw = 10 + 6 * math.sin(spin + ox)
+            pygame.draw.ellipse(self.win, (200, 220, 235), (x + ox - rw, y + oy - 2, rw * 2, 4))
+        # Body
+        pygame.draw.ellipse(self.win, (60, 68, 80), (x - 14, y - 8, 28, 16))
+        pygame.draw.ellipse(self.win, (40, 200, 255), (x - 6, y - 4, 12, 8))
+        # Minigun barrel: aims at the engaged target, rotates while firing
+        tgt = d.get("target") if d.get("state") == "engage" else None
+        if tgt is not None and not getattr(tgt, "dead", False):
+            ang = math.atan2((tgt.y - 20) - y, tgt.x - x)
+        else:
+            ang = math.pi / 2
+        bx2 = x + math.cos(ang) * 14
+        by2 = y + math.sin(ang) * 14
+        pygame.draw.line(self.win, (30, 30, 30), (x, y + 6), (bx2, by2), 3)
+        # Muzzle flash
+        if d.get("flash", 0) > 0:
+            pygame.draw.circle(self.win, (255, 220, 100), (int(bx2), int(by2)), 5)
+        # Kamikaze: red glow
+        if d.get("state") == "kamikaze":
+            pygame.draw.circle(self.win, (255, 60, 60), (int(x), int(y)), 20, 2)
 
     def draw_tesla_bolts(self):
         """Rysuje pioruny Tesli (krotkotrwale)."""

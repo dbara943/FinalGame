@@ -390,55 +390,72 @@ class StartMenu:
                         self._ach_scroll = max(0, min(self._ach_max_scroll,
                                                       self._ach_scroll - event.y * 40))
                     continue
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if self.click_sound and self.sound:
-                        self.click_sound.play()
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    # Dzwiek klikniecia TYLKO gdy klik faktycznie w cos trafil
+                    # (przycisk, zamkniecie panelu, opcja) - nie przy kliku
+                    # w puste miejsce i nie przy scrollu (przyciski 4/5 kola).
+                    clicked_something = False
                     # Achievements: zamknij tylko przez X (nie przez klik w panel)
                     if self.show_achievements:
                         if hasattr(self, "_ach_close_rect") and self._ach_close_rect.collidepoint(event.pos):
                             self.show_achievements = False
-                        continue
+                            clicked_something = True
                     # Resolution: wybor opcji
-                    if self.show_resolution and hasattr(self, "_res_buttons"):
+                    elif self.show_resolution and hasattr(self, "_res_buttons"):
                         pos = event.pos
                         for rect, idx in self._res_buttons:
                             if rect.collidepoint(pos):
                                 self.res_idx = idx
                                 self._save_resolution()
+                                clicked_something = True
                                 break
                         else:
                             self.show_resolution = False
-                        continue
-                    if self.show_help or self.show_resolution:
+                            clicked_something = True
+                    elif self.show_help or self.show_resolution:
                         self.show_help = False
                         self.show_resolution = False
-                        continue
-                    pos = event.pos
-                    if self.buttons["start"].collidepoint(pos):
-                        pygame.mixer.music.stop()
-                        name, lives, money = DIFFICULTIES[self.diff_idx]
-                        return {"difficulty": name, "lives": lives,
-                                "money": money, "sound": self.sound,
-                                "res_idx": self.res_idx}
-                    elif self.buttons["diff"].collidepoint(pos):
-                        self.diff_idx = (self.diff_idx + 1) % len(DIFFICULTIES)
-                    elif self.buttons["sound"].collidepoint(pos):
-                        self.sound = not self.sound
-                        # Wlacz/wylacz muzyke w menu na biezaco
-                        try:
-                            if self.sound:
-                                pygame.mixer.music.play(loops=-1)
-                            else:
-                                pygame.mixer.music.stop()
-                        except:
-                            pass
-                    elif self.buttons["achievements"].collidepoint(pos):
-                        self.show_achievements = True
-                    elif self.buttons["resolution"].collidepoint(pos):
-                        self.show_resolution = True
-                    elif self.buttons["help"].collidepoint(pos):
-                        self.show_help = True
-                    elif self.buttons["quit"].collidepoint(pos):
-                        pygame.mixer.music.stop()
-                        return None
+                        clicked_something = True
+                    else:
+                        pos = event.pos
+                        if self.buttons["start"].collidepoint(pos):
+                            clicked_something = True
+                            if clicked_something and self.click_sound and self.sound:
+                                self.click_sound.play()
+                            pygame.mixer.music.stop()
+                            name, lives, money = DIFFICULTIES[self.diff_idx]
+                            return {"difficulty": name, "lives": lives,
+                                    "money": money, "sound": self.sound,
+                                    "res_idx": self.res_idx}
+                        elif self.buttons["diff"].collidepoint(pos):
+                            self.diff_idx = (self.diff_idx + 1) % len(DIFFICULTIES)
+                            clicked_something = True
+                        elif self.buttons["sound"].collidepoint(pos):
+                            self.sound = not self.sound
+                            clicked_something = True
+                            # Wlacz/wylacz muzyke w menu na biezaco
+                            try:
+                                if self.sound:
+                                    pygame.mixer.music.play(loops=-1)
+                                else:
+                                    pygame.mixer.music.stop()
+                            except:
+                                pass
+                        elif self.buttons["achievements"].collidepoint(pos):
+                            self.show_achievements = True
+                            clicked_something = True
+                        elif self.buttons["resolution"].collidepoint(pos):
+                            self.show_resolution = True
+                            clicked_something = True
+                        elif self.buttons["help"].collidepoint(pos):
+                            self.show_help = True
+                            clicked_something = True
+                        elif self.buttons["quit"].collidepoint(pos):
+                            clicked_something = True
+                            if clicked_something and self.click_sound and self.sound:
+                                self.click_sound.play()
+                            pygame.mixer.music.stop()
+                            return None
+                    if clicked_something and self.click_sound and self.sound:
+                        self.click_sound.play()
             self.draw(mouse)
