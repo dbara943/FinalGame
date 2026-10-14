@@ -374,6 +374,11 @@ class Game:
                 s.set_volume(0)
         self.bg = pygame.image.load(os.path.join("images", "bg_noship.png"))
         self.bg = pygame.transform.scale(self.bg, (self.width, self.height))
+        # Recon Balloon sprite: same model as upgrades-tab icon (white balloon, transparent bg)
+        try:
+            self._balloon_img = pygame.image.load(os.path.join("images", "balloon_recon.png")).convert_alpha()
+        except Exception:
+            self._balloon_img = None
         self.ship = Ship(os.path.join("images", "ship.png"), dock_x=278, dock_y=669,
                          screen_w=self.width)
         self.ship.sail_in()
@@ -905,13 +910,14 @@ class Game:
                                         [(px - 5, sy + 8), (px + 5, sy + 8), (px, sy - 14)])
                     pygame.draw.polygon(self.win, (90, 60, 30),
                                         [(px - 5, sy + 8), (px + 5, sy + 8), (px, sy - 14)], 1)
-        # Recon Balloon: balon dryfujacy nad mapa + zrzut bomb
+        # Recon Balloon: ONE balloon, always flying. Drops bombs only after upgrade.
+        # (Previously: ambient balloon + a second red balloon after purchase = looked like two balloons.)
+        self._balloon_x += 0.5
+        if self._balloon_x > self.width + 100:
+            self._balloon_x = -100
+        bx = self._balloon_x
+        by = 120 + 15 * math.sin(self._balloon_x * 0.01)
         if "balloon" in self.tent_upgrades:
-            self._balloon_x += 0.5
-            if self._balloon_x > self.width + 100:
-                self._balloon_x = -100
-            bx = self._balloon_x
-            by = 120 + 15 * math.sin(self._balloon_x * 0.01)
             # Zrzut bomby co 3s (na najblizszego wroga pod balonem)
             self._balloon_bomb_cd -= 1
             if self._balloon_bomb_cd <= 0:
@@ -924,12 +930,14 @@ class Game:
                     if dx < best_dx:
                         best, best_dx = en, dx
                 if best:
-                    self._balloon_bombs.append({"x": bx, "y": by + 25, "vy": 2.0, "tx": best.x})
+                    self._balloon_bombs.append({"x": bx, "y": by + 55, "vy": 2.0, "tx": best.x})
                     self._balloon_bomb_cd = 180  # 3s
-            # Balon
+        # Balon: model z zakladki upgradow (obrazek), fallback do rysowanego gdy brak pliku
+        if getattr(self, "_balloon_img", None) is not None:
+            self.win.blit(self._balloon_img, (int(bx - 32), int(by - 51)))
+        else:
             pygame.draw.ellipse(self.win, (200, 80, 80), (bx - 30, by - 40, 60, 50))
             pygame.draw.ellipse(self.win, (220, 120, 120), (bx - 20, by - 35, 40, 40))
-            # Kosz
             pygame.draw.rect(self.win, (101, 67, 33), (bx - 12, by + 15, 24, 18))
             pygame.draw.line(self.win, (80, 50, 25), (bx - 20, by + 10), (bx - 12, by + 15), 2)
             pygame.draw.line(self.win, (80, 50, 25), (bx + 20, by + 10), (bx + 12, by + 15), 2)
@@ -2913,23 +2921,8 @@ class Game:
 
         # 13: usuniety wulkan na horyzoncie (na prosbe gracza)
 
-        # 14: balon
-        self.balloon_timer -= 1
-        if self.balloon_timer <= 0 and self.balloon is None:
-            self.balloon = [-80, random.randint(60, 160)]
-            self.balloon_timer = random.randint(3000, 5000)
-        if self.balloon:
-            self.balloon[0] += 0.7
-            bx, by = self.balloon
-            # Powłoka w paski
-            for i, col in enumerate([(220, 60, 60), (255, 220, 80), (60, 140, 220)]):
-                pygame.draw.arc(self.win, col, (bx - 26, by - 30, 52, 44), math.pi / 2 + i * 0.5, math.pi / 2 + (i + 1) * 0.5, 9)
-            pygame.draw.circle(self.win, (220, 60, 60), (int(bx), int(by - 8)), 24, 0)
-            pygame.draw.rect(self.win, (101, 67, 33), (bx - 8, by + 16, 16, 12), border_radius=3)
-            pygame.draw.line(self.win, (80, 60, 40), (bx - 14, by + 8), (bx - 8, by + 16), 2)
-            pygame.draw.line(self.win, (80, 60, 40), (bx + 14, by + 8), (bx + 8, by + 16), 2)
-            if bx > self.width + 80:
-                self.balloon = None
+        # 14: balon - REMOVED: single Recon Balloon in draw_tent_visuals now handles it
+        # (Previously this ambient balloon + the upgrade balloon = two balloons at once.)
 
         # 12: teczowe rybki
         self.fish_timer -= 1
