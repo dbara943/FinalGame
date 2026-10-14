@@ -47,7 +47,7 @@ class StartMenu:
 
         bw, bh, gap = 360, 54, 10
         x = self.rw // 2 - bw // 2
-        y0 = self.rh // 2 - 80
+        y0 = self.rh // 2 - 120  # wczesniej -80: QUIT byl 2px od dolu przy 720p (przycinanie)
         self.buttons = {
             "start": pygame.Rect(x, y0, bw, bh),
             "diff": pygame.Rect(x, y0 + (bh + gap), bw, bh),
@@ -89,12 +89,14 @@ class StartMenu:
         color = (46, 134, 193) if hover else (28, 90, 135)
         pygame.draw.rect(self.win, color, rect, border_radius=14)
         pygame.draw.rect(self.win, (255, 255, 255), rect, 2, border_radius=14)
-        # Dopasuj czcionke do szerokosci przycisku (DIFFICULTY: NORMAL bylo za dlugie)
-        font = self.btn_font
-        label = font.render(text, True, (255, 255, 255))
-        if label.get_width() > rect.w - 30:
-            font = self.btn_font_small
+        # Dopasuj czcionke do szerokosci przycisku - kurcz do dopasowania (30/26/22/18)
+        # (wczesniej tylko jeden fallback do 22, dlugie etykiety nadal mogly sie przycinas na Windows/Arial)
+        label = None
+        for size in (30, 26, 22, 18):
+            font = pygame.font.SysFont("arial", size, bold=True)
             label = font.render(text, True, (255, 255, 255))
+            if label.get_width() <= rect.w - 24 and label.get_height() <= rect.h - 10:
+                break
         self.win.blit(label, (rect.centerx - label.get_width() // 2,
                               rect.centery - label.get_height() // 2))
 

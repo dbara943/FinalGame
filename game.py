@@ -251,11 +251,11 @@ class Game:
         self._balloon_bomb_cd = 0
         self._balloon_bombs = []
         self._spike_pos = []
-        self._banner_phase = 0.0
         self._dancers = [
             {"x": 377, "y": 352, "home_x": 377, "home_y": 352, "alive": True, "sex": "m", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
             {"x": 183, "y": 357, "home_x": 183, "home_y": 357, "alive": True, "sex": "f", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
         ]
+        self._guard_arrows = []
         # Achievements
         from achievements import AchievementManager
         self.ach_mgr = AchievementManager()
@@ -290,12 +290,12 @@ class Game:
         self._ach_popup = None  # (name, desc, icon, timer)
         self._ach_popup_timer = 0
         self._spike_pos = []  # pozycje kolcow na drodze
-        self._banner_phase = 0.0  # animacja choragwi
         # Tancerze-straznicy (Signal Fire)
         self._dancers = [
             {"x": 377, "y": 352, "home_x": 377, "home_y": 352, "alive": True, "sex": "m", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},  # mezczyzna z toporem
             {"x": 183, "y": 357, "home_x": 183, "home_y": 357, "alive": True, "sex": "f", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},  # kobieta z patelnia
         ]
+        self._guard_arrows = []  # widoczne strzaly z lukow straznikow
         # Dron naprawczy (wizualny)
         self._drone_angle = 0.0
         # Tesla Coil
@@ -911,7 +911,7 @@ class Game:
                            for x, y in base_pts]
 
     def _update_spikes(self):
-        """Kolce rania przechodzacych wrogow (30 dmg/s)."""
+        """Kolce rania przechodzacych wrogow (8 dmg/s, nerf z 30). Uzywa hit(), wiec moga zabijac."""
         if "spikes" not in self.tent_upgrades or not self._spike_pos:
             return
         for sx, sy in self._spike_pos:
@@ -919,10 +919,16 @@ class Game:
                 if en.dying or en.dead or en.reached_end:
                     continue
                 if (en.x - sx) ** 2 + (en.y - sy) ** 2 < 40 ** 2:
-                    en.health -= 0.5  # 30/s przy 60 FPS
-                    self.stats_damage += 0.5
+                    dmg = 8.0 / 100.0  # 8 dps przy logice 100 Hz
+                    try:
+                        en.hit(dmg)
+                    except Exception:
+                        en.health -= dmg
+                        if en.health <= 0 and not en.dying:
+                            en.dying = True
+                    self.stats_damage += dmg
                     if random.random() < 0.1:
-                        self.damage_numbers.append([en.x, en.y - 40, "30", 30])
+                        self.damage_numbers.append([en.x, en.y - 40, "8", 30])
 
     def draw_achievement_popup(self):
         """Popup odblokowanego achievementu (prawy gorny rog)."""
@@ -948,22 +954,11 @@ class Game:
         self.win.blit(t2, (px + 68, py + 35))
 
     def draw_tent_visuals(self):
-        """Wizualne efekty upgradow namiotu: choragiew, ognisko, kolce, balon."""
+        """Wizualne efekty upgradow namiotu: ognisko, kolce, balon. (Choragiew usunieta.)"""
         # Tesla Coil: widoczna cewka na budynku (musi byc przed innymi)
         if "tesla" in self.building_upgrades:
             self.draw_tesla_coil()
-        # Honor Banner: choragiew przy namiocie
-        if "banner" in self.tent_upgrades:
-            self._banner_phase += 0.08
-            bx, by = 880, 300
-            # Maszt
-            pygame.draw.line(self.win, (101, 67, 33), (bx, by), (bx, by - 90), 6)
-            # Choragiew (falujaca)
-            wave = [ (bx + i * 8, by - 90 + 12 * math.sin(self._banner_phase + i * 0.5) + i * 1.5)
-                     for i in range(9) ]
-            wave += [(bx, by - 50)]
-            pygame.draw.polygon(self.win, (200, 170, 50), wave)
-            pygame.draw.polygon(self.win, (150, 120, 30), wave, 2)
+        # Honor Banner: bez wizualnej choragwi (wygladala nie na miejscu) - tylko +10% dmg
         # Signal Fire: uzywa istniejacego ogniska (2x wieksze) - brak osobnego wizualu
         # Spike Barricade: kolce na drodze
         if "spikes" in self.tent_upgrades:
@@ -994,7 +989,7 @@ class Game:
                     if dx < best_dx:
                         best, best_dx = en, dx
                 if best:
-                    self._balloon_bombs.append({"x": bx, "y": by + 55, "vy": 2.0, "tx": best.x})
+                    self._balloon_bombs.append({"x": bx, "y": by + 55, "tx": best.x, "ty": best.y - 10, "target": best})
                     self._balloon_bomb_cd = 180  # 3s
         # Balon: model z zakladki upgradow (obrazek), fallback do rysowanego gdy brak pliku
         if getattr(self, "_balloon_img", None) is not None:
@@ -1005,29 +1000,43 @@ class Game:
             pygame.draw.rect(self.win, (101, 67, 33), (bx - 12, by + 15, 24, 18))
             pygame.draw.line(self.win, (80, 50, 25), (bx - 20, by + 10), (bx - 12, by + 15), 2)
             pygame.draw.line(self.win, (80, 50, 25), (bx + 20, by + 10), (bx + 12, by + 15), 2)
-        # Bomby z balonu: spadaja i wybuchaja
+        # Bomby z balonu: leca DO celu (na drodze), nie na stale y=640 gdzie nikt nie chodzi.
+        # Namiar: pozycja celu w chwili zrzutu; jesli cel zyje, bomba podaza za nim.
         for bomb in self._balloon_bombs[:]:
-            bomb["vy"] += 0.15  # grawitacja
-            bomb["y"] += bomb["vy"]
-            # Rysuj bombe
-            pygame.draw.circle(self.win, (50, 50, 60), (int(bomb["x"]), int(bomb["y"])), 8)
-            pygame.draw.rect(self.win, (100, 100, 110), (int(bomb["x"]) - 3, int(bomb["y"]) - 12, 6, 5))
-            # Wybuch na ziemi (y ~ 650) lub przy celu
-            if bomb["y"] >= 640:
+            tgt = bomb.get("target")
+            if tgt is not None and not getattr(tgt, "dying", False) and not getattr(tgt, "dead", False):
+                tx, ty = tgt.x, tgt.y - 10
+                bomb["tx"], bomb["ty"] = tx, ty
+            else:
+                tx, ty = bomb.get("tx", bomb["x"]), bomb.get("ty", 500)
+            dx, dy = tx - bomb["x"], ty - bomb["y"]
+            dist = math.hypot(dx, dy) or 1.0
+            step = 4.0  # predkosc bomby
+            if dist <= step + 12:
+                # Trafienie: wybuch W CELU (na drodze)
+                ex, ey = bomb["x"], bomb["y"]
                 self._balloon_bombs.remove(bomb)
-                # Eksplozja: 150 dmg w promieniu 90
-                self.particles.burst(bomb["x"], 630, (255, 150, 50), count=25, speed=5, life=35, size=6)
-                self.particles.burst(bomb["x"], 630, (100, 100, 100), count=15, speed=3, life=50, size=8)
-                self.shockwaves.append(Shockwave(bomb["x"], 630, max_r=90, color=(255, 150, 50)))
+                self.particles.burst(ex, ey, (255, 150, 50), count=25, speed=5, life=35, size=6)
+                self.particles.burst(ex, ey, (100, 100, 100), count=15, speed=3, life=50, size=8)
+                self.shockwaves.append(Shockwave(ex, ey, max_r=90, color=(255, 150, 50)))
                 for en in self.enemies:
                     if en.dying or en.dead or en.reached_end:
                         continue
-                    if (en.x - bomb["x"]) ** 2 + (en.y - 630) ** 2 < 90 ** 2:
-                        en.health -= 150
+                    if (en.x - ex) ** 2 + (en.y - ey) ** 2 < 90 ** 2:
+                        try:
+                            en.hit(150)
+                        except Exception:
+                            en.health -= 150
+                            if en.health <= 0 and not en.dying:
+                                en.dying = True
                         self.stats_damage += 150
                         self.damage_numbers.append([en.x, en.y - 40, "150", 60])
-                        if en.health <= 0 and not en.dying:
-                            self._ach_stats["kills"] += 1
+            else:
+                bomb["x"] += dx / dist * step
+                bomb["y"] += dy / dist * step
+                # Rysuj bombe
+                pygame.draw.circle(self.win, (50, 50, 60), (int(bomb["x"]), int(bomb["y"])), 8)
+                pygame.draw.rect(self.win, (100, 100, 110), (int(bomb["x"]) - 3, int(bomb["y"]) - 12, 6, 5))
 
     def _update_bombardment(self):
         """Cinematic bombardowania - fazy."""
@@ -1329,8 +1338,8 @@ class Game:
                             self.show_menu = True
                             self.paused = True
                         continue
-                    # Blokada wszystkich klawiszy podczas cinematic
-                    if self.bombard_active:
+                    # Blokada wszystkich klawiszy podczas cinematic (faza 12 - poscig - nie blokuje)
+                    if self.bombard_active and self.bombard_phase != 12:
                         continue
                     # Gdy menu otwarte: blokuj wszystkie akcje wiez
                     if self.show_menu:
@@ -1447,7 +1456,8 @@ class Game:
                                     break
                         continue
                     # Blokada inputu podczas cinematic bombardowania (poza menu pauzy)
-                    if self.bombard_active:
+                    # Faza 12 (poscig) NIE blokuje - statki tylko odplywaja, gracz gra dalej
+                    if self.bombard_active and self.bombard_phase != 12:
                         continue
                     # Przeciganie sklepu: klik na panel (poza przyciskami) = drag
                     if self.menu.get_rect().collidepoint(pos):
@@ -1562,7 +1572,7 @@ class Game:
                             self._add_gold_spent(cost)
                             self.add_tower(side_menu_button)
                     
-                    btn_clicked = None                    
+                    btn_clicked = None
                     if self.selected_tower:
                         btn_clicked = self.selected_tower.menu.get_clicked(pos[0], pos[1])
                         if btn_clicked:
@@ -1580,24 +1590,26 @@ class Game:
                                 self.towers.remove(self.selected_tower)
                                 self._recalc_synergy()
                                 self.selected_tower = None
-                    if not (btn_clicked):    
-                        clicked_tower = None
-                        for tw in self.towers:
-                            if tw.click(pos[0], pos[1]):
-                                tw.selected = True
-                                clicked_tower = tw
-                            else:
-                                tw.selected = False
-                        # Klik w puste miejsce = odznacz (menu znika jak kiedys)
-                        self.selected_tower = clicked_tower
-                    # C: budynek/namiot otwieraja sie OSTATNIE - wieze, ich menu i stawianie wygrywaja
+                            # Upgrade/Sell zjada klik - budynek/namiot NIE otwieraja sie spod menu
+                            continue
+                    clicked_tower = None
+                    for tw in self.towers:
+                        if tw.click(pos[0], pos[1]):
+                            tw.selected = True
+                            clicked_tower = tw
+                        else:
+                            tw.selected = False
+                    # Klik w puste miejsce = odznacz (menu znika jak kiedys)
+                    self.selected_tower = clicked_tower
+                    # C: budynek/namiot otwieraja sie OSTATNIE i tylko gdy nie kliknieto wiezy
                     # (wczesniej kradly klikniecia przy stawianiu/upgradowaniu wiez)
-                    if self._point_in_poly(pos[0], pos[1], self._building_highlight_pts):
-                        self._building_menu_open = True
-                        continue
-                    if self._point_in_poly(pos[0], pos[1], self._tent_highlight_pts):
-                        self._tent_menu_open = True
-                        continue
+                    if clicked_tower is None:
+                        if self._point_in_poly(pos[0], pos[1], self._building_highlight_pts):
+                            self._building_menu_open = True
+                            continue
+                        if self._point_in_poly(pos[0], pos[1], self._tent_highlight_pts):
+                            self._tent_menu_open = True
+                            continue
             # Logika gry w tempie 100Hz (akumulator) - pauza pomija, predkosc mnozy
             # Cap 5 tickow/klatke: zapobiega spirali smierci i skokom po stallu
             if not self.paused:
@@ -1707,7 +1719,6 @@ class Game:
         self._balloon_bomb_cd = 0
         self._balloon_bombs = []
         self._spike_pos = []
-        self._banner_phase = 0.0
         self._dancers = [
             {"x": 377, "y": 352, "home_x": 377, "home_y": 352, "alive": True, "sex": "m", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
             {"x": 183, "y": 357, "home_x": 183, "home_y": 357, "alive": True, "sex": "f", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
@@ -1774,6 +1785,7 @@ class Game:
         self._update_spikes()
         # Straznicy przy budynku strzelaja z lukow
         self._update_guard_dancers()
+        self._update_guard_arrows()
         # Achievements: max_gold_held = szczyt kasy (nie tylko przy zabojstwach)
         self._ach_stats["max_gold_held"] = max(self._ach_stats.get("max_gold_held", 0), self.money)
         # Achievements: sprawdzanie co 60 tickow + zapis postepu (kumulatywnie)
@@ -1813,6 +1825,14 @@ class Game:
         self.particles.update()
         for c in self.coins[:]:
             if c.update():
+                # Moneta doleciala do licznika - DOPIERO TERAZ zloto wchodzi na konto
+                amt = getattr(c, "amount", 0) or 0
+                if amt:
+                    self.money += amt
+                    self.stats_gold += amt
+                    self._ach_stats["gold_earned"] = self._ach_stats.get("gold_earned", 0) + amt
+                    self._ach_stats["max_gold_held"] = max(self._ach_stats.get("max_gold_held", 0), self.money)
+                    self.display_money = self.money
                 self.coins.remove(c)
         for s in self.shockwaves[:]:
             if s.update():
@@ -1941,7 +1961,7 @@ class Game:
                 # War Treasury: +25% zlota (multiplikatywnie, po bazowym)
                 if "treasury" in self.building_upgrades:
                     reward = int(reward * 1.25)
-                self.money += reward
+                # self.money += reward - ODLOZONE: moneta doda zloto przy ladowaniu
                 # Trup zostaje na ziemi (ostatnia klatka animacji smierci)
                 if d.die_imgs:
                     corpse_img = d.die_imgs[-1]
@@ -1963,9 +1983,8 @@ class Game:
                     self._ach_stats["boss_kills"] += 1
                 if getattr(d, "elite", False):
                     self._ach_stats["elite_kills"] += 1
-                self.stats_gold += reward
-                self._ach_stats["gold_earned"] += reward
-                self._ach_stats["max_gold_held"] = max(self._ach_stats["max_gold_held"], self.money)
+                # Zloto NIE od razu - dopiero gdy moneta doleci do licznika
+                # (patrz update_game_logic: coin landing). Stats zlota tez tam.
                 # Zabicia wg typu wroga
                 etype = type(d).__name__
                 self.stats_kills_by_type[etype] = self.stats_kills_by_type.get(etype, 0) + 1
@@ -2218,6 +2237,16 @@ class Game:
         win.blit(label, (lx, ly))
 
     def show_end_screen(self, won, forfeited=False):
+        # Monety w locie: dolicz od razu, zeby statystyki koncowe byly pelne
+        for c in list(getattr(self, "coins", [])):
+            amt = getattr(c, "amount", 0) or 0
+            if amt:
+                self.money += amt
+                self.stats_gold += amt
+                self._ach_stats["gold_earned"] = self._ach_stats.get("gold_earned", 0) + amt
+                self._ach_stats["max_gold_held"] = max(self._ach_stats.get("max_gold_held", 0), self.money)
+        self.coins = []
+        self.display_money = self.money
         # Achievements: wygrana / perfekcyjna / comeback (raz na wygrana)
         if won and not forfeited and not getattr(self, "_win_recorded", False):
             self._win_recorded = True
@@ -2584,7 +2613,7 @@ class Game:
         
         # R2: Przycisk "Nastepna fala" - wczesniejsze przywolanie za bonus
         # (gdy statek odplynal ale wrogowie jeszcze sa na mapie, lub awaryjnie gdy fala utknela)
-        if self.waiting_for_clear and not self.won and not self.last_wave_done and not self.bombard_active:
+        if self.waiting_for_clear and not self.won and not self.last_wave_done and (not self.bombard_active or self.bombard_phase == 12):
             btn_w, btn_h = 240, 56
             bx = self.width - btn_w - 20
             by = 70
@@ -2608,11 +2637,12 @@ class Game:
         self.draw_ability_dock()
 
         # Podswietlenie klikalnego budynku + dron + menu upgradow
+        # Dron PO tent_visuals (Cewka Tesli), zeby nie byl przez nia przycinany
         self.draw_building_highlight()
         self.draw_tent_highlight()
+        self.draw_tent_visuals()
         self.draw_repair_drone()
         self.draw_tesla_bolts()
-        self.draw_tent_visuals()
         self.draw_building_menu()
         self.draw_tent_menu()
         self.draw_achievement_popup()
@@ -3181,11 +3211,45 @@ class Game:
     def draw_guard_dancers(self):
         """Guards on duty: hold bows always. Melee weapon only when charging/dueling/returning."""
         t = self._now_s
+        # Widoczne strzaly straznikow (w locie)
+        for a in getattr(self, "_guard_arrows", []):
+            ax, ay = a["x"], a["y"]
+            tx, ty = a.get("tx", ax), a.get("ty", ay)
+            ang = math.atan2(ty - ay, tx - ax)
+            # Strzala: drzewce + grot w kierunku lotu
+            ex = ax + math.cos(ang) * 12
+            ey = ay + math.sin(ang) * 12
+            pygame.draw.line(self.win, (200, 180, 150), (ax, ay), (ex, ey), 2)
+            pygame.draw.polygon(self.win, (220, 220, 220),
+                                [(ex, ey),
+                                 (ex - math.cos(ang + 2.6) * 6, ey - math.sin(ang + 2.6) * 6),
+                                 (ex - math.cos(ang - 2.6) * 6, ey - math.sin(ang - 2.6) * 6)])
         for d in self._dancers:
             if not d["alive"]:
                 continue
             dx, dy = d["x"], d["y"]
             mode = d.get("mode", "guard")
+            # Deploying: ida do posterunku (bieg, bron biala, twarz w kierunku marszu)
+            if mode == "deploying":
+                face = d.get("deploy_face", 1)
+                run = 6 * math.sin(t * 12)
+                pygame.draw.line(self.win, (50, 50, 80), (dx, dy), (dx - 6 + run, dy + 14), 3)
+                pygame.draw.line(self.win, (50, 50, 80), (dx, dy), (dx + 6 - run, dy + 14), 3)
+                if d["sex"] == "m":
+                    pygame.draw.circle(self.win, (255, 200, 170), (int(dx), int(dy - 28)), 8)
+                    pygame.draw.line(self.win, (70, 50, 120), (dx, dy - 20), (dx, dy), 4)
+                else:
+                    pygame.draw.polygon(self.win, (220, 100, 150), [(dx, dy - 20), (dx - 12, dy + 8), (dx + 12, dy + 8)])
+                    pygame.draw.circle(self.win, (255, 210, 180), (int(dx), int(dy - 28)), 7)
+                hx = dx + face * 18
+                hy = dy - 25
+                pygame.draw.line(self.win, (101, 67, 33), (dx + face * 5, dy - 15), (hx, hy), 3)
+                if d["sex"] == "m":
+                    pygame.draw.polygon(self.win, (180, 180, 180), [(hx, hy - 8), (hx + face * 12, hy), (hx, hy + 8)])
+                else:
+                    pygame.draw.line(self.win, (255, 210, 180), (dx + face * 5, dy - 18), (hx, hy), 3)
+                    pygame.draw.circle(self.win, (80, 80, 80), (int(hx), int(hy)), 7)
+                continue
             # Face toward target when dueling/charging, else toward nearest enemy, else right
             face = 1
             tgt = d.get("target")
@@ -3260,6 +3324,80 @@ class Game:
                 # Free hand to the bow
                 pygame.draw.line(self.win, (255, 200, 170) if d["sex"] == "m" else (255, 210, 180), (dx + face * 5, dy - 15), (bow_mid_x - face * 4, dy - 20), 2)
 
+    # Sciezka wrogow (kopia z enemies/enemy.py) - straznicy ida do posterunkow DROGA
+    _GUARD_PATH = [
+        (322, 658), (425, 630), (505, 591), (588, 581),
+        (696, 570), (792, 558), (890, 546), (953, 536),
+        (1034, 523), (1049, 497), (1021, 488), (944, 477),
+        (838, 467), (724, 450), (626, 438), (540, 426),
+        (448, 414), (359, 399), (264, 387), (250, 351)]
+
+    def _start_guard_deployment(self):
+        """Signal Fire kupione: tancerze IDA z ogniska na posterunki droga, nie teleportuja sie.
+        Na drodze 2x predkosc mobow (2.0 px/tick), od najblizszego punktu drogi do posterunku
+        polowa predkosci (1.0 px/tick)."""
+        starts = [(996, 415), (1086, 415)]  # pozycje tancerzy przy ognisku (1041, 410) +-45
+        for d, (sx, sy) in zip(self._dancers, starts):
+            d["x"], d["y"] = sx, sy
+            d["alive"] = True
+            d["mode"] = "deploying"
+            d["target"] = None
+            d["cd"] = 0
+            hx, hy = d.get("home_x", sx), d.get("home_y", sy)
+            # Najblizszy punkt sciezki do startu i do posterunku
+            def _nearest(px, py):
+                bi, bd = 0, 1e18
+                for i, (qx, qy) in enumerate(self._GUARD_PATH):
+                    dd = (qx - px) ** 2 + (qy - py) ** 2
+                    if dd < bd:
+                        bi, bd = i, dd
+                return bi
+            ni = _nearest(sx, sy)
+            ci = _nearest(hx, hy)
+            if ni <= ci:
+                pts = list(self._GUARD_PATH[ni:ci + 1])
+            else:
+                pts = list(reversed(self._GUARD_PATH[ci:ni + 1]))
+            pts.append((hx, hy))  # ostatni odcinek: droga -> posterunek (wolniej)
+            d["deploy_pts"] = pts
+            d["deploy_idx"] = 0
+            d["deploy_face"] = 1
+
+    def _update_guard_arrows(self):
+        """Strzaly straznikow: leca do celu, przy trafieniu 25 dmg (hit)."""
+        for a in list(getattr(self, "_guard_arrows", [])):
+            tgt = a.get("target")
+            if tgt is None or getattr(tgt, "dying", False) or getattr(tgt, "dead", False) or getattr(tgt, "reached_end", False):
+                # Cel zniknal: strzala leci do ostatniego punktu i znika
+                tx, ty = a.get("tx", a["x"]), a.get("ty", a["y"])
+            else:
+                tx, ty = tgt.x, tgt.y - 20
+                a["tx"], a["ty"] = tx, ty
+            dx, dy = tx - a["x"], ty - a["y"]
+            dist = math.hypot(dx, dy) or 1.0
+            if dist <= 14:
+                # Trafienie
+                if tgt is not None and not getattr(tgt, "dying", False) and not getattr(tgt, "dead", False):
+                    try:
+                        killed = bool(tgt.hit(25))
+                    except Exception:
+                        tgt.health -= 25
+                        if tgt.health <= 0 and not tgt.dying:
+                            tgt.dying = True
+                            killed = True
+                        else:
+                            killed = False
+                    if killed:
+                        self._ach_stats["dancer_kills"] = self._ach_stats.get("dancer_kills", 0) + 1
+                    self.stats_damage += 25
+                    self.damage_numbers.append([tgt.x, tgt.y - 40, "25", 40])
+                    self.particles.burst(a["x"], a["y"], (200, 180, 150), count=3, speed=3, life=15, size=2)
+                if a in self._guard_arrows:
+                    self._guard_arrows.remove(a)
+            else:
+                a["x"] += dx / dist * 8.0
+                a["y"] += dy / dist * 8.0
+
     def _update_guard_dancers(self):
         """Guards: bow shooting on post + one random guard duels a close enemy to mutual death."""
         if "signal" not in self.tent_upgrades:
@@ -3272,6 +3410,28 @@ class Game:
             if not d["alive"]:
                 continue
             mode = d.get("mode", "guard")
+            if mode == "deploying":
+                # Ida droga do posterunku: 2.0 px/tick na drodze, 1.0 na ostatnim odcinku do posterunku
+                pts = d.get("deploy_pts") or []
+                idx = d.get("deploy_idx", 0)
+                if idx >= len(pts):
+                    d["mode"] = "guard"
+                    continue
+                tx, ty = pts[idx]
+                vx, vy = tx - d["x"], ty - d["y"]
+                dist = math.hypot(vx, vy)
+                # Ostatni punkt = posterunek: polowa predkosci
+                speed = 1.0 if idx == len(pts) - 1 else 2.0
+                if dist <= speed:
+                    d["x"], d["y"] = tx, ty
+                    d["deploy_idx"] = idx + 1
+                    if d["deploy_idx"] >= len(pts):
+                        d["mode"] = "guard"
+                elif dist > 0:
+                    d["x"] += vx / dist * speed
+                    d["y"] += vy / dist * speed
+                    d["deploy_face"] = 1 if vx >= 0 else -1
+                continue
             if mode == "charging":
                 tgt = d.get("target")
                 if tgt is None or getattr(tgt, "dying", False) or getattr(tgt, "dead", False) or getattr(tgt, "reached_end", False) or getattr(tgt, "attacking", False):
@@ -3347,18 +3507,8 @@ class Game:
                     if d2 < best_d2:
                         best, best_d2 = en, d2
                 if best:
-                    killed = False
-                    try:
-                        killed = bool(best.hit(25))
-                    except Exception:
-                        best.health -= 25
-                        if best.health <= 0 and not best.dying:
-                            best.dying = True
-                            killed = True
-                    if killed:
-                        self._ach_stats["dancer_kills"] = self._ach_stats.get("dancer_kills", 0) + 1
-                    self.stats_damage += 25
-                    self.damage_numbers.append([best.x, best.y - 40, "25", 40])
+                    # Strzala jako widoczny pocisk (trafienie w _update_guard_arrows)
+                    self._guard_arrows.append({"x": d["x"], "y": d["y"] - 20, "tx": best.x, "ty": best.y - 20, "target": best})
                     self.particles.burst(d["x"], d["y"] - 25, (200, 180, 150), count=3, speed=3, life=15, size=2)
                     d["cd"] = 120  # 2s
                 else:
@@ -3687,6 +3837,8 @@ class Game:
             for tw in self.towers:
                 self._apply_tower_upgrade_flags(tw)
         # Natychmiastowe efekty namiotu
+        if uid == "signal":
+            self._start_guard_deployment()
         if uid == "spikes":
             self._place_spikes()
         elif uid in ("drums", "banner", "signal", "balloon"):
