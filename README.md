@@ -15,6 +15,7 @@ Survive **10 waves** of increasingly dangerous enemies. Each wave arrives by shi
 - **Lives:** Enemies that reach the facility cost you a life and shatter its glass walls
 - **Economy:** Earn gold for every kill. Golden (elite) enemies are tougher but worth 5× more
 - **Victory:** Survive all 10 waves, including the final boss
+- **Endless mode:** After victory, keep going — enemies scale +5% HP per wave, bigger gold bonuses per wave
 
 ---
 
@@ -37,6 +38,16 @@ Five unique towers, each with 5 upgrade levels, distinct projectiles, and a spec
 
 ---
 
+## Clickable Buildings
+
+**Glass Research Facility** (click it!) — 10 one-time upgrades per run:
+Reinforced Walls, Repair Drones, Tesla Coil, War Treasury, Bounty Board, Ammunition Depot, Lucky Charm, Storm Caller, Reinforced Docks, and the secret **Call the Cavalry** (endless only).
+
+**War Tent** (click it!) — 10 one-time upgrades per run:
+Scout Reports, War Drums, Supply Lines, Field Medic, Guerrilla Training, Honor Banner, Signal Fire, Spike Barricade, Recon Balloon, Sabotage.
+
+---
+
 ## Enemies
 
 Nine enemy types with full walk, hurt, and death animations:
@@ -50,10 +61,13 @@ Nine enemy types with full walk, hurt, and death animations:
 ## Features
 
 - **Animated pirate ship** — sails in from alternating sides with pirate fanfare, docks, disembarks enemies, and departs; lively animations (wave bobbing, rotation, wake trail, bow splashes, glowing demonic rune)
-- **Cannon barrage** — on waves 4 and 8 (with enough lives), the ship sails to a bombardment position and fires cannonballs at your towers (50% destroy chance)
+- **Cannon barrage** — on waves 4 and 8 (with enough lives), the ship sails to a bombardment position and fires cannonballs at your towers
+- **Call the Cavalry** — an allied ship intercepts the pirate ship, cripples it, then bombards enemies in endless mode
+- **50 achievements** — tracked across runs with unlock popups, persistent save, and a gallery in the main menu
+- **Resolution options** — 1124×720, 1280×720, 1600×900, 1920×1080, or native fullscreen
 - **Dynamic day/night cycle** with smooth transitions
-- **Weather system** — rain with splash particles and ambient audio
-- **Ambient life** — seagulls, butterflies, campfire with dancers
+- **Weather system** — rain/storms with splash particles and ambient audio
+- **Ambient life** — campfire with dancers (who stand guard when Signal Fire is bought)
 - **Particle effects** — muzzle flashes, explosions, damage numbers, glass shards
 - **Glass building destruction** — enemies shatter the facility's glass walls with sound and debris
 - **Kill-streak announcements** and wave banners
@@ -87,13 +101,13 @@ Nine enemy types with full walk, hurt, and death animations:
 
 ## Installation
 
-Requires **Python 3.12** and **Pygame 2.6+**.
+Requires **Python 3.15** and **pygame-ce 2.5.8**.
 
 ```bash
 git clone https://github.com/dbara943/FinalGame.git
 cd FinalGame
 pip install -r requirements.txt
-py game.py
+python game.py
 ```
 
 ---
@@ -103,12 +117,15 @@ py game.py
 ```
 FinalGame/
 ├── game.py              # Main game loop, UI, wave management
+├── achievements.py      # 50 achievements system
 ├── enemies/             # Enemy classes with animations
 ├── towers/              # Tower classes, projectiles, abilities
-├── ships/               # Pirate ship animation and docking
+├── ships/               # Pirate ship and allied ship
 ├── menu/                # Start menu, pause menu, shop UI
 ├── effects/             # Particle system, floating text
 ├── images/              # Sprites, backgrounds, UI assets
+│   ├── upgrades/        # Building/tent upgrade icons
+│   └── achievements/    # Achievement category icons
 └── sounds/              # Music and sound effects
 ```
 
