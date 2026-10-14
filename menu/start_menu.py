@@ -272,8 +272,15 @@ class StartMenu:
             bar_y = list_y0 + int(self._ach_scroll * (list_h - bar_h) / max(1, total_h - list_h))
             pygame.draw.rect(self.win, (101, 80, 50), (self.rw - 18, bar_y, 8, bar_h), border_radius=4)
         # Dolny hint
-        hint = self.small_font.render("Scroll with mouse wheel - click anywhere to close", True, (140, 120, 90))
-        self.win.blit(hint, (self.rw // 2 - hint.get_width() // 2, self.rh - 35))
+        hint = self.small_font.render("Scroll with mouse wheel", True, (140, 120, 90))
+        self.win.blit(hint, (self.rw // 2 - hint.get_width() // 2, self.rh - 55))
+        # Przycisk zamkniecia (X)
+        close_rect = pygame.Rect(self.rw - 60, 20, 40, 40)
+        pygame.draw.rect(self.win, (120, 50, 50), close_rect, border_radius=8)
+        x_lbl = self.btn_font_small.render("X", True, (255, 255, 255))
+        self.win.blit(x_lbl, (close_rect.centerx - x_lbl.get_width()//2,
+                              close_rect.centery - x_lbl.get_height()//2))
+        self._ach_close_rect = close_rect
         self._ach_max_scroll = max(0, total_h - list_h)
 
     def draw_resolution(self):
@@ -373,6 +380,12 @@ class StartMenu:
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     if self.click_sound and self.sound:
                         self.click_sound.play()
+                    # Achievements: zamknij tylko przez X (nie przez klik w panel)
+                    if self.show_achievements:
+                        if hasattr(self, "_ach_close_rect") and self._ach_close_rect.collidepoint(event.pos):
+                            self.show_achievements = False
+                        continue
+                    # Resolution: wybor opcji
                     if self.show_resolution and hasattr(self, "_res_buttons"):
                         pos = event.pos
                         for rect, idx in self._res_buttons:
@@ -383,9 +396,8 @@ class StartMenu:
                         else:
                             self.show_resolution = False
                         continue
-                    if self.show_help or self.show_achievements or self.show_resolution:
+                    if self.show_help or self.show_resolution:
                         self.show_help = False
-                        self.show_achievements = False
                         self.show_resolution = False
                         continue
                     pos = event.pos
