@@ -250,8 +250,8 @@ class Game:
         self._spike_pos = []
         self._banner_phase = 0.0
         self._dancers = [
-            {"x": 180, "y": 420, "alive": True, "sex": "m", "cd": 0},
-            {"x": 340, "y": 420, "alive": True, "sex": "f", "cd": 0},
+            {"x": 377, "y": 352, "alive": True, "sex": "m", "cd": 0},
+            {"x": 183, "y": 357, "alive": True, "sex": "f", "cd": 0},
         ]
         # Achievements
         from achievements import AchievementManager
@@ -277,8 +277,8 @@ class Game:
         self._banner_phase = 0.0  # animacja choragwi
         # Tancerze-straznicy (Signal Fire)
         self._dancers = [
-            {"x": 180, "y": 420, "alive": True, "sex": "m", "cd": 0},  # mezczyzna z toporem
-            {"x": 340, "y": 420, "alive": True, "sex": "f", "cd": 0},  # kobieta z patelnia
+            {"x": 377, "y": 352, "alive": True, "sex": "m", "cd": 0},  # mezczyzna z toporem
+            {"x": 183, "y": 357, "alive": True, "sex": "f", "cd": 0},  # kobieta z patelnia
         ]
         # Dron naprawczy (wizualny)
         self._drone_angle = 0.0
@@ -1606,8 +1606,8 @@ class Game:
         self._spike_pos = []
         self._banner_phase = 0.0
         self._dancers = [
-            {"x": 180, "y": 420, "alive": True, "sex": "m", "cd": 0},
-            {"x": 340, "y": 420, "alive": True, "sex": "f", "cd": 0},
+            {"x": 377, "y": 352, "alive": True, "sex": "m", "cd": 0},
+            {"x": 183, "y": 357, "alive": True, "sex": "f", "cd": 0},
         ]
         self.ship = Ship(os.path.join("images", "ship.png"), dock_x=278, dock_y=669,
                          screen_w=self.width)
@@ -3035,7 +3035,7 @@ class Game:
 
     def draw_campfire(self):
         t = self._now_s
-        cx, cy = 830, 385  # na trawie przed wejsciem do namiotu (poziom ziemi)
+        cx, cy = 1041, 410  # moved via drag tool (was 830, 385)
         # Signal Fire: ognisko 2x wieksze
         s = 2.0 if "signal" in self.tent_upgrades else 1.0
         for i in range(8):
@@ -3354,9 +3354,9 @@ class Game:
         tw._fire_rate_mult = 1.0
         if "ammo" in self.building_upgrades:
             tw._fire_rate_mult *= 1.15
-        # Signal Fire: +12% fire rate dla wiez w zasiegu ogniska (830, 385)
+        # Signal Fire: +12% fire rate dla wiez w zasiegu ogniska (1041, 410)
         if "signal" in self.tent_upgrades:
-            sx, sy = 830, 385  # ognisko
+            sx, sy = 1041, 410  # ognisko (moved via drag tool)
             if (tw.x - sx) ** 2 + (tw.y - sy) ** 2 < 350 ** 2:
                 tw._fire_rate_mult *= 1.12
         tw._lucky_crit = "lucky" in self.building_upgrades
