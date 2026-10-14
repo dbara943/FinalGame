@@ -59,7 +59,12 @@ class AllyShip:
         t = time.time() - self._t0
         bob = math.sin(t * 2.0) * 6
         rot = math.sin(t * 1.5) * 1.5
-        img = pygame.transform.rotate(self.base_img, rot)
+        # Sprite bazowy patrzy w LEWO - przy ruchu w prawo odwracamy
+        base = self.base_img
+        if self.state in (AllyShip.IN, AllyShip.OUT):
+            # Zawsze plynie w prawo (z lewej wplywa, w prawo wyplywa)
+            base = pygame.transform.flip(self.base_img, True, False)
+        img = pygame.transform.rotate(base, rot)
         win.blit(img, (self.x - img.get_width() // 2,
                        self.y - img.get_height() // 2 + bob))
         # Kilwater gdy plynie

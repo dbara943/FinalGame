@@ -247,6 +247,11 @@ class Game:
         self._balloon_x = -100  # balon zwiadowczy
         self._spike_pos = []  # pozycje kolcow na drodze
         self._banner_phase = 0.0  # animacja choragwi
+        # Tancerze-straznicy (Signal Fire)
+        self._dancers = [
+            {"x": 180, "y": 420, "alive": True, "sex": "m", "cd": 0},  # mezczyzna z toporem
+            {"x": 340, "y": 420, "alive": True, "sex": "f", "cd": 0},  # kobieta z patelnia
+        ]
         # Dron naprawczy (wizualny)
         self._drone_angle = 0.0
         # Tesla Coil
@@ -426,9 +431,8 @@ class Game:
             return
         # Boss czeka na zadokowanie - spawnuj gdy statek w porcie
         if self.pending_boss:
-            # Sabotage: boss tez z -15% HP
+            # Sabotage: boss tez z -15% HP (widoczne na pasku)
             if "sabotage" in self.tent_upgrades:
-                self.pending_boss.max_health = int(self.pending_boss.max_health * 0.85)
                 self.pending_boss.health = int(self.pending_boss.health * 0.85)
             self.pending_boss._spawn_time = time.time()
             self.enemies.append(self.pending_boss)
@@ -480,10 +484,8 @@ class Game:
                     scaled = self._endless_hp(en.max_health, self.endless_wave)
                     en.max_health = scaled
                     en.health = scaled
-                    # Endless: 5x zlota + 5% co fale (jak HP)
-                    en.money = self._endless_gold(en.money, self.endless_wave)
                 if "sabotage" in self.tent_upgrades:
-                    en.max_health = int(en.max_health * 0.85)
+                    # Tylko aktualne HP (widoczne na pasku), max zostaje
                     en.health = int(en.health * 0.85)
                 if "docks" in self.building_upgrades:
                     en.velocity *= 0.85
@@ -497,18 +499,11 @@ class Game:
                         self._ally_strike_at = None  # tylko raz na fale
                         self.ally_ship = AllyShip(os.path.join("images", "ship_ally.png"),
                                                   screen_w=self.width)
-                        self.ally_ship.sail_in("strike", fire_x=420)
+                        # Baraz z miejsca pirata (867, 603), nie z portu
+                        self.ally_ship.sail_in("strike", fire_x=867)
+                        self.ally_ship.y = 603
                         self.wave_banner_text = "ALLY SHIP INBOUND!"
                         self.wave_banner_timer = 150
-
-    def _endless_gold(self, base, endless_wave):
-        """Zloto w endless: 5x bazowo od fali 11, potem +5% co fale (compound).
-        Jesli 5% nie daje ani 1 zlota, to +1."""
-        gold = int(base * 5)
-        for _ in range(1, endless_wave):
-            bonus = int(gold * 0.05)
-            gold += bonus if bonus >= 1 else 1
-        return gold
 
     def _setup_endless_wave(self):
         """Generuje kolejna fale endless (proceduralnie, rosnace HP)."""
@@ -519,7 +514,7 @@ class Game:
             int(20 * scale), int(15 * scale), int(12 * scale), int(10 * scale),
             int(8 * scale), int(6 * scale), int(5 * scale), int(3 * scale),
         ]
-        gold = 200
+        gold = 500 + self.endless_wave * 25
         self.money += gold
         self.gold_notifications.append([f"+{gold} gold (endless wave)", 150])
         if self.endless_wave % 4 == 0:
@@ -671,19 +666,18 @@ class Game:
         self.ship.sail_to_bombard(867, 603)
 
     def _start_interception(self):
-        """Sojuszniczy statek wplywa z lewej i unieszkodliwia pirata."""
-        from ships.ally_ship import AllyShip
+        """Sojuszniczy statek wplywa z lewej i unieszkodliwia pirata.
+        Najpierw pirat na spokojnie doplywa na pozycje, DOPIERO POTEM wplywa sojusznik."""
         self.bombard_active = True
-        self.bombard_phase = 10  # 10: przechwycenie - sojusznik plynie
+        self.bombard_phase = 10  # 10: czekamy az pirat doplynie
         self.bombard_timer = 0
+        self._interception_timeout = 0
         self.wave_banner_text = "CALL THE CAVALRY!"
         self.wave_banner_timer = 200
         # Pirat plynie na pozycje barazu (jak zwykle)
         self.ship.sail_to_bombard(867, 603)
-        # Sojusznik wplywa z lewej
-        self.ally_ship = AllyShip(os.path.join("images", "ship_ally.png"),
-                                  screen_w=self.width)
-        self.ally_ship.sail_in("cripple", fire_x=350)
+        # Sojusznik wystartuje dopiero gdy pirat bedzie na miejscu
+        self.ally_ship = None
 
     def _update_ally_ship(self):
         """Sojusznik w trybie 'strike': po doplynieciu strzela 1-4 razy w wrogow."""
@@ -786,6 +780,30 @@ class Game:
                 mult *= 1.35
         return mult
 
+    def draw_tesla_coil(self):
+        """Widoczna cewka Tesli na budynku - stad strzela piorun."""
+        tx, ty = 260, 180  # na dachu budynku
+        # Podstawa
+        pygame.draw.rect(self.win, (60, 65, 75), (tx - 20, ty, 40, 12))
+        # Cewka (uzwojenie)
+        for i in range(6):
+            y = ty - 8 - i * 10
+            pygame.draw.ellipse(self.win, (150, 160, 175), (tx - 15, y, 30, 12))
+            pygame.draw.ellipse(self.win, (100, 110, 125), (tx - 15, y, 30, 12), 2)
+        # Elektroda (kula na gorze)
+        pygame.draw.circle(self.win, (180, 190, 205), (tx, ty - 75), 12)
+        pygame.draw.circle(self.win, (220, 235, 250), (tx - 4, ty - 79), 5)
+        # Iskry (losowe, ciagle)
+        if random.random() < 0.4:
+            ax = tx + random.randint(-25, 25)
+            ay = ty - 75 + random.randint(-20, 20)
+            self.particles.burst(ax, ay, (150, 220, 255), count=2, speed=2, life=15, size=2)
+        # Pulsujaca aura
+        pulse = int(30 + 20 * math.sin(time.time() * 3))
+        s = pygame.Surface((100, 100), pygame.SRCALPHA)
+        pygame.draw.circle(s, (150, 220, 255, pulse), (50, 50), 40, 2)
+        self.win.blit(s, (tx - 50, ty - 120))
+
     def _place_spikes(self):
         """Rozstawia kolce na drodze (3 punkty na sciezce wrogow)."""
         # Punkty na drodze (srodek mapy)
@@ -809,6 +827,9 @@ class Game:
 
     def draw_tent_visuals(self):
         """Wizualne efekty upgradow namiotu: choragiew, ognisko, kolce, balon."""
+        # Tesla Coil: widoczna cewka na budynku (musi byc przed innymi)
+        if "tesla" in self.building_upgrades:
+            self.draw_tesla_coil()
         # Honor Banner: choragiew przy namiocie
         if "banner" in self.tent_upgrades:
             self._banner_phase += 0.08
@@ -821,23 +842,7 @@ class Game:
             wave += [(bx, by - 50)]
             pygame.draw.polygon(self.win, (200, 170, 50), wave)
             pygame.draw.polygon(self.win, (150, 120, 30), wave, 2)
-        # Signal Fire: plonace ognisko przy namiocie
-        if "signal" in self.tent_upgrades:
-            sx, sy = 810, 480
-            # Glow
-            glow = pygame.Surface((120, 120), pygame.SRCALPHA)
-            pygame.draw.circle(glow, (255, 150, 50, 60), (60, 60), 55)
-            self.win.blit(glow, (sx - 60, sy - 60))
-            # Polana
-            pygame.draw.ellipse(self.win, (101, 67, 33), (sx - 25, sy - 8, 50, 16))
-            # Plomienie
-            for _ in range(3):
-                fx = sx + random.randint(-12, 12)
-                fy = sy - 10 - random.randint(0, 20)
-                self.particles.burst(fx, fy, (255, 120, 30), count=1, speed=1, life=20, size=4, gravity=-0.1)
-            # Aura: okrag zasiegu
-            if random.random() < 0.05:
-                pygame.draw.circle(self.win, (255, 200, 100, 40), (sx, sy), 350, 2)
+        # Signal Fire: uzywa istniejacego ogniska (2x wieksze) - brak osobnego wizualu
         # Spike Barricade: kolce na drodze
         if "spikes" in self.tent_upgrades:
             for sx, sy in self._spike_pos:
@@ -921,11 +926,25 @@ class Game:
                 # Normalny przeplyw: statek juz odplynal, czekamy na wyczyszczenie
         # === PRZECHWYCENIE (Call the Cavalry) ===
         elif self.bombard_phase == 10:
-            # Czekamy az pirat doplynie na pozycje i sojusznik na swoja
-            if (self.ship.state == Ship.BOMBARD and self.ally_ship
-                    and self.ally_ship.state == AllyShip.FIRING):
+            # Faza 10a: czekamy az pirat na spokojnie doplynie na pozycje
+            # Timeout awaryjny: jesli pirat nie doplywa, odblokuj
+            self._interception_timeout += 1
+            if self._interception_timeout > 1800:  # 30s
+                self.bombard_active = False
+                self.bombard_phase = 0
+                self.ally_ship = None
+                self.ship.sail_out_from_bombard()
+                return
+            if self.ship.state == Ship.BOMBARD and not self.ally_ship:
+                # Pirat na miejscu - DOPIERO TERAZ wplywa sojusznik (powoli, do portu)
+                self.ally_ship = AllyShip(os.path.join("images", "ship_ally.png"),
+                                          screen_w=self.width)
+                self.ally_ship.sail_in("cripple", fire_x=350)
+            # Faza 10b: czekamy az sojusznik doplynie
+            if (self.ally_ship and self.ally_ship.state == AllyShip.FIRING):
                 self.bombard_phase = 11
                 self.bombard_timer = 0
+                self._interception_timeout = 0
         elif self.bombard_phase == 11:
             # Sojusznik wali salwa w pirata (3 potezne strzaly)
             if self.bombard_timer == 30:
@@ -945,11 +964,14 @@ class Game:
                 self.bombard_timer = 0
         elif self.bombard_phase == 12:
             # Poscig: oba statki w prawo. Odblokowanie dopiero jak oba znikna.
+            # Timeout awaryjny 20s
+            self._interception_timeout += 1
             ally_gone = not self.ally_ship or self.ally_ship.state == AllyShip.AWAY
-            if self.ship.state == Ship.AWAY and ally_gone:
+            if (self.ship.state == Ship.AWAY and ally_gone) or self._interception_timeout > 1200:
                 self.bombard_active = False
                 self.bombard_phase = 0
-                self.ship.speed = 3.5  # przywroc normalna predkosc
+                self.ship.speed = 3.5
+                self.ship.state = Ship.AWAY
                 self.ally_ship = None
 
     def _ally_broadside_at_pirate(self):
@@ -1479,6 +1501,10 @@ class Game:
         self._balloon_x = -100
         self._spike_pos = []
         self._banner_phase = 0.0
+        self._dancers = [
+            {"x": 180, "y": 420, "alive": True, "sex": "m", "cd": 0},
+            {"x": 340, "y": 420, "alive": True, "sex": "f", "cd": 0},
+        ]
         self.ship = Ship(os.path.join("images", "ship.png"), dock_x=278, dock_y=669,
                          screen_w=self.width)
         self.ship.sail_in()
@@ -1536,6 +1562,8 @@ class Game:
                 self._tesla_zap()
         # Spike Barricade: kolce rania wrogow
         self._update_spikes()
+        # Straznicy przy budynku strzelaja z lukow
+        self._update_guard_dancers()
         # Powiadomienia o zlocie
         for gn in self.gold_notifications[:]:
             gn[1] -= 1
@@ -1655,6 +1683,9 @@ class Game:
 
         for d in to_del:
             if d.reached_end:
+                # Signal Fire: tancerz poswieca sie zamiast utraty zycia
+                if self._dancer_sacrifice(d):
+                    continue
                 sound_1.play()
                 sound_glass.play()  # tluczone szklo - budynek jest szklany
                 self.lives -= 1
@@ -2894,16 +2925,96 @@ class Game:
     def draw_campfire(self):
         t = self._now_s
         cx, cy = 830, 385  # na trawie przed wejsciem do namiotu (poziom ziemi)
+        # Signal Fire: ognisko 2x wieksze
+        s = 2.0 if "signal" in self.tent_upgrades else 1.0
         for i in range(8):
             ang = i * math.pi / 4
             pygame.draw.circle(self.win, (120, 120, 120),
-                             (int(cx + 18 * math.cos(ang)), int(cy + 10 * math.sin(ang))), 6)
-        pygame.draw.line(self.win, (101, 67, 33), (cx - 12, cy), (cx + 12, cy - 8), 4)
+                             (int(cx + 18 * s * math.cos(ang)), int(cy + 10 * s * math.sin(ang))), int(6 * s))
+        pygame.draw.line(self.win, (101, 67, 33), (cx - 12 * s, cy), (cx + 12 * s, cy - 8 * s), int(4 * s))
         for i, (col, h) in enumerate([((255, 80, 20), 28), ((255, 160, 40), 20), ((255, 230, 120), 12)]):
-            fh = h + 6 * math.sin(t * 12 + i * 2)
-            pygame.draw.polygon(self.win, col, [(cx - 10 + i*2, cy), (cx, cy - fh), (cx + 10 - i*2, cy)])
-        if random.random() < 0.3:
-            self.particles.burst(cx, cy - 20, (255, 180, 80), count=1, speed=1, life=20, size=2, gravity=-0.12)
+            fh = (h + 6 * math.sin(t * 12 + i * 2)) * s
+            pygame.draw.polygon(self.win, col, [(cx - 10 * s + i*2, cy), (cx, cy - fh), (cx + 10 * s - i*2, cy)])
+        if random.random() < 0.3 * s:
+            self.particles.burst(cx, cy - 20 * s, (255, 180, 80), count=1, speed=1, life=20, size=2, gravity=-0.12)
+        # Tancerze: przy ognisku (normalnie) lub na strazy przy budynku (Signal Fire)
+        if "signal" in self.tent_upgrades:
+            self.draw_guard_dancers()
+        else:
+            self.draw_campfire_dancers(cx, cy, t)
+
+    def draw_guard_dancers(self):
+        """Tancerze na strazy przy budynku: strzelaja z lukow, poswiecaja sie."""
+        t = self._now_s
+        for d in self._dancers:
+            if not d["alive"]:
+                continue
+            dx, dy = d["x"], d["y"]
+            # Cialo
+            if d["sex"] == "m":
+                pygame.draw.circle(self.win, (255, 200, 170), (int(dx), int(dy - 28)), 8)
+                pygame.draw.line(self.win, (70, 50, 120), (dx, dy - 20), (dx, dy), 4)
+                # Topor w reku
+                ax = dx + 15
+                pygame.draw.line(self.win, (101, 67, 33), (dx + 5, dy - 15), (ax, dy - 25), 3)
+                pygame.draw.polygon(self.win, (180, 180, 180), [(ax, dy - 25), (ax - 10, dy - 20), (ax - 6, dy - 30)])
+            else:
+                pygame.draw.polygon(self.win, (220, 100, 150), [(dx, dy - 20), (dx - 12, dy + 8), (dx + 12, dy + 8)])
+                pygame.draw.circle(self.win, (255, 210, 180), (int(dx), int(dy - 28)), 7)
+                # Patelnia w reku
+                px = dx + 15
+                pygame.draw.line(self.win, (255, 210, 180), (dx, dy - 18), (px, dy - 22), 3)
+                pygame.draw.circle(self.win, (80, 80, 80), (int(px), int(dy - 22)), 7)
+            # Nogi
+            pygame.draw.line(self.win, (50, 50, 80), (dx, dy), (dx - 6, dy + 14), 3)
+            pygame.draw.line(self.win, (50, 50, 80), (dx, dy), (dx + 6, dy + 14), 3)
+            # Luk (gdy strzela)
+            if d["cd"] > 100:
+                pygame.draw.arc(self.win, (101, 67, 33), (dx - 15, dy - 35, 20, 30), -1.2, 1.2, 2)
+
+    def _update_guard_dancers(self):
+        """Straznicy strzelaja z lukow do pobliskich wrogow."""
+        if "signal" not in self.tent_upgrades:
+            return
+        for d in self._dancers:
+            if not d["alive"]:
+                continue
+            d["cd"] -= 1
+            if d["cd"] <= 0:
+                # Najblizszy wrog w zasiegu 350
+                best, best_d2 = None, 350 ** 2
+                for en in self.enemies:
+                    if en.dying or en.dead or en.reached_end:
+                        continue
+                    d2 = (en.x - d["x"]) ** 2 + (en.y - d["y"]) ** 2
+                    if d2 < best_d2:
+                        best, best_d2 = en, d2
+                if best:
+                    # Strzal z luku (25 dmg)
+                    best.health -= 25
+                    self.stats_damage += 25
+                    self.damage_numbers.append([best.x, best.y - 40, "25", 40])
+                    # Wizualna strzala
+                    self.particles.burst(d["x"], d["y"] - 25, (200, 180, 150), count=3, speed=3, life=15, size=2)
+                    d["cd"] = 120  # 2s
+                else:
+                    d["cd"] = 30
+
+    def _dancer_sacrifice(self, en):
+        """Wrog przy wejsciu zabija tancerza zamiast budynku. Zwraca True jesli poswiecono."""
+        if "signal" not in self.tent_upgrades:
+            return False
+        for d in self._dancers:
+            if d["alive"]:
+                d["alive"] = False
+                # Animacja smierci
+                self.particles.burst(d["x"], d["y"] - 20, (255, 100, 100), count=20, speed=4, life=40, size=4)
+                self.gold_notifications.append(["A guard gave their life!", 180])
+                return True
+        return False
+
+    def draw_campfire_dancers(self, cx, cy, t):
+        """Tancerze przy ognisku (oryginalna animacja)."""
         mx = cx - 45 + 8 * math.sin(t * 3)
         my = cy + 5 - abs(10 * math.sin(t * 6))
         pygame.draw.circle(self.win, (255, 200, 170), (int(mx), int(my - 28)), 8)
@@ -3132,9 +3243,9 @@ class Game:
         tw._fire_rate_mult = 1.0
         if "ammo" in self.building_upgrades:
             tw._fire_rate_mult *= 1.15
-        # Signal Fire: +12% fire rate dla wiez w zasiegu 350px od ogniska
+        # Signal Fire: +12% fire rate dla wiez w zasiegu ogniska (830, 385)
         if "signal" in self.tent_upgrades:
-            sx, sy = 810, 480  # ognisko przy namiocie
+            sx, sy = 830, 385  # ognisko
             if (tw.x - sx) ** 2 + (tw.y - sy) ** 2 < 350 ** 2:
                 tw._fire_rate_mult *= 1.12
         tw._lucky_crit = "lucky" in self.building_upgrades
@@ -3257,26 +3368,32 @@ class Game:
                 getattr(self, buttons_attr).append((rect, upg["id"]))
 
     def draw_building_highlight(self):
-        """Delikatne podswietlenie budynku gdy kursor nad nim (klikany)."""
+        """Podswietlenie obrysu budynku (nie prostokat)."""
         if self._building_menu_open:
             return
         mx, my = self._mouse_pos()
         if self._building_rect.collidepoint(mx, my):
-            hl = pygame.Surface((self._building_rect.w, self._building_rect.h), pygame.SRCALPHA)
-            pygame.draw.rect(hl, (255, 215, 100, 40), hl.get_rect(), border_radius=12)
-            pygame.draw.rect(hl, (255, 215, 100, 120), hl.get_rect(), 2, border_radius=12)
-            self.win.blit(hl, self._building_rect.topleft)
+            # Przybblizony obrys szklanego budynku (kopula + bryla)
+            pts = [(120, 380), (110, 280), (140, 200), (200, 165),
+                   (280, 165), (340, 200), (380, 260), (400, 340),
+                   (390, 390), (150, 390)]
+            s = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            pygame.draw.polygon(s, (255, 215, 100, 50), pts)
+            pygame.draw.polygon(s, (255, 215, 100, 150), pts, 3)
+            self.win.blit(s, (0, 0))
 
     def draw_tent_highlight(self):
-        """Delikatne podswietlenie namiotu gdy kursor nad nim (klikany)."""
+        """Podswietlenie obrysu namiotu (trojkat tipi)."""
         if self._tent_menu_open:
             return
         mx, my = self._mouse_pos()
         if self._tent_rect.collidepoint(mx, my):
-            hl = pygame.Surface((self._tent_rect.w, self._tent_rect.h), pygame.SRCALPHA)
-            pygame.draw.rect(hl, (255, 215, 100, 40), hl.get_rect(), border_radius=12)
-            pygame.draw.rect(hl, (255, 215, 100, 120), hl.get_rect(), 2, border_radius=12)
-            self.win.blit(hl, self._tent_rect.topleft)
+            # Obrys tipi (trojkat)
+            pts = [(725, 405), (805, 255), (888, 405)]
+            s = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            pygame.draw.polygon(s, (255, 215, 100, 50), pts)
+            pygame.draw.polygon(s, (255, 215, 100, 150), pts, 3)
+            self.win.blit(s, (0, 0))
 
     def draw_repair_drone(self):
         """Wizualny dron krazacy wokol budynku (po kupnie Repair Drones)."""
