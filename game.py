@@ -677,6 +677,38 @@ class Game:
                 self.pending_boss = Boss(final=True)
                 self.wave_banner_text = "FINALNA FALA - BOSS!"
         self.waiting_for_clear = False
+    def _close_all_menus(self, refund_placement=True):
+        """Close every open menu / cancel in-progress actions so the cinematic is visible."""
+        self._building_menu_open = False
+        self._tent_menu_open = False
+        self._show_help = False
+        self.menu_dragging = False
+        if getattr(self, "selected_tower", None) is not None:
+            try:
+                self.selected_tower.selected = False
+            except Exception:
+                pass
+            self.selected_tower = None
+        for tw in getattr(self, "towers", []):
+            try:
+                tw.selected = False
+            except Exception:
+                pass
+        if getattr(self, "moving_object", None) is not None:
+            if refund_placement:
+                try:
+                    self.money += self.shop_price(self.moving_object.name)
+                except Exception:
+                    pass
+            try:
+                self.moving_object.moving = False
+            except Exception:
+                pass
+            self.moving_object = None
+        if getattr(self, "show_menu", False):
+            self.show_menu = False
+            self.paused = False
+
     def _start_bombardment(self, num_targets=3):
         """Rozpoczyna cinematic bombardowania: statek plynie na srodek oceanu.
         Call the Cavalry: pierwsze bombardowanie w endless po kupnie - przechwycenie."""
@@ -689,6 +721,8 @@ class Game:
         if self.pirate_crippled:
             self.ship.sail_out()
             return
+        # Zamknij wszystkie menu - cinematic ma byc widoczny, nie zakryty menu
+        self._close_all_menus()
         self.bombard_active = True
         self.bombard_phase = 0  # 0: statek plynie na srodek
         self.bombard_timer = 0
@@ -706,6 +740,8 @@ class Game:
     def _start_interception(self):
         """Sojuszniczy statek wplywa z lewej i unieszkodliwia pirata.
         Najpierw pirat na spokojnie doplywa na pozycje, DOPIERO POTEM wplywa sojusznik."""
+        # Zamknij wszystkie menu - cinematic ma byc widoczny
+        self._close_all_menus()
         self.bombard_active = True
         self.bombard_phase = 10  # 10: czekamy az pirat doplynie
         self.bombard_timer = 0
@@ -1229,14 +1265,42 @@ class Game:
                 if event.type == pygame.MOUSEBUTTONUP:
                     self.menu_dragging = False
                 if event.type == pygame.KEYDOWN:
-                    # ESC zawsze dziala (toggle menu) - ale nie podczas cinematic
+                    # ESC = cancel first, pause menu only if nothing to cancel
                     if event.key == pygame.K_ESCAPE:
                         if getattr(self, '_show_help', False):
                             self._show_help = False
+                        elif getattr(self, '_building_menu_open', False):
+                            self._building_menu_open = False
+                        elif getattr(self, '_tent_menu_open', False):
+                            self._tent_menu_open = False
+                        elif getattr(self, 'moving_object', None) is not None:
+                            # Anuluj stawianie wiezy (zwrot kasy)
+                            try:
+                                self.money += self.shop_price(self.moving_object.name)
+                            except Exception:
+                                pass
+                            try:
+                                self.moving_object.moving = False
+                            except Exception:
+                                pass
+                            self.moving_object = None
+                        elif getattr(self, 'selected_tower', None) is not None:
+                            # Odznacz wieze (zamknij jej menu upgrade)
+                            try:
+                                self.selected_tower.selected = False
+                            except Exception:
+                                pass
+                            self.selected_tower = None
+                        elif getattr(self, 'menu_dragging', False):
+                            self.menu_dragging = False
+                        elif getattr(self, 'show_menu', False):
+                            self.show_menu = False
+                            self.paused = False
                         elif not self.bombard_active:
-                            self.show_menu = not getattr(self, 'show_menu', False)
-                            # ESC toggle: menu+pauza razem
-                            self.paused = self.show_menu
+                            # Nic do anulowania - dopiero wtedy otworz menu pauzy
+                            self.show_menu = True
+                            self.paused = True
+                        # Podczas cinematic nic wiecej nie robimy (menu juz zamkniete na starcie)
                         continue
                     # Blokada wszystkich klawiszy podczas cinematic
                     if self.bombard_active:
