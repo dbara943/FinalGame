@@ -216,7 +216,7 @@ class Game:
         self.building_upgrades = set()  # id kupionych upgradow
         self._building_menu_open = False
         self._building_menu_buttons = []  # (rect, upgrade_id)
-        self._building_rect = pygame.Rect(90, 160, 340, 250)  # szklany budynek na tle
+        self._building_rect = pygame.Rect(110, 158, 353, 231)  # bbox of drawn highlight polygon
         self._building_icons = {}
         for uid in ("walls", "drones", "tesla", "treasury", "bounty",
                     "ammo", "lucky", "storm", "docks", "cavalry"):
@@ -230,7 +230,10 @@ class Game:
         self.tent_upgrades = set()  # id kupionych upgradow
         self._tent_menu_open = False
         self._tent_menu_buttons = []
-        self._tent_rect = pygame.Rect(725, 255, 163, 150)  # tipi na tle
+        self._tent_rect = pygame.Rect(861, 244, 170, 144)  # bbox of drawn highlight polygon
+        # Highlight polygons drawn by Daniel in the draw tool (2026-10-14)
+        self._building_highlight_pts = [(114, 386), (110, 280), (140, 214), (200, 165), (276, 158), (340, 200), (389, 189), (463, 254), (457, 383), (304, 387), (139, 389)]
+        self._tent_highlight_pts = [(861, 366), (948, 244), (1031, 376), (946, 388), (879, 380)]
         self._tent_icons = {}
         _tent_icon_files = {"scout": "scout", "drums": "drums", "supply": "supply",
                             "medic": "medic", "guerrilla": "guerrilla",
@@ -1494,10 +1497,10 @@ class Game:
                         self.selected_tower = clicked_tower
                     # C: budynek/namiot otwieraja sie OSTATNIE - wieze, ich menu i stawianie wygrywaja
                     # (wczesniej kradly klikniecia przy stawianiu/upgradowaniu wiez)
-                    if self._building_rect.collidepoint(pos):
+                    if self._point_in_poly(pos[0], pos[1], self._building_highlight_pts):
                         self._building_menu_open = True
                         continue
-                    if self._tent_rect.collidepoint(pos):
+                    if self._point_in_poly(pos[0], pos[1], self._tent_highlight_pts):
                         self._tent_menu_open = True
                         continue
             # Logika gry w tempie 100Hz (akumulator) - pauza pomija, predkosc mnozy
@@ -3658,37 +3661,61 @@ class Game:
             if not owned:
                 getattr(self, buttons_attr).append((rect, upg["id"]))
 
+    def _scale_poly(self, pts, factor):
+        """Scale polygon around its centroid (for lift effect)."""
+        if not pts:
+            return pts
+        cx = sum(p[0] for p in pts) / len(pts)
+        cy = sum(p[1] for p in pts) / len(pts)
+        return [(cx + (x - cx) * factor, cy + (y - cy) * factor) for (x, y) in pts]
+
     def draw_building_highlight(self):
-        """Podswietlenie obrysu budynku (nie prostokat)."""
-        if self._building_menu_open:
-            return
+        """Gwent-style lift + glow on the drawn building polygon (glass-blue, not yellow)."""
         if getattr(self, "moving_object", None) is not None:
             return  # A: podczas przecigania wiezy budynek nie podswietla sie
+        t = self._now_s
         mx, my = self._mouse_pos()
-        if self._building_rect.collidepoint(mx, my):
-            # Przybblizony obrys szklanego budynku (kopula + bryla)
-            pts = [(120, 380), (110, 280), (140, 200), (200, 165),
-                   (280, 165), (340, 200), (380, 260), (400, 340),
-                   (390, 390), (150, 390)]
-            s = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-            pygame.draw.polygon(s, (255, 215, 100, 50), pts)
-            pygame.draw.polygon(s, (255, 215, 100, 150), pts, 3)
-            self.win.blit(s, (0, 0))
+        hovering = self._point_in_poly(mx, my, self._building_highlight_pts)
+        menu_open = getattr(self, "_building_menu_open", False)
+        if not hovering and not menu_open:
+            return
+        # Hover: breathing pulse; menu open: steady strong lift
+        pulse = 0.5 + 0.5 * math.sin(t * 4) if hovering and not menu_open else 1.0
+        lift = 1.03 + 0.015 * pulse if hovering else 1.04
+        pts = self._scale_poly(self._building_highlight_pts, lift)
+        # Drop shadow under the "lifted" shape
+        s = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        shadow = [(x, y + 8) for (x, y) in pts]
+        pygame.draw.polygon(s, (0, 0, 0, 60), shadow)
+        # Outer glow layers
+        pygame.draw.polygon(s, (80, 160, 255, 35 + int(25 * pulse)), pts)
+        pygame.draw.polygon(s, (120, 200, 255, 60 + int(40 * pulse)), pts, 6)
+        pygame.draw.polygon(s, (180, 230, 255, 140 + int(60 * pulse)), pts, 3)
+        # Fill
+        pygame.draw.polygon(s, (80, 160, 255, 30 + int(20 * pulse)), pts)
+        self.win.blit(s, (0, 0))
 
     def draw_tent_highlight(self):
-        """Podswietlenie obrysu namiotu (trojkat tipi)."""
-        if self._tent_menu_open:
-            return
+        """Gwent-style lift + glow on the drawn tent polygon (warm amber, not yellow)."""
         if getattr(self, "moving_object", None) is not None:
             return  # A: podczas przecigania wiezy namiot nie podswietla sie
+        t = self._now_s
         mx, my = self._mouse_pos()
-        if self._tent_rect.collidepoint(mx, my):
-            # Obrys tipi (trojkat)
-            pts = [(725, 405), (805, 255), (888, 405)]
-            s = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-            pygame.draw.polygon(s, (255, 215, 100, 50), pts)
-            pygame.draw.polygon(s, (255, 215, 100, 150), pts, 3)
-            self.win.blit(s, (0, 0))
+        hovering = self._point_in_poly(mx, my, self._tent_highlight_pts)
+        menu_open = getattr(self, "_tent_menu_open", False)
+        if not hovering and not menu_open:
+            return
+        pulse = 0.5 + 0.5 * math.sin(t * 4) if hovering and not menu_open else 1.0
+        lift = 1.04 + 0.02 * pulse if hovering else 1.05
+        pts = self._scale_poly(self._tent_highlight_pts, lift)
+        s = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        shadow = [(x, y + 8) for (x, y) in pts]
+        pygame.draw.polygon(s, (0, 0, 0, 60), shadow)
+        pygame.draw.polygon(s, (255, 170, 40, 35 + int(25 * pulse)), pts)
+        pygame.draw.polygon(s, (255, 190, 80, 60 + int(40 * pulse)), pts, 6)
+        pygame.draw.polygon(s, (255, 220, 150, 140 + int(60 * pulse)), pts, 3)
+        pygame.draw.polygon(s, (255, 180, 60, 30 + int(20 * pulse)), pts)
+        self.win.blit(s, (0, 0))
 
     def draw_repair_drone(self):
         """Wizualny dron krazacy wokol budynku (po kupnie Repair Drones)."""
