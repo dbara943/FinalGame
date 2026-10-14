@@ -259,7 +259,7 @@ class Game:
         # Achievements
         from achievements import AchievementManager
         self.ach_mgr = AchievementManager()
-        self._ach_stats = {
+        _ach_defaults = {
             "kills": 0, "boss_kills": 0, "elite_kills": 0,
             "max_wave": 0, "wins": 0, "flawless_waves": 0,
             "perfect_wins": 0, "comeback_wins": 0,
@@ -274,6 +274,19 @@ class Game:
             "dancers_sacrificed": 0, "tesla_kills": 0,
             "towers_lost_bombard": 0, "full_lives_wave8": 0, "dancer_kills": 0,
         }
+        # Skumulowane statystyki z poprzednich runow (achievements.json) - nie zeruj
+        _saved = dict(getattr(self.ach_mgr, "stats", {}) or {})
+        self._ach_stats = dict(_ach_defaults)
+        for _k, _v in _saved.items():
+            if _k in self._ach_stats:
+                try:
+                    self._ach_stats[_k] = int(_v)
+                except:
+                    pass
+        # Liczniki per-run (Fire/Golden "in one game" - max per-run, nie suma)
+        self._run_fire_towers = 0
+        self._run_golden_towers = 0
+        self._win_recorded = False  # unikaj podwojnego liczenia wygranej
         self._ach_popup = None  # (name, desc, icon, timer)
         self._ach_popup_timer = 0
         self._spike_pos = []  # pozycje kolcow na drodze
@@ -545,7 +558,8 @@ class Game:
         """Generuje kolejna fale endless (proceduralnie, rosnace HP)."""
         self.endless_wave += 1
         self.wave += 1
-        self._ach_stats['max_wave'] = max(self._ach_stats['max_wave'], self.wave)
+        self._ach_stats['max_wave'] = max(self._ach_stats.get('max_wave', 0), self.wave + 1)
+        self._ach_stats['max_endless_wave'] = max(self._ach_stats.get('max_endless_wave', 0), self.endless_wave)
         scale = 1 + self.endless_wave * 0.15
         self.current_wave = [
             int(20 * scale), int(15 * scale), int(12 * scale), int(10 * scale),
@@ -554,6 +568,7 @@ class Game:
         # Bonus: numer fali x $100 (fala 11 = $1100)
         gold = self.wave * 100
         self.money += gold
+        self._ach_stats["gold_earned"] = self._ach_stats.get("gold_earned", 0) + gold
         self.gold_notifications.append([f"+{gold} gold (wave {self.wave})", 150])
         if self.endless_wave % 4 == 0:
             # Endless boss: 5x HP + 5% co fale (jak zwykli wrogowie)
@@ -593,6 +608,10 @@ class Game:
                 f.write(f"advance_wave: wave {self.wave} -> {self.wave+1}, enemies={len(self.enemies)}, waiting={self.waiting_for_clear}\n")
         except:
             pass
+        # Achievements: czysta fala (bez utraty zyc) - liczy tez fale 1
+        _lives_lost_this_wave = self._wave_start_lives - self.lives
+        if _lives_lost_this_wave == 0:
+            self._ach_stats["flawless_waves"] = self._ach_stats.get("flawless_waves", 0) + 1
         # 9: raport po fali
         if self.wave > 0 or self.endless_wave > 0:
             kills = self.stats_kills - self._wave_kills_start
@@ -627,12 +646,18 @@ class Game:
                 bonus = 50 + self.wave * 10
             total = base_gold + bonus
             self.money += total
+            self._ach_stats["gold_earned"] = self._ach_stats.get("gold_earned", 0) + total
             # Widoczne powiadomienie o zlocie
             parts = [f"+{base_gold} for wave"]
             if bonus > 0:
                 parts.append(f"+{bonus} clean wave")
             self.gold_notifications.append([" | ".join(parts), 180])
             self.wave += 1
+            # Achievements: max_wave = wyswietlany numer fali (wave+1)
+            self._ach_stats["max_wave"] = max(self._ach_stats.get("max_wave", 0), self.wave + 1)
+            # Achievements: fala 8 z pelnymi zyciami
+            if self.wave + 1 == 8 and self.lives == self._start_lives:
+                self._ach_stats["full_lives_wave8"] = self._ach_stats.get("full_lives_wave8", 0) + 1
             self.current_wave = waves[self.wave][:]
             self._wave_start_lives = self.lives
             self.wave_banner_text = f"WAVE {self.wave + 1}"  # V3
@@ -1089,6 +1114,7 @@ class Game:
             if self.bombard_timer >= 150:
                 # Pirat okaleczony - UCIEKA w prawo, sojusznik GONI!
                 self.pirate_crippled = True
+                self._ach_stats["pirate_crippled"] = 1
                 self.wave_banner_text = "PIRATE SHIP CRIPPLED!"
                 self.wave_banner_timer = 200
                 # Pirat ucieka w prawo (szybciej niz zwykle)
@@ -1162,6 +1188,7 @@ class Game:
                                            (139, 90, 43), count=3, speed=4, life=40, size=5)
                     self.towers.remove(tw)
                     self.stats_towers_lost += 1
+                    self._ach_stats["towers_lost_bombard"] = self._ach_stats.get("towers_lost_bombard", 0) + 1
                     if self.selected_tower == tw:
                         self.selected_tower = None
                     self.gold_notifications.append(["Tower destroyed!", 150])
@@ -1336,7 +1363,7 @@ class Game:
                             cost = self.menu.get_item_cost(tower_names[idx])
                             if self.money >= cost:
                                 self.money -= cost
-                                self.stats_gold_spent += cost
+                                self._add_gold_spent(cost)
                                 self.add_tower(tower_names[idx])
                     # U: upgrade wybranej wiezy, S: sprzedaz
                     if event.key == pygame.K_u and self.selected_tower:
@@ -1345,8 +1372,9 @@ class Game:
                             cost = int(cost * 0.85)
                         if cost != "MAX" and self.money >= cost:
                             self.money -= cost
-                            self.stats_gold_spent += cost
+                            self._add_gold_spent(cost)
                             self.selected_tower.upgrade(cost)
+                            self._on_tower_upgraded(self.selected_tower)
                             # Q13: zapamietaj do Ctrl+Z
                             self.last_upgrade = (self.selected_tower, cost)
                     # U10: R - pokaz/ukryj wszystkie zasiegi
@@ -1449,6 +1477,7 @@ class Game:
                                         activated = True
                                 if activated:
                                     self.stats_abilities_used += 1
+                                    self._ach_stats["abilities_used"] = self._ach_stats.get("abilities_used", 0) + 1
                                     # Unikalny dzwiek dla kazdej umiejetnosci
                                     snd = {"Wooden": sound_ab_rapid, "Metal": sound_ab_frost,
                                            "Golden": sound_ab_gold, "Fire": sound_ab_meteor,
@@ -1465,6 +1494,7 @@ class Game:
                         else:
                             bonus = len(self.enemies) * 5
                             self.money += bonus
+                            self._ach_stats["gold_earned"] = self._ach_stats.get("gold_earned", 0) + bonus
                             self.gold_notifications.append([f"+{bonus}$ rush bonus!", 150])
                             # Pozostali wrogowie ZYJA - ida dalej, nowa fala dolacza
                             self.advance_wave()
@@ -1511,7 +1541,7 @@ class Game:
                                 else:
                                     self.towers.append(self.moving_object)
                                     self._apply_tower_upgrade_flags(self.moving_object)
-                                    self.stats_towers_built += 1
+                                    self._on_tower_built(self.moving_object)
                                     self._recalc_synergy()
                                 # Q7: zapamietaj do Ctrl+Z
                                 self.last_placed = (self.moving_object, self.shop_price(self.moving_object.name))
@@ -1530,7 +1560,7 @@ class Game:
                         cost = self.menu.get_item_cost(side_menu_button)
                         if self.money >= cost:
                             self.money -= cost
-                            self.stats_gold_spent += cost
+                            self._add_gold_spent(cost)
                             self.add_tower(side_menu_button)
                     
                     btn_clicked = None                    
@@ -1543,8 +1573,9 @@ class Game:
                                     cost = int(cost * 0.85)
                                 if cost != "MAX" and self.money >= cost:
                                     self.money -= cost
-                                    self.stats_gold_spent += cost
+                                    self._add_gold_spent(cost)
                                     self.selected_tower.upgrade(cost)
+                                    self._on_tower_upgraded(self.selected_tower)
                             elif btn_clicked == "Sell":
                                 self.money += self.selected_tower.sell_value()
                                 self.towers.remove(self.selected_tower)
@@ -1607,6 +1638,7 @@ class Game:
                     return "menu"
                 elif result == "continue":
                     # Tryb endless: od razu fala 11 (bez pustego rejsu statku z fali 10)
+                    self._ach_stats["endless_entered"] = self._ach_stats.get("endless_entered", 0) + 1
                     self.endless = True
                     self.won = False
                     self.last_wave_done = False
@@ -1629,10 +1661,11 @@ class Game:
         self.projectiles = []
         self.cannonballs = []
         self.damage_numbers = []
-        # Reset statystyk achievementow (na run)
-        if hasattr(self, "_ach_stats"):
-            for k in self._ach_stats:
-                self._ach_stats[k] = 0
+        # Achievements: NIE zeruj _ach_stats - sa skumulowane (plik achievements.json).
+        # Zeruj tylko liczniki per-run (Fire/Golden "in one game") i flage wygranej.
+        self._run_fire_towers = 0
+        self._run_golden_towers = 0
+        self._win_recorded = False
         self.lives = self._start_lives
         self.money = self._start_money
         self.wave = 0
@@ -1714,7 +1747,10 @@ class Game:
             targets.extend(near)
         prev = (308, 123)  # zap origin z drag tool (electrode ball: coil 308,198 - 75)
         for tgt in targets:
-            tgt.health -= dmg
+            # hit() ustawia dying przy smierci - liczymy zabojstwa Tesli
+            _died = tgt.hit(dmg)
+            if _died:
+                self._ach_stats["tesla_kills"] = self._ach_stats.get("tesla_kills", 0) + 1
             self.stats_damage += dmg
             self.damage_numbers.append([tgt.x, tgt.y - 40, str(dmg), 60])
             self.particles.burst(tgt.x, tgt.y - 30, (150, 220, 255), count=12, speed=4, size=3)
@@ -1739,9 +1775,17 @@ class Game:
         self._update_spikes()
         # Straznicy przy budynku strzelaja z lukow
         self._update_guard_dancers()
-        # Achievements: sprawdzanie co 60 tickow
+        # Achievements: max_gold_held = szczyt kasy (nie tylko przy zabojstwach)
+        self._ach_stats["max_gold_held"] = max(self._ach_stats.get("max_gold_held", 0), self.money)
+        # Achievements: sprawdzanie co 60 tickow + zapis postepu (kumulatywnie)
+        if self.raining:
+            self._ach_stats["storm_fights"] = 1
         if self._now % 60 == 0:
             self.ach_mgr.check(self._ach_stats)
+            try:
+                self.ach_mgr.save_stats(self._ach_stats)
+            except:
+                pass
             popup = self.ach_mgr.pop_popup()
             if popup:
                 self._ach_popup = popup
@@ -1795,13 +1839,13 @@ class Game:
             cost = self.shop_price(name)
             if self.money >= cost and self.is_valid_placement(gx, gy):
                 self.money -= cost
-                self.stats_gold_spent += cost
+                self._add_gold_spent(cost)
                 tower_map = {"t1": WoodenTower, "t2": MetalTower, "t3": GoldenTower,
                              "t4": FireTower, "t5": BlazeTower}
                 tw = tower_map[name](gx, gy)
                 self.towers.append(tw)
                 self._apply_tower_upgrade_flags(tw)
-                self.stats_towers_built += 1
+                self._on_tower_built(tw)
                 self._recalc_synergy()
                 self.build_queue.pop(0)
             else:
@@ -1982,6 +2026,8 @@ class Game:
                     hit_enemy.last_hit_by = proj.source_tower
                 # U6: Critical hit - 15% szansy na 2x obrazen
                 is_crit = random.random() < 0.15
+                if is_crit:
+                    self._ach_stats["crits"] = self._ach_stats.get("crits", 0) + 1
                 crit_mult = 2.0 if is_crit else 1.0
                 # Efekty specjalne pociskow umiejetnosci
                 if proj.special == "frost_nova":
@@ -2173,6 +2219,14 @@ class Game:
         win.blit(label, (lx, ly))
 
     def show_end_screen(self, won, forfeited=False):
+        # Achievements: wygrana / perfekcyjna / comeback (raz na wygrana)
+        if won and not forfeited and not getattr(self, "_win_recorded", False):
+            self._win_recorded = True
+            self._ach_stats["wins"] = self._ach_stats.get("wins", 0) + 1
+            if self.lives == self._start_lives:
+                self._ach_stats["perfect_wins"] = self._ach_stats.get("perfect_wins", 0) + 1
+            if self.lives == 1:
+                self._ach_stats["comeback_wins"] = self._ach_stats.get("comeback_wins", 0) + 1
         """Ekran koncowy. Zwraca 'restart', 'continue' (endless), 'menu' lub 'quit'."""
         big_font = self.font_big70
         small_font = self.font_small30
@@ -3563,6 +3617,33 @@ class Game:
         """Kupno upgradu namiotu."""
         self._buy_upgrade(TENT_UPGRADES, self.tent_upgrades, uid, "tent")
 
+    def _add_gold_spent(self, amount):
+        """Wydatki: stats_gold_spent (ekran koncowy) + _ach_stats (achievementy, kumulatywnie)."""
+        try:
+            self.stats_gold_spent += amount
+        except AttributeError:
+            self.stats_gold_spent = amount
+        self._ach_stats["gold_spent"] = self._ach_stats.get("gold_spent", 0) + amount
+
+    def _on_tower_built(self, tower):
+        """Wieza postawiona: towers_built + Fire/Golden per-run (max, nie suma)."""
+        self.stats_towers_built += 1
+        self._ach_stats["towers_built"] = self._ach_stats.get("towers_built", 0) + 1
+        _tname = type(tower).__name__
+        if _tname == "FireTower":
+            self._run_fire_towers += 1
+            self._ach_stats["fire_towers"] = max(self._ach_stats.get("fire_towers", 0), self._run_fire_towers)
+        elif _tname == "GoldenTower":
+            self._run_golden_towers += 1
+            self._ach_stats["golden_towers"] = max(self._ach_stats.get("golden_towers", 0), self._run_golden_towers)
+
+    def _on_tower_upgraded(self, tower):
+        """Wieza ulepszona: max_level_towers (kumulatywnie) + max_level_at_once (max)."""
+        if getattr(tower, "level", 0) >= getattr(tower, "max_level", 3):
+            self._ach_stats["max_level_towers"] = self._ach_stats.get("max_level_towers", 0) + 1
+        _at_max = sum(1 for _tw in self.towers if getattr(_tw, "level", 0) >= getattr(_tw, "max_level", 3))
+        self._ach_stats["max_level_at_once"] = max(self._ach_stats.get("max_level_at_once", 0), _at_max)
+
     def _buy_upgrade(self, upg_list, owned_set, uid, kind):
         """Generyczne kupno upgradu."""
         upg = next((u for u in upg_list if u["id"] == uid), None)
@@ -3581,8 +3662,23 @@ class Game:
             self.gold_notifications.append(["Not enough gold!", 150])
             return
         self.money -= upg["cost"]
-        self.stats_gold_spent += upg["cost"]
+        self._add_gold_spent(upg["cost"])
         owned_set.add(uid)
+        # Achievements: liczniki upgradow (max per-run) + konkretne zakupy
+        if kind == "building":
+            self._ach_stats["building_upgrades"] = max(self._ach_stats.get("building_upgrades", 0), len(self.building_upgrades))
+            if uid == "cavalry":
+                self._ach_stats["cavalry_bought"] = 1
+        else:
+            self._ach_stats["tent_upgrades"] = max(self._ach_stats.get("tent_upgrades", 0), len(self.tent_upgrades))
+            if uid == "sabotage":
+                self._ach_stats["sabotage_bought"] = 1
+            elif uid == "balloon":
+                self._ach_stats["balloon_bought"] = 1
+            elif uid == "drums":
+                self._ach_stats["drums_bought"] = 1
+            elif uid == "medic":
+                self._ach_stats["medic_bought"] = 1
         self.gold_notifications.append([f"{upg['name']} acquired!", 200])
         # Natychmiastowe efekty budynku
         if uid == "walls":

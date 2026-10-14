@@ -191,7 +191,8 @@ class StartMenu:
         title = self.btn_font.render("PIRATE ACHIEVEMENTS", True, (255, 215, 100))
         self.win.blit(title, (self.rw // 2 - title.get_width() // 2, 25))
         unlocked = len(self._ach_mgr.unlocked)
-        sub = self.small_font.render(f"{unlocked} / 50 treasures found", True, (180, 150, 110))
+        total_ach = len(self._ach_mgr.get_all())
+        sub = self.small_font.render(f"{unlocked} / {total_ach} treasures found", True, (180, 150, 110))
         self.win.blit(sub, (self.rw // 2 - sub.get_width() // 2, 65))
         # Monety po bokach tytulu
         pygame.draw.circle(self.win, (255, 215, 100), (self.rw//2 - 220, 50), 12)

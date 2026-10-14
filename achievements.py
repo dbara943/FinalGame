@@ -128,17 +128,35 @@ class AchievementManager:
         self._pending_popup = []  # do wyswietlenia
 
     def _load(self):
+        self.stats = {}
         try:
             if os.path.exists(SAVE_FILE):
                 with open(SAVE_FILE) as f:
-                    self.unlocked = set(json.load(f))
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    # Nowy format: {unlocked: [...], stats: {...}}
+                    self.unlocked = set(data.get("unlocked", []))
+                    self.stats = dict(data.get("stats", {}))
+                elif isinstance(data, list):
+                    # Stary format: tylko lista odblokowanych
+                    self.unlocked = set(data)
+                    self.stats = {}
         except:
             self.unlocked = set()
+            self.stats = {}
 
     def _save(self):
         try:
             with open(SAVE_FILE, "w") as f:
-                json.dump(list(self.unlocked), f)
+                json.dump({"unlocked": list(self.unlocked), "stats": dict(getattr(self, "stats", {}))}, f)
+        except:
+            pass
+
+    def save_stats(self, stats):
+        """Zapisuje skumulowane statystyki (postep achievementow miedzy runami)."""
+        try:
+            self.stats = dict(stats)
+            self._save()
         except:
             pass
 
