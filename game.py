@@ -874,7 +874,7 @@ class Game:
             self.win.blit(icon, (px + 10, py + 16))
         # Tekst
         t1 = self.font_btn18.render("ACHIEVEMENT UNLOCKED!", True, (255, 215, 100))
-        t2 = self.small_font.render(name, True, (255, 255, 255))
+        t2 = self.font_small30.render(name, True, (255, 255, 255))
         self.win.blit(t1, (px + 68, py + 10))
         self.win.blit(t2, (px + 68, py + 35))
 
