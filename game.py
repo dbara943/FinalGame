@@ -252,10 +252,11 @@ class Game:
         self._balloon_bombs = []
         self._spike_pos = []
         self._dancers = [
-            {"x": 377, "y": 352, "home_x": 377, "home_y": 352, "alive": True, "sex": "m", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
-            {"x": 183, "y": 357, "home_x": 183, "home_y": 357, "alive": True, "sex": "f", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
+            {"x": 377, "y": 352, "home_x": 377, "home_y": 352, "alive": True, "sex": "m", "name": "Clyde", "kills": 0, "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
+            {"x": 183, "y": 357, "home_x": 183, "home_y": 357, "alive": True, "sex": "f", "name": "Bonnie", "kills": 0, "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
         ]
         self._guard_arrows = []
+        self._tombstones = []  # R.I.P. stones for fallen guards (reset each run)
         # Achievements
         from achievements import AchievementManager
         self.ach_mgr = AchievementManager()
@@ -292,10 +293,11 @@ class Game:
         self._spike_pos = []  # pozycje kolcow na drodze
         # Tancerze-straznicy (Signal Fire)
         self._dancers = [
-            {"x": 377, "y": 352, "home_x": 377, "home_y": 352, "alive": True, "sex": "m", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},  # mezczyzna z toporem
-            {"x": 183, "y": 357, "home_x": 183, "home_y": 357, "alive": True, "sex": "f", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},  # kobieta z patelnia
+            {"x": 377, "y": 352, "home_x": 377, "home_y": 352, "alive": True, "sex": "m", "name": "Clyde", "kills": 0, "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},  # mezczyzna z toporem
+            {"x": 183, "y": 357, "home_x": 183, "home_y": 357, "alive": True, "sex": "f", "name": "Bonnie", "kills": 0, "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},  # kobieta z patelnia
         ]
         self._guard_arrows = []  # widoczne strzaly z lukow straznikow
+        self._tombstones = []  # R.I.P. stones for fallen guards (reset each run)
         # Dron naprawczy (wizualny)
         self._drone_angle = 0.0
         # Tesla Coil
@@ -416,6 +418,7 @@ class Game:
         self.font_boss16 = pygame.font.SysFont(_fn, 16, bold=True)
         self.font_btn18 = pygame.font.SysFont(_fn, 18, bold=True)
         self.font_c13 = pygame.font.SysFont(_fn, 13, bold=True)
+        self._tomb_fonts = {s: pygame.font.SysFont(_fn, s, bold=True) for s in (13, 11, 10, 9, 8, 7, 6)}  # tombstone text, shrink-to-fit
         self.font_r16 = pygame.font.SysFont(_fn, 16)
         self.font_q14 = pygame.font.SysFont(_fn, 14)
         self.font_p36 = pygame.font.SysFont(_fn, 36, bold=True)
@@ -1725,9 +1728,11 @@ class Game:
         self._balloon_bombs = []
         self._spike_pos = []
         self._dancers = [
-            {"x": 377, "y": 352, "home_x": 377, "home_y": 352, "alive": True, "sex": "m", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
-            {"x": 183, "y": 357, "home_x": 183, "home_y": 357, "alive": True, "sex": "f", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
+            {"x": 377, "y": 352, "home_x": 377, "home_y": 352, "alive": True, "sex": "m", "name": "Clyde", "kills": 0, "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
+            {"x": 183, "y": 357, "home_x": 183, "home_y": 357, "alive": True, "sex": "f", "name": "Bonnie", "kills": 0, "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
         ]
+        self._tombstones = []  # reset: no graves in a fresh run
+        self._guard_arrows = []  # reset: no arrows in flight in a fresh run
         self.ship = Ship(os.path.join("images", "ship.png"), dock_x=278, dock_y=669,
                          screen_w=self.width)
         self.ship.sail_in()
@@ -3224,6 +3229,7 @@ class Game:
     def draw_guard_dancers(self):
         """Guards on duty: hold bows always. Melee weapon only when charging/dueling/returning."""
         t = self._now_s
+        self.draw_tombstones()
         # Widoczne strzaly straznikow (w locie)
         for a in getattr(self, "_guard_arrows", []):
             ax, ay = a["x"], a["y"]
@@ -3337,6 +3343,40 @@ class Game:
                 # Free hand to the bow
                 pygame.draw.line(self.win, (255, 200, 170) if d["sex"] == "m" else (255, 210, 180), (dx + face * 5, dy - 15), (bow_mid_x - face * 4, dy - 20), 2)
 
+    # Tombstone spots (z drag tool, 2026-10-14): Bonnie 22,393 / Clyde 71,393
+    _TOMBSTONE_POS = {"Bonnie": (22, 393), "Clyde": (71, 393)}
+
+    def _add_tombstone(self, d):
+        """Guard dead -> R.I.P. stone at their placed spot. Kills read live from the guard."""
+        if not hasattr(self, "_tombstones"):
+            self._tombstones = []
+        pos = self._TOMBSTONE_POS.get(d.get("name"), (d["x"], d["y"]))
+        self._tombstones.append({"x": pos[0], "y": pos[1], "name": d.get("name", "?"), "d": d})
+
+    def draw_tombstones(self):
+        """R.I.P. stones for fallen guards. Font shrink-to-fit: text NEVER goes over the stone."""
+        for tb in getattr(self, "_tombstones", []):
+            w, h = 56, 60
+            # Clamp so the stone is never cut off by the screen edge (Bonnie sits near x=22)
+            cx = max(w // 2, min(self.width - w // 2, tb["x"]))
+            cy = tb["y"]
+            pygame.draw.ellipse(self.win, (50, 50, 50), (cx - w // 2, cy - 6, w, 10))
+            rect = pygame.Rect(cx - w // 2, cy - h, w, h)
+            pygame.draw.rect(self.win, (195, 195, 200), rect, border_radius=16)
+            pygame.draw.rect(self.win, (120, 120, 130), rect, 2, border_radius=16)
+            lines = ["R.I.P.", tb["name"], f"Kills: {tb['d'].get('kills', 0)}"]
+            font = self._tomb_fonts[6]
+            for s in (13, 11, 10, 9, 8, 7, 6):
+                f = self._tomb_fonts[s]
+                if max(f.size(ln)[0] for ln in lines) <= w - 8:
+                    font = f
+                    break
+            ty = cy - h + 7
+            for ln in lines:
+                surf = font.render(ln, True, (60, 60, 70))
+                self.win.blit(surf, (cx - surf.get_width() // 2, ty))
+                ty += font.get_height() + 1
+
     # Sciezka wrogow (kopia z enemies/enemy.py) - straznicy ida do posterunkow DROGA
     _GUARD_PATH = [
         (322, 658), (425, 630), (505, 591), (588, 581),
@@ -3402,6 +3442,9 @@ class Game:
                             killed = False
                     if killed:
                         self._ach_stats["dancer_kills"] = self._ach_stats.get("dancer_kills", 0) + 1
+                        _g = a.get("guard")
+                        if _g is not None:
+                            _g["kills"] = _g.get("kills", 0) + 1
                     self.stats_damage += 25
                     self.damage_numbers.append([tgt.x, tgt.y - 40, "25", 40])
                     self.particles.burst(a["x"], a["y"], (200, 180, 150), count=3, speed=3, life=15, size=2)
@@ -3489,12 +3532,14 @@ class Game:
                         killed = True
                     if killed or getattr(tgt, "dying", False):
                         self._ach_stats["dancer_kills"] = self._ach_stats.get("dancer_kills", 0) + 1
+                        d["kills"] = d.get("kills", 0) + 1
                     if dmg > 0:
                         self.stats_damage += dmg
                     d["alive"] = False
                     d["mode"] = "dead"
                     d["target"] = None
                     self._ach_stats["dancers_sacrificed"] = self._ach_stats.get("dancers_sacrificed", 0) + 1
+                    self._add_tombstone(d)
                     self.particles.burst(d["x"], d["y"] - 20, (255, 100, 100), count=20, speed=4, life=40, size=4)
                     self.gold_notifications.append(["A guard gave their life!", 180])
                 continue
@@ -3521,7 +3566,7 @@ class Game:
                         best, best_d2 = en, d2
                 if best:
                     # Strzala jako widoczny pocisk (trafienie w _update_guard_arrows)
-                    self._guard_arrows.append({"x": d["x"], "y": d["y"] - 20, "tx": best.x, "ty": best.y - 20, "target": best})
+                    self._guard_arrows.append({"x": d["x"], "y": d["y"] - 20, "tx": best.x, "ty": best.y - 20, "target": best, "guard": d})
                     self.particles.burst(d["x"], d["y"] - 25, (200, 180, 150), count=3, speed=3, life=15, size=2)
                     d["cd"] = 120  # 2s
                 else:
@@ -3579,6 +3624,8 @@ class Game:
         pick["alive"] = False
         pick["mode"] = "dead"
         pick["target"] = None
+        pick["kills"] = pick.get("kills", 0) + 1  # guard took the gate enemy down with them
+        self._add_tombstone(pick)
         self._ach_stats["dancers_sacrificed"] = self._ach_stats.get("dancers_sacrificed", 0) + 1
         self.particles.burst(pick["x"], pick["y"] - 20, (255, 100, 100), count=20, speed=4, life=40, size=4)
         self.gold_notifications.append(["A guard gave their life!", 180])
