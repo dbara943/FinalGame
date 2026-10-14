@@ -405,6 +405,9 @@ class Game:
         _fn = "segoe ui, calibri, arial"
         self.font_big70 = pygame.font.SysFont(_fn, 70)
         self.font_small30 = pygame.font.SysFont(_fn, 30)
+        self.font_small26 = pygame.font.SysFont(_fn, 26)
+        self.font_small22 = pygame.font.SysFont(_fn, 22)
+        self.font_small18 = pygame.font.SysFont(_fn, 18)
         self.font_stats24 = pygame.font.SysFont(_fn, 24)
         self.font_dmg18 = pygame.font.SysFont(_fn, 18, bold=True)
         self.font_crit22 = pygame.font.SysFont(_fn, 22, bold=True)
@@ -2208,9 +2211,17 @@ class Game:
     def _draw_glass_button(self, rect, label_text, glow_color, hover=False, font=None):
         """Szklany przycisk (glassmorphism): poswiata, matowe szklo, jasna krawedz, blysk u gory."""
         win = self.win
-        font = font or self.font_small30
+        # Tekst MUSI miescic sie w przycisku: kurcz czcionke (30/26/22/18) az wejdzie
+        # (wczesniej ENDLESS MODE przy 30px byl szerszy niz przycisk 170px i wylewal sie poza)
+        _cands = [font or self.font_small30, self.font_small26, self.font_small22, self.font_small18]
+        font = _cands[0]
+        for _f in _cands:
+            if _f.size(label_text)[0] <= rect.w - 16 and _f.size(label_text)[1] <= rect.h - 10:
+                font = _f
+                break
         # Miekka poswiata za przyciskiem (kilka warstw = przyblizony blur)
-        for pad, alpha in ((22, 18), (14, 30), (7, 45)):
+        # Pady mniejsze (14/9/4 zamiast 22/14/7): przy gap 28 poswiaty sie tylko stykaja, nie zlewaja
+        for pad, alpha in ((14, 18), (9, 30), (4, 45)):
             glow = pygame.Surface((rect.w + pad * 2, rect.h + pad * 2), pygame.SRCALPHA)
             a = alpha + (20 if hover else 0)
             pygame.draw.rect(glow, (*glow_color, a), glow.get_rect(), border_radius=18)
@@ -2272,10 +2283,10 @@ class Game:
             title = "ISLAND LOST"
             color = (150, 60, 60)  # przygaszona czerwien na ciemnym tle
             title_bg = None
-        # Przyciski - wieksze, wyraziste
-        bw, bh = 170, 52
+        # Przyciski - szersze + wiekszy odstep (wczesniej 170x52, gap 20: ciasno + ENDLESS MODE wylewal sie)
+        bw, bh = 210, 56
         by = self.height // 2 + 200
-        gap = 20
+        gap = 28
         if won and not forfeited:
             total = 4 * bw + 3 * gap
             x0 = self.width // 2 - total // 2
