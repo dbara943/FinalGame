@@ -250,8 +250,8 @@ class Game:
         self._spike_pos = []
         self._banner_phase = 0.0
         self._dancers = [
-            {"x": 377, "y": 352, "alive": True, "sex": "m", "cd": 0},
-            {"x": 183, "y": 357, "alive": True, "sex": "f", "cd": 0},
+            {"x": 377, "y": 352, "home_x": 377, "home_y": 352, "alive": True, "sex": "m", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
+            {"x": 183, "y": 357, "home_x": 183, "home_y": 357, "alive": True, "sex": "f", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
         ]
         # Achievements
         from achievements import AchievementManager
@@ -277,8 +277,8 @@ class Game:
         self._banner_phase = 0.0  # animacja choragwi
         # Tancerze-straznicy (Signal Fire)
         self._dancers = [
-            {"x": 377, "y": 352, "alive": True, "sex": "m", "cd": 0},  # mezczyzna z toporem
-            {"x": 183, "y": 357, "alive": True, "sex": "f", "cd": 0},  # kobieta z patelnia
+            {"x": 377, "y": 352, "home_x": 377, "home_y": 352, "alive": True, "sex": "m", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},  # mezczyzna z toporem
+            {"x": 183, "y": 357, "home_x": 183, "home_y": 357, "alive": True, "sex": "f", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},  # kobieta z patelnia
         ]
         # Dron naprawczy (wizualny)
         self._drone_angle = 0.0
@@ -1606,8 +1606,8 @@ class Game:
         self._spike_pos = []
         self._banner_phase = 0.0
         self._dancers = [
-            {"x": 377, "y": 352, "alive": True, "sex": "m", "cd": 0},
-            {"x": 183, "y": 357, "alive": True, "sex": "f", "cd": 0},
+            {"x": 377, "y": 352, "home_x": 377, "home_y": 352, "alive": True, "sex": "m", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
+            {"x": 183, "y": 357, "home_x": 183, "home_y": 357, "alive": True, "sex": "f", "cd": 0, "mode": "guard", "target": None, "duel_t": 0, "swing": 0},
         ]
         self.ship = Ship(os.path.join("images", "ship.png"), dock_x=278, dock_y=669,
                          screen_w=self.width)
@@ -3055,44 +3055,166 @@ class Game:
             self.draw_campfire_dancers(cx, cy, t)
 
     def draw_guard_dancers(self):
-        """Tancerze na strazy przy budynku: strzelaja z lukow, poswiecaja sie."""
+        """Guards on duty: hold bows always. Melee weapon only when charging/dueling/returning."""
         t = self._now_s
         for d in self._dancers:
             if not d["alive"]:
                 continue
             dx, dy = d["x"], d["y"]
-            # Cialo
+            mode = d.get("mode", "guard")
+            # Face toward target when dueling/charging, else toward nearest enemy, else right
+            face = 1
+            tgt = d.get("target")
+            if mode in ("charging", "dueling") and tgt is not None and not getattr(tgt, "dead", False) and not getattr(tgt, "dying", False):
+                face = 1 if tgt.x >= dx else -1
+            else:
+                best, best_d2 = None, 1e18
+                for en in self.enemies:
+                    if en.dying or en.dead or en.reached_end:
+                        continue
+                    d2 = (en.x - dx) ** 2 + (en.y - dy) ** 2
+                    if d2 < best_d2:
+                        best, best_d2 = en, d2
+                if best is not None:
+                    face = 1 if best.x >= dx else -1
+            # Legs: running when charging/returning, standing otherwise
+            if mode in ("charging", "returning"):
+                run = 6 * math.sin(t * 12)
+                pygame.draw.line(self.win, (50, 50, 80), (dx, dy), (dx - 6 + run, dy + 14), 3)
+                pygame.draw.line(self.win, (50, 50, 80), (dx, dy), (dx + 6 - run, dy + 14), 3)
+            else:
+                pygame.draw.line(self.win, (50, 50, 80), (dx, dy), (dx - 6, dy + 14), 3)
+                pygame.draw.line(self.win, (50, 50, 80), (dx, dy), (dx + 6, dy + 14), 3)
+            # Body
             if d["sex"] == "m":
                 pygame.draw.circle(self.win, (255, 200, 170), (int(dx), int(dy - 28)), 8)
                 pygame.draw.line(self.win, (70, 50, 120), (dx, dy - 20), (dx, dy), 4)
-                # Topor w reku
-                ax = dx + 15
-                pygame.draw.line(self.win, (101, 67, 33), (dx + 5, dy - 15), (ax, dy - 25), 3)
-                pygame.draw.polygon(self.win, (180, 180, 180), [(ax, dy - 25), (ax - 10, dy - 20), (ax - 6, dy - 30)])
             else:
                 pygame.draw.polygon(self.win, (220, 100, 150), [(dx, dy - 20), (dx - 12, dy + 8), (dx + 12, dy + 8)])
                 pygame.draw.circle(self.win, (255, 210, 180), (int(dx), int(dy - 28)), 7)
-                # Patelnia w reku
-                px = dx + 15
-                pygame.draw.line(self.win, (255, 210, 180), (dx, dy - 18), (px, dy - 22), 3)
-                pygame.draw.circle(self.win, (80, 80, 80), (int(px), int(dy - 22)), 7)
-            # Nogi
-            pygame.draw.line(self.win, (50, 50, 80), (dx, dy), (dx - 6, dy + 14), 3)
-            pygame.draw.line(self.win, (50, 50, 80), (dx, dy), (dx + 6, dy + 14), 3)
-            # Luk (gdy strzela)
-            if d["cd"] > 100:
-                pygame.draw.arc(self.win, (101, 67, 33), (dx - 15, dy - 35, 20, 30), -1.2, 1.2, 2)
+            if mode in ("charging", "dueling", "returning"):
+                # Melee weapon in hand, blade AWAY from body toward facing dir
+                swing = 0
+                if mode == "dueling":
+                    swing = 6 * math.sin(d.get("swing", 0) * 0.6)
+                hx = dx + face * 18
+                hy = dy - 25 + swing
+                pygame.draw.line(self.win, (101, 67, 33), (dx + face * 5, dy - 15), (hx, hy), 3)
+                if d["sex"] == "m":
+                    # Axe: blade points AWAY from body (face dir), not back at the guard
+                    pygame.draw.polygon(self.win, (180, 180, 180), [(hx, hy - 8), (hx + face * 12, hy), (hx, hy + 8)])
+                else:
+                    # Frying pan held out toward the enemy
+                    pygame.draw.line(self.win, (255, 210, 180), (dx + face * 5, dy - 18), (hx, hy), 3)
+                    pygame.draw.circle(self.win, (80, 80, 80), (int(hx), int(hy)), 7)
+            else:
+                # Bow ALWAYS in hands on guard duty (no more pop-in bow)
+                # Bow arc on the facing side
+                if face == 1:
+                    bx0, by0 = dx + 4, dy - 35
+                    pygame.draw.arc(self.win, (101, 67, 33), (bx0, by0, 20, 30), -1.2, 1.2, 2)
+                    tip_top = (bx0 + 18, by0 + 2)
+                    tip_bot = (bx0 + 18, by0 + 28)
+                    bow_mid_x = bx0 + 18
+                else:
+                    bx0, by0 = dx - 24, dy - 35
+                    pygame.draw.arc(self.win, (101, 67, 33), (bx0, by0, 20, 30), 1.94, 4.34, 2)
+                    tip_top = (bx0 + 2, by0 + 2)
+                    tip_bot = (bx0 + 2, by0 + 28)
+                    bow_mid_x = bx0 + 2
+                # Bowstring: pulled back when just shot (cd > 105) or about to shoot
+                just_shot = d.get("cd", 0) > 105
+                if just_shot:
+                    pull = 6 * face
+                    str_x = bow_mid_x - pull
+                    pygame.draw.line(self.win, (240, 240, 240), tip_top, (str_x, dy - 20), 1)
+                    pygame.draw.line(self.win, (240, 240, 240), (str_x, dy - 20), tip_bot, 1)
+                    # Arrow nocked during the pull
+                    pygame.draw.line(self.win, (200, 180, 150), (str_x, dy - 20), (bow_mid_x + face * 6, dy - 20), 2)
+                else:
+                    pygame.draw.line(self.win, (240, 240, 240), tip_top, tip_bot, 1)
+                # Free hand to the bow
+                pygame.draw.line(self.win, (255, 200, 170) if d["sex"] == "m" else (255, 210, 180), (dx + face * 5, dy - 15), (bow_mid_x - face * 4, dy - 20), 2)
 
     def _update_guard_dancers(self):
-        """Straznicy strzelaja z lukow do pobliskich wrogow."""
+        """Guards: bow shooting on post + one random guard duels a close enemy to mutual death."""
         if "signal" not in self.tent_upgrades:
             return
+        GATE_X, GATE_Y = 250, 351
+        TRIGGER_DIST = 150
+        # Only one duel at a time: the other guard keeps bow-guarding until the next trigger
+        duel_active = any(dd["alive"] and dd.get("mode") in ("charging", "dueling") for dd in self._dancers)
         for d in self._dancers:
             if not d["alive"]:
                 continue
+            mode = d.get("mode", "guard")
+            if mode == "charging":
+                tgt = d.get("target")
+                if tgt is None or getattr(tgt, "dying", False) or getattr(tgt, "dead", False) or getattr(tgt, "reached_end", False) or getattr(tgt, "attacking", False):
+                    d["mode"] = "returning"
+                    d["target"] = None
+                    continue
+                tx, ty = tgt.x, tgt.y - 20
+                vx, vy = tx - d["x"], ty - d["y"]
+                dist = math.hypot(vx, vy)
+                if dist < 32:
+                    d["mode"] = "dueling"
+                    d["duel_t"] = 30
+                    d["swing"] = 0
+                elif dist > 0:
+                    d["x"] += vx / dist * 3.5
+                    d["y"] += vy / dist * 3.5
+                continue
+            if mode == "dueling":
+                tgt = d.get("target")
+                d["swing"] = d.get("swing", 0) + 1
+                if tgt is None or getattr(tgt, "dying", False) or getattr(tgt, "dead", False):
+                    # Enemy died by tower/balloon mid-duel: guard survives, walks back
+                    d["mode"] = "returning"
+                    d["target"] = None
+                    continue
+                if getattr(tgt, "reached_end", False) or getattr(tgt, "attacking", False):
+                    d["mode"] = "returning"
+                    d["target"] = None
+                    continue
+                d["duel_t"] = d.get("duel_t", 30) - 1
+                if d["duel_t"] % 10 == 0:
+                    self.particles.burst(tgt.x, tgt.y - 25, (255, 220, 100), count=4, speed=3, life=15, size=2)
+                if d["duel_t"] <= 0:
+                    # Mutual kill: guard trades their life for the mob
+                    dmg = max(0, int(getattr(tgt, "health", 0)))
+                    killed = False
+                    try:
+                        killed = bool(tgt.hit(dmg)) if dmg > 0 else False
+                    except Exception:
+                        tgt.health = 0
+                        tgt.dying = True
+                        killed = True
+                    if killed or getattr(tgt, "dying", False):
+                        self._ach_stats["dancer_kills"] = self._ach_stats.get("dancer_kills", 0) + 1
+                    if dmg > 0:
+                        self.stats_damage += dmg
+                    d["alive"] = False
+                    d["mode"] = "dead"
+                    d["target"] = None
+                    self._ach_stats["dancers_sacrificed"] = self._ach_stats.get("dancers_sacrificed", 0) + 1
+                    self.particles.burst(d["x"], d["y"] - 20, (255, 100, 100), count=20, speed=4, life=40, size=4)
+                    self.gold_notifications.append(["A guard gave their life!", 180])
+                continue
+            if mode == "returning":
+                hx, hy = d.get("home_x", d["x"]), d.get("home_y", d["y"])
+                vx, vy = hx - d["x"], hy - d["y"]
+                dist = math.hypot(vx, vy)
+                if dist < 5:
+                    d["x"], d["y"] = hx, hy
+                    d["mode"] = "guard"
+                elif dist > 0:
+                    d["x"] += vx / dist * 3.5
+                    d["y"] += vy / dist * 3.5
+                continue
+            # mode == "guard": bow shooting
             d["cd"] -= 1
             if d["cd"] <= 0:
-                # Najblizszy wrog w zasiegu 350
                 best, best_d2 = None, 350 ** 2
                 for en in self.enemies:
                     if en.dying or en.dead or en.reached_end:
@@ -3101,28 +3223,79 @@ class Game:
                     if d2 < best_d2:
                         best, best_d2 = en, d2
                 if best:
-                    # Strzal z luku (25 dmg)
-                    best.health -= 25
+                    killed = False
+                    try:
+                        killed = bool(best.hit(25))
+                    except Exception:
+                        best.health -= 25
+                        if best.health <= 0 and not best.dying:
+                            best.dying = True
+                            killed = True
+                    if killed:
+                        self._ach_stats["dancer_kills"] = self._ach_stats.get("dancer_kills", 0) + 1
                     self.stats_damage += 25
                     self.damage_numbers.append([best.x, best.y - 40, "25", 40])
-                    # Wizualna strzala
                     self.particles.burst(d["x"], d["y"] - 25, (200, 180, 150), count=3, speed=3, life=15, size=2)
                     d["cd"] = 120  # 2s
                 else:
                     d["cd"] = 30
+            # Duel trigger: one enemy close to (but not yet at) the gate
+            if not duel_active and d.get("mode") == "guard":
+                candidates = []
+                for en in self.enemies:
+                    if en.dying or en.dead or en.reached_end or getattr(en, "attacking", False):
+                        continue
+                    # Bosses are not dueled: they still use the gate sacrifice fallback
+                    if type(en).__name__ == "Boss":
+                        continue
+                    # Already targeted by another guard?
+                    if any(other is not d and other.get("target") is en for other in self._dancers):
+                        continue
+                    dist_gate = math.hypot(en.x - GATE_X, en.y - GATE_Y)
+                    if dist_gate < TRIGGER_DIST:
+                        candidates.append((dist_gate, en))
+                if candidates:
+                    candidates.sort(key=lambda p: p[0])
+                    _, chosen_enemy = candidates[0]
+                    # One RANDOM guard charges (this guard is the random pick when multiple are free;
+                    # to keep it truly random across guards, pick from all free guards here)
+                    free = [gg for gg in self._dancers if gg["alive"] and gg.get("mode") == "guard"]
+                    if free:
+                        pick = random.choice(free)
+                        pick["mode"] = "charging"
+                        pick["target"] = chosen_enemy
+                        pick["swing"] = 0
+                        duel_active = True
 
     def _dancer_sacrifice(self, en):
-        """Wrog przy wejsciu zabija tancerza zamiast budynku. Zwraca True jesli poswiecono."""
+        """Enemy at the gate kills a guard instead of the building. Returns True if sacrificed."""
         if "signal" not in self.tent_upgrades:
             return False
-        for d in self._dancers:
-            if d["alive"]:
-                d["alive"] = False
-                # Animacja smierci
-                self.particles.burst(d["x"], d["y"] - 20, (255, 100, 100), count=20, speed=4, life=40, size=4)
-                self.gold_notifications.append(["A guard gave their life!", 180])
-                return True
-        return False
+        # Prefer a guard on post; if the reaching enemy was dueled, kill its duelist
+        pick = None
+        for dd in self._dancers:
+            if dd["alive"] and dd.get("target") is en:
+                pick = dd
+                break
+        if pick is None:
+            for dd in self._dancers:
+                if dd["alive"] and dd.get("mode") == "guard":
+                    pick = dd
+                    break
+        if pick is None:
+            for dd in self._dancers:
+                if dd["alive"]:
+                    pick = dd
+                    break
+        if pick is None:
+            return False
+        pick["alive"] = False
+        pick["mode"] = "dead"
+        pick["target"] = None
+        self._ach_stats["dancers_sacrificed"] = self._ach_stats.get("dancers_sacrificed", 0) + 1
+        self.particles.burst(pick["x"], pick["y"] - 20, (255, 100, 100), count=20, speed=4, life=40, size=4)
+        self.gold_notifications.append(["A guard gave their life!", 180])
+        return True
 
     def draw_campfire_dancers(self, cx, cy, t):
         """Tancerze przy ognisku (oryginalna animacja)."""
@@ -3136,7 +3309,12 @@ class Game:
         sa = -0.5 + 0.4 * math.sin(t * 6)
         sx2, sy2 = mx + 25 * math.cos(sa), (my - 20) + 25 * math.sin(sa)
         pygame.draw.line(self.win, (101, 67, 33), (mx + 5, my - 15), (sx2, sy2), 3)
-        pygame.draw.polygon(self.win, (180, 180, 180), [(sx2, sy2), (sx2 - 8, sy2 + 4), (sx2 - 4, sy2 - 6)])
+        # Axe blade points AWAY from the body (outward from handle tip), not back at the dancer
+        _ox, _oy = sx2 - mx, sy2 - (my - 20)
+        _ol = math.hypot(_ox, _oy) or 1.0
+        _ox, _oy = _ox / _ol, _oy / _ol
+        _px, _py = -_oy, _ox
+        pygame.draw.polygon(self.win, (180, 180, 180), [(sx2 + _ox * 10 + _px * 4, sy2 + _oy * 10 + _py * 4), (sx2 + _ox * 10 - _px * 4, sy2 + _oy * 10 - _py * 4), (sx2, sy2)])
         wx = cx + 45 + 8 * math.cos(t * 2.5)
         wy = cy + 5
         spin = t * 4
