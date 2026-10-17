@@ -75,38 +75,40 @@ class Menu():
             "BlazeTower": (180, 60, 200),
         }
         holo = colors.get(tname, (0, 255, 204))
+        # Jasniejsza wersja koloru wiezy do tekstow - surowy kolor byl wymazany
+        bright = tuple(min(255, int(c * 1.4 + 45)) for c in holo)
         panel_w, panel_h = 240, 160
         px = self.x - panel_w // 2
         py = self.y - 210  # calkowicie nad wieza (wieza w pelni widoczna)
         bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-        pygame.draw.rect(bg, (8, 14, 22, 220), bg.get_rect(), border_radius=8)
-        pygame.draw.rect(bg, (*holo, 255), bg.get_rect(), 2, border_radius=8)
+        pygame.draw.rect(bg, (16, 26, 40, 235), bg.get_rect(), border_radius=8)
+        pygame.draw.rect(bg, (*bright, 255), bg.get_rect(), 2, border_radius=8)
         c = 12
         for cx, cy in [(0, 0), (panel_w, 0), (0, panel_h), (panel_w, panel_h)]:
             dx = -1 if cx == 0 else 1
             dy = -1 if cy == 0 else 1
-            pygame.draw.line(bg, (*holo, 255), (cx, cy), (cx + dx*c, cy), 3)
-            pygame.draw.line(bg, (*holo, 255), (cx, cy), (cx, cy + dy*c), 3)
+            pygame.draw.line(bg, (*bright, 255), (cx, cy), (cx + dx*c, cy), 3)
+            pygame.draw.line(bg, (*bright, 255), (cx, cy), (cx, cy + dy*c), 3)
         win.blit(bg, (px, py))
         tag_font = pygame.font.SysFont("consolas, monospace", 11)
-        tag = tag_font.render("TOWER.EXE", True, holo)
+        tag = tag_font.render("TOWER.EXE", True, bright)
         pygame.draw.rect(win, (8, 14, 22), (px + 8, py - 10, tag.get_width() + 8, 14))
         win.blit(tag, (px + 12, py - 8))
         name_font = pygame.font.SysFont("consolas, monospace", 15, bold=True)
         name_text = tw.name if hasattr(tw, 'name') else tname
-        label = name_font.render(f"> {name_text.upper()}", True, holo)
+        label = name_font.render(f"> {name_text.upper()}", True, bright)
         win.blit(label, (px + 14, py + 14))
         lvl, maxlvl = tw.level, tw.max_level
         bar_x, bar_y, bar_w, bar_h = px + 14, py + 36, panel_w - 28, 8
-        pygame.draw.rect(win, (40, 50, 65), (bar_x, bar_y, bar_w, bar_h), border_radius=4)
+        pygame.draw.rect(win, (50, 62, 80), (bar_x, bar_y, bar_w, bar_h), border_radius=4)
         fill_w = int(bar_w * lvl / maxlvl)
-        pygame.draw.rect(win, holo, (bar_x, bar_y, fill_w, bar_h), border_radius=4)
-        lvl_txt = tag_font.render(f"LV.{lvl}/{maxlvl}", True, holo)
+        pygame.draw.rect(win, bright, (bar_x, bar_y, fill_w, bar_h), border_radius=4)
+        lvl_txt = tag_font.render(f"LV.{lvl}/{maxlvl}", True, bright)
         win.blit(lvl_txt, (px + panel_w - lvl_txt.get_width() - 14, py + 32))
         stat_font = pygame.font.SysFont("consolas, monospace", 12)
-        slabel = stat_font.render(f"DMG {tw.damage}  RNG {tw.range}", True, holo)
+        slabel = stat_font.render(f"DMG {tw.damage}  RNG {tw.range}", True, bright)
         win.blit(slabel, (px + 14, py + 52))
-        klabel = stat_font.render(f"KILLS {tw.kills}", True, holo)
+        klabel = stat_font.render(f"KILLS {tw.kills}", True, bright)
         win.blit(klabel, (px + 14, py + 68))
         btn_y, btn_h = py + 92, 52
         is_max = tw.level >= tw.max_level
@@ -138,18 +140,20 @@ class Menu():
             self.buttons[1].width, self.buttons[1].height = 106, btn_h
 
     def _draw_holo_btn(self, win, x, y, w, h, title, sub, color, disabled, sub_color=None):
+        # Zywsze przyciski: mocniejsze wypelnienie, grubsza ramka, jasniejszy tekst
+        br = tuple(min(255, int(c * 1.4 + 45)) for c in color)
         btn = pygame.Surface((w, h), pygame.SRCALPHA)
-        r, g, b = color[0], color[1], color[2]
+        r, g, b = br[0], br[1], br[2]
         if disabled:
-            pygame.draw.rect(btn, (40, 45, 55, 180), btn.get_rect(), border_radius=6)
-            pygame.draw.rect(btn, (80, 90, 100, 100), btn.get_rect(), 1, border_radius=6)
+            pygame.draw.rect(btn, (50, 58, 70, 200), btn.get_rect(), border_radius=6)
+            pygame.draw.rect(btn, (110, 120, 135, 160), btn.get_rect(), 1, border_radius=6)
         else:
-            pygame.draw.rect(btn, (r, g, b, 40), btn.get_rect(), border_radius=6)
-            pygame.draw.rect(btn, (r, g, b, 255), btn.get_rect(), 2, border_radius=6)
+            pygame.draw.rect(btn, (r, g, b, 120), btn.get_rect(), border_radius=6)
+            pygame.draw.rect(btn, (r, g, b, 255), btn.get_rect(), 3, border_radius=6)
         win.blit(btn, (x, y))
         tfont = pygame.font.SysFont("consolas, monospace", 13, bold=True)
         sfont = pygame.font.SysFont("consolas, monospace", 12)
-        tcol = (120, 130, 140) if disabled else (r, g, b)
+        tcol = (155, 165, 175) if disabled else (r, g, b)
         t = tfont.render(title, True, tcol)
         win.blit(t, (x + w//2 - t.get_width()//2, y + 8))
         if sub:
@@ -159,21 +163,22 @@ class Menu():
 
     def _draw_holo_btn_sale(self, win, x, y, w, h, title, orig_price, sale_price, color, disabled):
         """Przycisk z przekreslona cena (Costco style)."""
+        br = tuple(min(255, int(c * 1.4 + 45)) for c in color)
         btn = pygame.Surface((w, h), pygame.SRCALPHA)
-        r, g, b = color[0], color[1], color[2]
+        r, g, b = br[0], br[1], br[2]
         if disabled:
-            pygame.draw.rect(btn, (40, 45, 55, 180), btn.get_rect(), border_radius=6)
+            pygame.draw.rect(btn, (50, 58, 70, 200), btn.get_rect(), border_radius=6)
         else:
-            pygame.draw.rect(btn, (r, g, b, 40), btn.get_rect(), border_radius=6)
-            pygame.draw.rect(btn, (r, g, b, 255), btn.get_rect(), 2, border_radius=6)
+            pygame.draw.rect(btn, (r, g, b, 120), btn.get_rect(), border_radius=6)
+            pygame.draw.rect(btn, (r, g, b, 255), btn.get_rect(), 3, border_radius=6)
         win.blit(btn, (x, y))
         tfont = pygame.font.SysFont("consolas, monospace", 13, bold=True)
         sfont = pygame.font.SysFont("consolas, monospace", 11)
-        tcol = (120, 130, 140) if disabled else (r, g, b)
+        tcol = (155, 165, 175) if disabled else (r, g, b)
         t = tfont.render(title, True, tcol)
         win.blit(t, (x + w//2 - t.get_width()//2, y + 6))
         # Przekreslona oryginalna
-        o = sfont.render(f"${orig_price}", True, (120, 120, 120))
+        o = sfont.render(f"${orig_price}", True, (150, 150, 150))
         ox = x + w//2 - o.get_width()//2
         oy = y + 24
         win.blit(o, (ox, oy))

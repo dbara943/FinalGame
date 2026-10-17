@@ -41,7 +41,7 @@ Five unique towers, each with 5 upgrade levels, distinct projectiles, and a spec
 ## Clickable Buildings
 
 **Glass Research Facility** (click it!) — 10 one-time upgrades per run, sorted by price:
-War Treasury $1,200, Bounty Board $1,500, Lucky Charm $2,000, Reinforced Docks $2,500, Storm Caller $3,000, Reinforced Walls $3,500, Ammunition Depot $4,000, Repair Drones $5,000, Tesla Coil $6,500, **Drone Launch Facility** $8,000 (requires Repair Drones, same icon), and the secret **Call the Cavalry** $10,000 (endless only).
+War Treasury $1,200, Bounty Board $1,500, Lucky Charm $2,000, Reinforced Docks $2,500, Storm Caller $3,000, Reinforced Walls $3,500, Ammunition Depot $4,000, Repair Drones $5,000, Tesla Coil $6,500, and the secret **Call the Cavalry** $10,000 (endless only). Buying Repair Drones turns its slot into the **Drone Launch Facility** $8,000 (same slot, same icon — no locked/blacked-out entry).
 
 **War Tent** (click it!) — 10 one-time upgrades per run, sorted by price:
 Field Medic $1,500 (barrage destroy chance 50% → 25%), Scout Reports $2,000, Supply Lines $2,500 (towers 15% cheaper), War Drums $3,000, Signal Fire $3,500, Guerrilla Training $4,000, Honor Banner $4,000 (+10% damage, no flag visual), Spike Barricade $4,500, Recon Balloon $5,500, Sabotage $6,000.
@@ -73,7 +73,8 @@ Nine enemy types with full walk, hurt, and death animations:
 - **Gold on coin landing** — kill gold is added only when the flying dollar bill lands in the counter, not the moment the enemy dies
 - **Tesla Coil** — visible coil on the facility roof; lightning starts at the electrode ball, range 400 from the ball (300 damage + chain in storms)
 - **Repair drone** — flies above the Tesla Coil (never clipped by it)
-- **Drone Launch Facility** — flat rectangular dock on the building roof; launches a combat drone that zigzags across the map, strafes enemies with an animated minigun (8 dmg/shot), then kamikazes into a random enemy (400 splash in 140px). Lifetime 2–4 min, then a 3-min rearm. The dock shows only the countdown: KAMIKAZE while the drone flies, NEXT DRONE while rearming
+- **Drone Launch Facility** — flat rectangular dock on the building roof; launches a combat drone that zigzags across the map at a calmer speed, keeps its distance from enemies while strafing them with an animated minigun (8 dmg/shot, with sound), and fires a rocket launcher every ~20s (150 splash damage in 120px, with launch + explosion sounds). Then kamikazes into a random enemy (400 splash in 140px). Lifetime 2–4 min, then a 3-min rearm. The dock shows only the countdown: KAMIKAZE while the drone flies, NEXT DRONE while rearming. The drone model shows both weapons: minigun on the left, rocket launcher on the right
+- **Tower upgrade menu** — vivid hologram buttons and brighter text (stronger fill, thicker borders, lightened tower colors)
 - **Particle effects** — muzzle flashes, explosions, damage numbers, glass shards
 - **Glass building destruction** — enemies shatter the facility's glass walls with sound and debris
 - **Kill-streak announcements** and wave banners

@@ -142,6 +142,12 @@ sound_rain.set_volume(0.35)  # deszcz wyraznie ciszej niz reszta
 sound_gull = pygame.mixer.Sound("sounds/gull.wav")
 sound_fanfare = pygame.mixer.Sound("sounds/fanfare.wav")
 sound_pirate = pygame.mixer.Sound("sounds/music_pirate.wav")  # piracki fanfar przy wplynieciu statku
+sound_minigun = pygame.mixer.Sound("sounds/minigun.wav")
+sound_minigun.set_volume(0.35)  # szybkie serie: ciszej, zeby nie zagluszaly
+sound_rocket = pygame.mixer.Sound("sounds/rocket_launch.wav")
+sound_rocket.set_volume(0.5)
+sound_rocket_boom = pygame.mixer.Sound("sounds/rocket_boom.wav")
+sound_rocket_boom.set_volume(0.6)
 shoot_sounds = {
     "WoodenTower": pygame.mixer.Sound("sounds/shoot_wood.wav"),
     "MetalTower": pygame.mixer.Sound("sounds/shoot_metal.wav"),
@@ -312,6 +318,7 @@ class Game:
         self._facility_rearm = 0
         self._facility_tracers = []
         self._facility_blasts = []
+        self._facility_rockets = []  # lecace rakiety drona bojowego
         # Statek sojuszniczy (Call the Cavalry)
         self.pirate_crippled = False
         self.ally_ship = None
@@ -398,6 +405,7 @@ class Game:
                       tower_sound_1, tower_sound_2, tower_sound_3,
                       tower_sound_4, tower_sound_5, sound_win, sound_lose, sound_roar,
                       sound_levelup, sound_horn, sound_rain, sound_gull, sound_fanfare,
+                      sound_minigun, sound_rocket, sound_rocket_boom,
                       *shoot_sounds.values()):
                 s.set_volume(0)
         self.bg = pygame.image.load(os.path.join("images", "bg_noship.png"))
@@ -1442,10 +1450,12 @@ class Game:
                         vol = 0 if self.muted else 1
                         for s in (sound_1, sound_2, sound_3, sound_4, sound_5, sound_win, sound_lose, sound_roar,
                                   sound_levelup, sound_horn, sound_rain, sound_gull, sound_fanfare,
+                                  sound_minigun, sound_rocket, sound_rocket_boom,
                                   *shoot_sounds.values()):
                             s.set_volume(vol)
                         if not self.muted:
                             sound_rain.set_volume(0.35)  # deszcz zawsze ciszej
+                            sound_minigun.set_volume(0.35)  # minigun zawsze ciszej
                     # Q11: F5 - zapis, F9 - wczytaj
                     if event.key == pygame.K_F5:
                         self.save_game()
@@ -1728,6 +1738,7 @@ class Game:
         self._facility_rearm = 0
         self._facility_tracers = []
         self._facility_blasts = []
+        self._facility_rockets = []  # lecace rakiety drona bojowego
         self.pirate_crippled = False
         self.ally_ship = None
         self._ally_strike_at = None
@@ -3971,8 +3982,25 @@ class Game:
         dim = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         dim.fill((0, 0, 0, 120))
         self.win.blit(dim, (0, 0))
+        # Chain: wpis z "requires" (Drone Launch Facility -> Repair Drones)
+        # NIE dostaje wlasnego czarnego slotu LOCKED. Dzieli slot rodzica:
+        # rodzic niekupiony -> pokaz rodzica; rodzic kupiony, dziecko nie ->
+        # ten SAM slot oferuje dziecko; oba kupione -> dziecko jako OWNED.
+        _by_id = {u["id"]: u for u in upg_list}
+        _children = {}
+        for _u in upg_list:
+            if _u.get("requires") and _u["requires"] in _by_id:
+                _children[_u["requires"]] = _u
+        ordered = []
+        for _u in sorted(upg_list, key=lambda x: x["cost"]):
+            if _u.get("requires") and _u["requires"] in _by_id:
+                continue  # dziecko: pokazuje sie w slocie rodzica, nigdy osobno
+            if _u["id"] in _children and _u["id"] in owned_set:
+                ordered.append(_children[_u["id"]])
+            else:
+                ordered.append(_u)
         # Panel (wyzszy przy 6 wierszach) - rows policzone z gory, bo panel od niego zalezy
-        rows = (len(upg_list) + 1) // 2
+        rows = (len(ordered) + 1) // 2
         pw, ph = 820, 620 if rows <= 5 else 660
         px, py = (self.width - pw) // 2, (self.height - ph) // 2
         pygame.draw.rect(self.win, (22, 28, 38), (px, py, pw, ph), border_radius=16)
@@ -3989,10 +4017,10 @@ class Game:
                               _close_rect.centery - x_lbl.get_height() // 2))
         # Sloty: sortowanie po cenie + uklad KOLUMNOWY (najpierw cala lewa kolumna z gory na dol,
         # potem prawa) - nie wierszowy (lewo-prawo, lewo-prawo).
-        ordered = sorted(upg_list, key=lambda u: u["cost"])
+        # `ordered` policzone wyzej (z chainem: Facility w slocie Drones) - tu tylko rozmiar.
         n = len(ordered)
         # rows policzone wyzej (przed panelem)
-        # 11+ upgradow (Facility) -> 6 wierszy: kompaktowy uklad, inaczej panel by nie pomiescil
+        # 11+ widocznych upgradow -> 6 wierszy: kompaktowy uklad, inaczej panel by nie pomiescil
         row_h = 100 if rows <= 5 else 84
         gap_y = 8 if rows <= 5 else 6
         name_y = 8 if rows <= 5 else 6
@@ -4011,7 +4039,9 @@ class Game:
             owned = upg["id"] in owned_set
             # Easter egg: cavalry ukryte w normalnej grze
             mystery = upg.get("endless_only") and not self.endless
-            # Locked: wymaga innego upgradu (Facility wymaga Repair Drones)
+            # Locked: wymaga innego upgradu (zapasowy mechanizm - chain pokazuje
+            # dziecko w slocie rodzica dopiero po kupieniu rodzica, wiec LOCKED
+            # w praktyce sie nie pojawia)
             _req_id = upg.get("requires")
             locked = bool(_req_id) and _req_id not in owned_set
             _req_name = next((u["name"] for u in upg_list if u["id"] == _req_id), _req_id) if _req_id else ""
@@ -4170,11 +4200,20 @@ class Game:
     _DRONE_LIFE = (12000, 24000)
     _DRONE_REARM = 18000
     _DRONE_FIRE_CD = 15
-    _DRONE_SPEED = 4.0
-    _DRONE_DIVE = 9.0
+    _DRONE_SPEED = 2.2  # wolniej - wczesniej latal jak rozwscieczony komar
+    _DRONE_DIVE = 5.5
     _DRONE_MINIGUN = 8
     _DRONE_KAMIKAZE_DMG = 400
     _DRONE_KAMIKAZE_R = 140
+    # Standoff: dron trzyma dystans do celu, nie wlatuje we wrogow
+    _DRONE_STANDOFF_MIN = 110
+    _DRONE_STANDOFF_MAX = 170
+    # Wyrzutnia rakiet: rzadki strzal, obrazenia obszarowe
+    _DRONE_ROCKET_CD = 2000  # 20 s miedzy rakietami
+    _DRONE_ROCKET_FIRST = 600  # pierwsza rakieta po 6 s od startu
+    _DRONE_ROCKET_DMG = 150
+    _DRONE_ROCKET_R = 120
+    _DRONE_ROCKET_SPEED = 7.0
 
     def _spawn_combat_drone(self):
         """Drone emerges from the facility box."""
@@ -4185,6 +4224,7 @@ class Game:
             "wp": None, "fire_cd": 0, "engage_t": 0,
             "kamikaze_target": None, "kamikaze_pos": None,
             "spin": 0.0, "barrel": 0.0, "flash": 0,
+            "rocket_cd": self._DRONE_ROCKET_FIRST, "strafe_dir": 1,
         }
         self.gold_notifications.append(["Combat drone launched!", 150])
 
@@ -4203,6 +4243,33 @@ class Game:
             d["y"] = max(40, min(700, d["y"]))
         return False
 
+    def _drone_standoff(self, d, tx, ty):
+        """Trzyma dystans do celu: zbliza sie gdy dalej niz MAX, cofa gdy
+        blizej niz MIN, a w pasmie miedzy nimi strafuje na boki (orbita).
+        Dron nigdy nie wlatuje we wrogow, ktorych ostrzeliwuje."""
+        vx, vy = tx - d["x"], ty - d["y"]
+        dist = math.hypot(vx, vy)
+        if dist < 1:
+            return
+        ux, uy = vx / dist, vy / dist
+        wob = math.sin(d.get("spin", 0) * 0.35) * 1.2
+        px, py = -uy, ux  # prostopadly (strafe)
+        if dist > self._DRONE_STANDOFF_MAX:
+            mx, my = ux, uy
+        elif dist < self._DRONE_STANDOFF_MIN:
+            mx, my = -ux, -uy
+        else:
+            # W pasmie: orbita + odrobina dryfu, zeby nie stal w miejscu
+            if random.random() < 0.005:
+                d["strafe_dir"] = -d.get("strafe_dir", 1)
+            s = d.get("strafe_dir", 1)
+            mx, my = px * s + ux * 0.15, py * s + uy * 0.15
+        ml = math.hypot(mx, my) or 1.0
+        d["x"] += mx / ml * self._DRONE_SPEED + px * wob
+        d["y"] += my / ml * self._DRONE_SPEED + py * wob
+        d["x"] = max(20, min(1104, d["x"]))
+        d["y"] = max(40, min(700, d["y"]))
+
     def _drone_living_enemies(self):
         return [e for e in self.enemies if not getattr(e, "dying", False)
                 and not getattr(e, "dead", False) and not getattr(e, "reached_end", False)]
@@ -4217,6 +4284,7 @@ class Game:
             bl["ttl"] -= 1
             if bl["ttl"] <= 0:
                 self._facility_blasts.remove(bl)
+        self._update_drone_rockets()
         if "facility" not in self.building_upgrades:
             return
         d = self._combat_drone
@@ -4271,8 +4339,9 @@ class Game:
                     d["target"] = None
                     return
             d["engage_t"] += 1
-            self._drone_fly_toward(d, tgt.x, tgt.y - 20, self._DRONE_SPEED)
-            # Animated minigun: rotating barrels + tracer + muzzle flash
+            # Standoff: trzyma dystans, nie wlatuje w cel
+            self._drone_standoff(d, tgt.x, tgt.y - 20)
+            # Animated minigun: rotating barrels + tracer + muzzle flash + sound
             d["fire_cd"] -= 1
             if d["fire_cd"] <= 0:
                 d["fire_cd"] = self._DRONE_FIRE_CD
@@ -4281,6 +4350,10 @@ class Game:
                 if tgt is not None and not getattr(tgt, "dying", False) and not getattr(tgt, "dead", False):
                     self._facility_tracers.append([d["x"], d["y"] - 18, tgt.x, tgt.y - 20, 6])
                     try:
+                        sound_minigun.play()
+                    except Exception:
+                        pass
+                    try:
                         tgt.hit(self._DRONE_MINIGUN)
                     except Exception:
                         tgt.health -= self._DRONE_MINIGUN
@@ -4288,6 +4361,12 @@ class Game:
                             tgt.dying = True
                     self.stats_damage += self._DRONE_MINIGUN
                     self.damage_numbers.append([tgt.x, tgt.y - 40, str(self._DRONE_MINIGUN), 40])
+            # Wyrzutnia rakiet: rzadki strzal obszarowy (co ~20 s)
+            d["rocket_cd"] -= 1
+            if d["rocket_cd"] <= 0:
+                d["rocket_cd"] = self._DRONE_ROCKET_CD
+                if tgt is not None and not getattr(tgt, "dying", False) and not getattr(tgt, "dead", False):
+                    self._fire_drone_rocket(d, tgt)
             # Sometimes break off and just fly somewhere (zigzag idle feel)
             if d["engage_t"] > random.randint(300, 600):
                 d["state"] = "wander"
@@ -4318,13 +4397,67 @@ class Game:
                 if self._drone_fly_toward(d, tx, ty, self._DRONE_DIVE):
                     self._detonate_drone()
 
+    def _fire_drone_rocket(self, d, tgt):
+        """Wyrzutnia rakiet: rakieta leci do celu i wybucha obszarowo."""
+        self._facility_rockets.append({
+            "x": float(d["x"]), "y": float(d["y"] - 18),
+            "target": tgt, "tx": float(tgt.x), "ty": float(tgt.y - 20),
+            "trail": [],
+        })
+        try:
+            sound_rocket.play()
+        except Exception:
+            pass
+
+    def _update_drone_rockets(self):
+        """Rakiety leca do celu (sledza go, gdy zyje); na miejscu - wybuch."""
+        for r in list(getattr(self, "_facility_rockets", [])):
+            tgt = r.get("target")
+            if tgt is not None and not getattr(tgt, "dying", False) and not getattr(tgt, "dead", False) and not getattr(tgt, "reached_end", False):
+                r["tx"], r["ty"] = float(tgt.x), float(tgt.y - 20)
+            vx, vy = r["tx"] - r["x"], r["ty"] - r["y"]
+            dist = math.hypot(vx, vy)
+            r["trail"].append((r["x"], r["y"]))
+            if len(r["trail"]) > 10:
+                r["trail"].pop(0)
+            if dist <= 16:
+                self._facility_rockets.remove(r)
+                self._explode_drone_rocket(r["tx"], r["ty"])
+            elif dist > 0:
+                r["x"] += vx / dist * self._DRONE_ROCKET_SPEED
+                r["y"] += vy / dist * self._DRONE_ROCKET_SPEED
+
+    def _explode_drone_rocket(self, x, y):
+        """Wybuch rakiety: obrazenia obszarowe dla wielu wrogow."""
+        self._facility_blasts.append({"x": x, "y": y, "ttl": 24, "max": 24,
+                                      "r": self._DRONE_ROCKET_R})
+        self.particles.burst(x, y, (255, 150, 50), count=25, speed=5, life=30, size=4)
+        self.particles.burst(x, y, (255, 220, 120), count=15, speed=3, life=22, size=3)
+        try:
+            sound_rocket_boom.play()
+        except Exception:
+            pass
+        for en in list(self.enemies):
+            if getattr(en, "dying", False) or getattr(en, "dead", False) or getattr(en, "reached_end", False):
+                continue
+            if (en.x - x) ** 2 + (en.y - y) ** 2 <= self._DRONE_ROCKET_R ** 2:
+                try:
+                    en.hit(self._DRONE_ROCKET_DMG)
+                except Exception:
+                    en.health -= self._DRONE_ROCKET_DMG
+                    if en.health <= 0 and not en.dying:
+                        en.dying = True
+                self.stats_damage += self._DRONE_ROCKET_DMG
+                self.damage_numbers.append([en.x, en.y - 40, str(self._DRONE_ROCKET_DMG), 60])
+
     def _detonate_drone(self):
         """Kamikaze splash: 400 dmg in 140px, then the 3-min rearm starts."""
         d = self._combat_drone
         if d is None:
             return
         x, y = d["x"], d["y"] - 18
-        self._facility_blasts.append({"x": x, "y": y, "ttl": 30, "max": 30})
+        self._facility_blasts.append({"x": x, "y": y, "ttl": 30, "max": 30,
+                                      "r": self._DRONE_KAMIKAZE_R})
         self.particles.burst(x, y, (255, 150, 50), count=40, speed=6, life=40, size=4)
         self.particles.burst(x, y, (255, 220, 120), count=25, speed=4, life=30, size=3)
         for en in list(self.enemies):
@@ -4381,7 +4514,10 @@ class Game:
         self.win.blit(tlab, (fx - tlab.get_width() // 2, fy - 3))
 
     def draw_combat_drone(self):
-        """Flying drone + minigun tracers + kamikaze blast rings."""
+        """Flying drone + minigun tracers + kamikaze blast rings + rockets.
+        Model po grafice Daniela: jasna sylwetka quadcoptera, 4 ramiona
+        z wirnikami, kamera-gimbal pod spodem, minigun po lewej i wyrzutnia
+        rakiet po prawej - obie bronie widoczne na modelu."""
         for tr in getattr(self, "_facility_tracers", []):
             a = max(0, min(255, int(255 * tr[4] / 6)))
             s = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
@@ -4389,41 +4525,67 @@ class Game:
             self.win.blit(s, (0, 0))
         for bl in getattr(self, "_facility_blasts", []):
             prog = 1.0 - bl["ttl"] / bl["max"]
-            r = int(30 + prog * 130)
+            rmax = bl.get("r", 140) + 20
+            r = int(30 + prog * (rmax - 30))
             a = int(220 * (1 - prog))
             s = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
             pygame.draw.circle(s, (255, 150, 50, a), (int(bl["x"]), int(bl["y"])), r, 4)
             pygame.draw.circle(s, (255, 220, 120, a), (int(bl["x"]), int(bl["y"])), int(r * 0.6), 3)
             self.win.blit(s, (0, 0))
+        # Lecace rakiety: smuga + korpus z plomieniem
+        for r in getattr(self, "_facility_rockets", []):
+            trail = r.get("trail", [])
+            if len(trail) > 1:
+                s = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+                for i in range(len(trail) - 1):
+                    a = int(160 * (i + 1) / len(trail))
+                    pygame.draw.line(s, (255, 180, 80, a), trail[i], trail[i + 1], 2)
+                self.win.blit(s, (0, 0))
+            ang = math.atan2(r["ty"] - r["y"], r["tx"] - r["x"])
+            rx, ry = r["x"], r["y"]
+            bx, by = rx - math.cos(ang) * 8, ry - math.sin(ang) * 8
+            pygame.draw.line(self.win, (255, 120, 60), (bx, by), (rx, ry), 4)
+            pygame.draw.circle(self.win, (255, 220, 100), (int(bx), int(by)), 3)
         d = self._combat_drone
         if d is None:
             return
         x, y = d["x"], d["y"] - 18
         # Ground shadow
-        pygame.draw.ellipse(self.win, (50, 50, 50), (d["x"] - 14, d["y"] + 8, 28, 8))
-        # Spinning rotors
+        pygame.draw.ellipse(self.win, (50, 50, 50), (d["x"] - 24, d["y"] + 12, 48, 10))
+        # Ramiona (4) - ciemne, jak w sylwetce z grafiki
+        for ox, oy in [(-24, -12), (24, -12), (-24, 12), (24, 12)]:
+            pygame.draw.line(self.win, (45, 50, 58), (x, y), (x + ox, y + oy), 3)
+        # Wirniki - krecace sie
         spin = d.get("spin", 0)
-        for ox, oy in [(-16, -10), (16, -10), (-16, 10), (16, 10)]:
-            rw = 10 + 6 * math.sin(spin + ox)
+        for ox, oy in [(-24, -12), (24, -12), (-24, 12), (24, 12)]:
+            rw = 9 + 5 * math.sin(spin + ox)
             pygame.draw.ellipse(self.win, (200, 220, 235), (x + ox - rw, y + oy - 2, rw * 2, 4))
-        # Body
-        pygame.draw.ellipse(self.win, (60, 68, 80), (x - 14, y - 8, 28, 16))
-        pygame.draw.ellipse(self.win, (40, 200, 255), (x - 6, y - 4, 12, 8))
-        # Minigun barrel: aims at the engaged target, rotates while firing
+        # Korpus - jasna sylwetka (jak na grafice)
+        pygame.draw.ellipse(self.win, (210, 215, 222), (x - 16, y - 10, 32, 20))
+        pygame.draw.ellipse(self.win, (150, 158, 168), (x - 16, y - 10, 32, 20), 2)
+        # Kamera-gimbal pod spodem
+        pygame.draw.circle(self.win, (40, 200, 255), (int(x), int(y + 8)), 4)
+        pygame.draw.circle(self.win, (20, 60, 90), (int(x), int(y + 8)), 4, 1)
+        # Minigun (lewa strona): lufa celuje w cel, blysk przy strzale
         tgt = d.get("target") if d.get("state") == "engage" else None
         if tgt is not None and not getattr(tgt, "dead", False):
-            ang = math.atan2((tgt.y - 20) - y, tgt.x - x)
+            ang = math.atan2((tgt.y - 20) - (y + 8), tgt.x - (x - 12))
         else:
             ang = math.pi / 2
-        bx2 = x + math.cos(ang) * 14
-        by2 = y + math.sin(ang) * 14
-        pygame.draw.line(self.win, (30, 30, 30), (x, y + 6), (bx2, by2), 3)
-        # Muzzle flash
+        gx, gy = x - 12, y + 8
+        bx2 = gx + math.cos(ang) * 16
+        by2 = gy + math.sin(ang) * 16
+        pygame.draw.rect(self.win, (35, 38, 45), (gx - 4, gy - 3, 8, 6), border_radius=2)
+        pygame.draw.line(self.win, (25, 25, 28), (gx, gy), (bx2, by2), 3)
         if d.get("flash", 0) > 0:
             pygame.draw.circle(self.win, (255, 220, 100), (int(bx2), int(by2)), 5)
-        # Kamikaze: red glow
+        # Wyrzutnia rakiet (prawa strona): tuba + 2 widoczne glowice rakiet
+        pygame.draw.line(self.win, (70, 75, 60), (x + 6, y + 8), (x + 22, y + 8), 7)
+        pygame.draw.circle(self.win, (255, 120, 60), (int(x + 24), int(y + 6)), 3)
+        pygame.draw.circle(self.win, (255, 120, 60), (int(x + 24), int(y + 10)), 3)
+        # Kamikaze: czerwona poswiata
         if d.get("state") == "kamikaze":
-            pygame.draw.circle(self.win, (255, 60, 60), (int(x), int(y)), 20, 2)
+            pygame.draw.circle(self.win, (255, 60, 60), (int(x), int(y)), 26, 2)
 
     def draw_tesla_bolts(self):
         """Rysuje pioruny Tesli (krotkotrwale)."""
