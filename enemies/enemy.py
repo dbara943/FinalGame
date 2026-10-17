@@ -65,7 +65,7 @@ class Enemy:
         self.base_velocity = 3
         self.flash_timer = 0  # V1: bialy blysk przy trafieniu
         self.last_hit_by = None  # R5: wieza ktora zadala ostatni cios
-        self.elite = False  # 6: elitarny wrog (3x HP, 5x zlota)
+        self.elite = False  # 6: elitarny wrog (2x HP, 5x zlota)
 
     def _apply_gold_filter(self, img):
         """Zloty filtr (grayscale -> zloto) - jak posag ze zlota."""
@@ -96,10 +96,10 @@ class Enemy:
                 lst[i] = self._apply_gold_filter(img)
 
     def make_elite(self):
-        """6: Zamienia w elitarnego (3x HP, 5x zlota, wiekszy zlociutki model)."""
+        """6: Zamienia w elitarnego (2x HP, 5x zlota, wiekszy zlociutki model)."""
         if not self.elite:
             self.elite = True
-            self.max_health *= 3
+            self.max_health *= 2
             self.health = self.max_health
             self.money *= 5
             # Kopia list (nie modyfikuj wspoldzielonych!)

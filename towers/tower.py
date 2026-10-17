@@ -10,6 +10,9 @@ sell_btn = pygame.transform.scale(pygame.image.load(os.path.join("images", "sell
 class Tower:
     buy_price = 0
     upgrade_costs = [250, 500]  # domyslne koszty ulepszen (lvl 1->2, 2->3); klasy je nadpisuja
+    # Obrazenia z upgradu: drozsze wieze zyskuja wiecej (wczesniej plaskie +2 dla
+    # wszystkich - upgrade Blaze'a za 1500 dawal tyle samo co upgrade Woodena za 150).
+    upgrade_dmg = 2
 
     def __init__(self, x, y):
         self.x = x
@@ -125,15 +128,17 @@ class Tower:
             return True
         return False
 
-    def sell_value(self):
-        # Zwrot 70% tego, co wlozono w wieze (zakup + ulepszenia).
-        return (self.total_spent * 7) // 10
+    def sell_value(self, rate=0.7):
+        # Zwrot % tego, co wlozono w wieze (zakup + ulepszenia).
+        # Stawka zalezy od trudnosci: EASY 80%, NORMAL 70%, HARD 60%.
+        return int(self.total_spent * rate)
 
     def upgrade(self, cost=0):
         if self.level < self.max_level:
             self.total_spent += cost
             self.level += 1
-            self.damage += 2
+            # Obrazenia z upgradu skaluja sie z klasa wiezy (upgrade_dmg), nie plaskie +2
+            self.damage += getattr(type(self), "upgrade_dmg", 2)
             self.range += 12
             # A5: efekt ulepszenia (flaga do game.py)
             self._upgrade_fx = True

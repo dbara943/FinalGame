@@ -74,7 +74,7 @@ BUILDING_UPGRADES = [
     {"id": "ammo", "name": "Ammunition Depot", "cost": 4000,
      "desc": "All towers shoot 15% faster."},
     {"id": "drones", "name": "Repair Drones", "cost": 5000,
-     "desc": "+1 life every 2 waves. A drone orbits the building."},
+     "desc": "+1 life right away, then +1 every 2 waves. A drone orbits the building."},
     {"id": "tesla", "name": "Tesla Coil", "cost": 6500,
      "desc": "Zaps the nearest enemy every few seconds. Attracts storms; huge range in storms."},
     {"id": "facility", "name": "Drone Launch Facility", "cost": 8000,
@@ -112,13 +112,17 @@ TENT_UPGRADES = [
 # enemy_hp_mult / enemy_speed_mult: zwykli wrogowie (bossowie maja wlasne HP w _boss_hp).
 # gold_mult: zloto za zabojstwa. spawn_mult: odstep miedzy spawnami (wiekszy = wolniej).
 # ability_cd_mult: czasy odnowienia umiejetnosci wiez. storm_chance: bazowa szansa na burze.
+# sell_mult: zwrot przy sprzedazy wiezy (zakup + ulepszenia).
 DIFFICULTY_CONFIG = {
     "EASY": {"price_mult": 0.8, "enemy_hp_mult": 0.8, "enemy_speed_mult": 0.85,
-             "gold_mult": 1.25, "spawn_mult": 1.3, "ability_cd_mult": 0.85, "storm_chance": 0.2},
+             "gold_mult": 1.25, "spawn_mult": 1.3, "ability_cd_mult": 0.85, "storm_chance": 0.2,
+             "sell_mult": 0.8},
     "NORMAL": {"price_mult": 1.0, "enemy_hp_mult": 1.0, "enemy_speed_mult": 1.0,
-               "gold_mult": 1.0, "spawn_mult": 1.0, "ability_cd_mult": 1.0, "storm_chance": 0.2},
+               "gold_mult": 1.0, "spawn_mult": 1.0, "ability_cd_mult": 1.0, "storm_chance": 0.2,
+               "sell_mult": 0.7},
     "HARD": {"price_mult": 1.25, "enemy_hp_mult": 1.3, "enemy_speed_mult": 1.15,
-             "gold_mult": 0.85, "spawn_mult": 0.7, "ability_cd_mult": 1.25, "storm_chance": 0.2},
+             "gold_mult": 0.85, "spawn_mult": 0.7, "ability_cd_mult": 1.25, "storm_chance": 0.2,
+             "sell_mult": 0.6},
 }
 waves = [
     [40,0,0,0,0,0,0,0],
@@ -628,7 +632,7 @@ class Game:
         self.gold_notifications.append([f"+{gold} gold (wave {self.wave})", 150])
         if self.endless_wave % 4 == 0:
             # Endless boss: 5x HP + 5% co fale (jak zwykli wrogowie)
-            self.pending_boss = Boss(hp=int(self._endless_hp(400, self.endless_wave) * self._diff("enemy_hp_mult")))
+            self.pending_boss = Boss(hp=int(self._endless_hp(350, self.endless_wave) * self._diff("enemy_hp_mult")))
         # Call the Cavalry: 50% szans na uderzenie w tej fali (po okaleczeniu pirata)
         self._ally_strike_at = None
         if ("cavalry" in self.building_upgrades and self.pirate_crippled
@@ -648,12 +652,12 @@ class Game:
         return hp
 
     def _boss_hp(self, wave_num):
-        """HP bossa wg fali i trudnosci.
-        Fala 4: EASY 200, NORMAL 250, HARD 300.
-        Fala 8: EASY 400, NORMAL 500, HARD 600."""
+        """HP bossa wg fali i trudnosci (po obnizce o 50: bossowie byli za silni).
+        Fala 4: EASY 150, NORMAL 200, HARD 250.
+        Fala 8: EASY 350, NORMAL 450, HARD 550."""
         if wave_num == 8:
-            return {"EASY": 400, "NORMAL": 500, "HARD": 600}.get(self.difficulty, 500)
-        return {"EASY": 200, "NORMAL": 250, "HARD": 300}.get(self.difficulty, 250)
+            return {"EASY": 350, "NORMAL": 450, "HARD": 550}.get(self.difficulty, 450)
+        return {"EASY": 150, "NORMAL": 200, "HARD": 250}.get(self.difficulty, 200)
 
     def advance_wave(self):
         """Przechodzi do nastepnej fali: zloto, bonusy, powiadomienie. Wywolywane
@@ -757,8 +761,8 @@ class Game:
                 self.pending_boss = Boss(hp=self._boss_hp(self.wave + 1))
                 self.wave_banner_text = f"WAVE {self.wave + 1} - BOSS!"
             elif self.wave + 1 == 10:
-                # Boss finalny: 1000 bazowo, skalowany trudnoscia (EASY 800 / HARD 1300)
-                self.pending_boss = Boss(final=True, hp=int(1000 * self._diff("enemy_hp_mult")))
+                # Boss finalny: 950 bazowo (-50, jak reszta bossow), skalowany trudnoscia
+                self.pending_boss = Boss(final=True, hp=int(950 * self._diff("enemy_hp_mult")))
                 self.wave_banner_text = "FINALNA FALA - BOSS!"
         self.waiting_for_clear = False
     def _close_all_menus(self, refund_placement=True):
@@ -1500,7 +1504,7 @@ class Game:
                         idx = types.index(self.tower_filter) if self.tower_filter in types else 0
                         self.tower_filter = types[(idx + 1) % len(types)]
                     if event.key == pygame.K_s and self.selected_tower:
-                        self.money += self.selected_tower.sell_value()
+                        self.money += self.selected_tower.sell_value(self._diff("sell_mult"))
                         self.towers.remove(self.selected_tower)
                         self._recalc_synergy()
                         self.selected_tower = None
@@ -1530,7 +1534,7 @@ class Game:
                     # Q3: Shift+klik = szybka sprzedaz wiezy
                     keys = pygame.key.get_mods()
                     if keys & pygame.KMOD_SHIFT and self.selected_tower:
-                        self.money += self.selected_tower.sell_value()
+                        self.money += self.selected_tower.sell_value(self._diff("sell_mult"))
                         self.towers.remove(self.selected_tower)
                         self._recalc_synergy()
                         self.selected_tower = None
@@ -1649,7 +1653,7 @@ class Game:
                                     self.selected_tower.upgrade(cost)
                                     self._on_tower_upgraded(self.selected_tower)
                             elif btn_clicked == "Sell":
-                                self.money += self.selected_tower.sell_value()
+                                self.money += self.selected_tower.sell_value(self._diff("sell_mult"))
                                 self.towers.remove(self.selected_tower)
                                 self._recalc_synergy()
                                 self.selected_tower = None
@@ -4042,6 +4046,12 @@ class Game:
         # Natychmiastowe efekty budynku
         if uid == "facility":
             self._facility_rearm = 30  # first drone emerges almost immediately
+        if uid == "drones":
+            # Repair Drones: +1 zycie OD RAZU przy zakupie (potem +1 co 2 fale).
+            # Jak Walls: podnosi tez max (start_lives), wiec bonus zawsze dziala.
+            self._start_lives += 1
+            self.lives += 1
+            self.gold_notifications.append(["+1 life (drones)", 150])
         if uid == "walls":
             self._start_lives += 5
             self.lives += 5

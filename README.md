@@ -28,8 +28,10 @@ Five unique towers, each with 3 levels, distinct projectiles, and a special abil
 | Wooden Tower | $100 | 1 | **Rapid Fire** — temporary fire-rate boost |
 | Metal Tower | $500 | 3 | **Frost Nova** — slows all enemies in range |
 | Golden Tower | $750 | 5 | **Golden Touch** — marks enemies for double gold |
-| Fire Tower | $1,000 | 8 | **Meteor** — devastating area strike |
-| Blaze Tower | $2,000 | 10 | **Armageddon** — massive screen-wide damage |
+| Fire Tower | $1,000 | 9 | **Meteor** — devastating area strike |
+| Blaze Tower | $2,000 | 12 | **Armageddon** — massive screen-wide damage |
+
+Upgrades add damage per level by tier (Wooden +2, Metal +3, Golden +4, Fire +6, Blaze +8) — pricier towers gain more from upgrades, so saving up for them pays off.
 
 - **Free placement** — no grid snapping; place towers anywhere on valid grass zones
 - **Tower synergy** — adjacent towers of the same type boost each other
@@ -41,7 +43,7 @@ Five unique towers, each with 3 levels, distinct projectiles, and a special abil
 ## Clickable Buildings
 
 **Glass Research Facility** (click it!) — 10 one-time upgrades per run, sorted by price:
-War Treasury $1,200, Bounty Board $1,500, Lucky Charm $2,000, Reinforced Docks $2,500, Storm Caller $3,000, Reinforced Walls $3,500, Ammunition Depot $4,000, Repair Drones $5,000, Tesla Coil $6,500, and the secret **Call the Cavalry** $10,000 (endless only). Buying Repair Drones turns its slot into the **Drone Launch Facility** $8,000 (same slot, same icon — no locked/blacked-out entry).
+War Treasury $1,200, Bounty Board $1,500, Lucky Charm $2,000, Reinforced Docks $2,500, Storm Caller $3,000, Reinforced Walls $3,500, Ammunition Depot $4,000, Repair Drones $5,000 (+1 life right away, then +1 every 2 waves), Tesla Coil $6,500, and the secret **Call the Cavalry** $10,000 (endless only). Buying Repair Drones turns its slot into the **Drone Launch Facility** $8,000 (same slot, same icon — no locked/blacked-out entry).
 
 **War Tent** (click it!) — 10 one-time upgrades per run, sorted by price:
 Field Medic $1,500 (barrage destroy chance 50% → 25%), Scout Reports $2,000, Supply Lines $2,500 (towers 15% cheaper), War Drums $3,000, Signal Fire $3,500 (campfire grows 2×, all Fire/Blaze towers shoot 12% faster, dancers guard with bows), Guerrilla Training $4,000, Honor Banner $4,000 (+10% damage, no flag visual), Spike Barricade $4,500, Recon Balloon $5,500, Sabotage $6,000.
@@ -60,6 +62,7 @@ Three difficulties that actually change the game (shown in the main menu under t
 | Gold from kills | +25% | standard | −15% (every kill pays at least $1) |
 | Spawn interval | +30% (slower) | standard | −30% (faster) |
 | Ability cooldowns | −15% | standard | +25% |
+| Sell-back value (buy + upgrades) | 80% | 70% | 60% |
 | Starting lives / gold | 30 / 300 | 20 / 200 | 12 / 150 |
 | Storm chance | 20% | 20% | 20% |
 
@@ -68,7 +71,7 @@ Tower upgrade costs scale with the tower tier (not a flat 250/500 for all): Wood
 Nine enemy types with full walk, hurt, and death animations:
 
 - **Goblin, Swordman, Knight, Cyclop, Impostor, Ogre, Evil Villager, Forkman** — each with unique stats and behaviors
-- **Golden (Elite) variants** — 8% spawn chance, 3× HP, 5× gold reward, 1.25× size, rendered in solid gold
+- **Golden (Elite) variants** — 8% spawn chance, 2× HP, 5× gold reward, 1.25× size, rendered in solid gold
 - **Boss** — multi-phase final encounter with enrage mechanic and dedicated health bar
 
 ---

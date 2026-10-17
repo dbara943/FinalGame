@@ -44,6 +44,7 @@ archer_imgs1.append(pygame.transform.scale(
 
 class WoodenTower(Tower):
     buy_price = 100
+    upgrade_dmg = 2
     # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
     upgrade_costs = [150, 300]
     ability_name = "Rapid Fire"
@@ -245,6 +246,7 @@ archer_imgs2.append(pygame.transform.scale(
 
 class MetalTower(WoodenTower):
     buy_price = 500
+    upgrade_dmg = 3
     # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
     upgrade_costs = [400, 800]
     ability_name = "Frost Nova"
@@ -309,6 +311,7 @@ archer_imgs3 = [_gold_tint(img) for img in archer_imgs3]
 
 class GoldenTower(WoodenTower):
     buy_price = 750
+    upgrade_dmg = 4
     # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
     upgrade_costs = [600, 1200]
     ability_name = "Golden Touch"
@@ -363,6 +366,7 @@ archer_imgs4.append(pygame.transform.scale(
 
 class FireTower(WoodenTower):
     buy_price = 1000
+    upgrade_dmg = 6
     # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
     upgrade_costs = [800, 1600]
     ability_name = "Meteor"
@@ -377,7 +381,7 @@ class FireTower(WoodenTower):
         self.inRange = False
         self.facing_left = False
         self.timer = time.time()      
-        self.damage = 8
+        self.damage = 9
         self.splash_radius = 60  # Obrazenia obszarowe
         self._setup_menu()
         self.name = "fireTower"
@@ -413,6 +417,7 @@ archer_imgs5.append(pygame.transform.scale(
 
 class BlazeTower(WoodenTower):
     buy_price = 2000
+    upgrade_dmg = 8
     # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
     upgrade_costs = [1500, 3000]
     ability_name = "Armageddon"
@@ -427,7 +432,7 @@ class BlazeTower(WoodenTower):
         self.inRange = False
         self.facing_left = False
         self.timer = time.time()      
-        self.damage = 10
+        self.damage = 12
         self.splash_radius = 80  # Wieksze obrazenia obszarowe
         self._setup_menu()
         self.name = "blazeTower"
