@@ -57,7 +57,7 @@ Three difficulties that actually change the game (shown in the main menu under t
 | Prices (towers, tower upgrades, building/tent upgrades) | −20% | standard | +25% |
 | Enemy HP (incl. bosses) | −20% | standard | +30% |
 | Enemy speed | −15% | standard | +15% |
-| Gold from kills | +25% | standard | −15% |
+| Gold from kills | +25% | standard | −15% (every kill pays at least $1) |
 | Spawn interval | +30% (slower) | standard | −30% (faster) |
 | Ability cooldowns | −15% | standard | +25% |
 | Starting lives / gold | 30 / 300 | 20 / 200 | 12 / 150 |
@@ -98,7 +98,7 @@ Nine enemy types with full walk, hurt, and death animations:
 - **Ability dock** — hidden until you own a tower; shows only the abilities of tower types you actually have on the board, growing/shrinking as types are bought or sold
 - **Enemies panel** — sized exactly to its content (icons + counts), no extra empty space
 - **Guards' tombstones** — Bonnie and Clyde's tombstones stand apart, with the name and kill count fitting inside each stone
-- **Music / Sound Effects** — separate toggles (pause menu, M key = music only): Music covers the normal track and the boss (intense) track; everything else is SFX
+- **Music / Sound Effects** — separate toggles (pause menu, M key = music only): Music covers the normal track and the boss (intense) track; everything else is SFX. The intense track plays only while a boss is alive
 - **Speed** — 2×/3× speeds up everything, including enemy disembark from the ship (tick-based spawning)
 - **Damage dealt** — end-screen stats show rounded whole numbers
 - **Performance optimized** — spatial targeting grid, 60 FPS rendering, 100 Hz logic

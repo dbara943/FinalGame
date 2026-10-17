@@ -396,6 +396,7 @@ class Game:
         self.game_time = 0  # Q17: zegar sesji (ticki)
         self.music_muted = not sound  # jesli sound=False z menu, muzyka wyciszona
         self.sfx_muted = not sound  # dzwieki tez wyciszone
+        self._music_intense = False  # intensywna (boss) vs zwykla sciezka
         self.build_queue = []  # Q14: kolejka budowy
         self.tower_filter = None  # Q15: filtr wiez
         self.display_money = 200  # Niespodzianka 4: animowany licznik zlota
@@ -1991,10 +1992,10 @@ class Game:
             self.display_money = min(self.money, self.display_money + max(1, (self.money - self.display_money) // 10))
         elif self.display_money > self.money:
             self.display_money = self.money
-        # Dynamiczna muzyka: intensywna gdy boss lub malo zyc
+        # Dynamiczna muzyka: intensywna TYLKO podczas bossa (nie przy malych zyciach).
         if self.sound and not self.music_muted:
             boss_alive = any(isinstance(en, Boss) for en in self.enemies)
-            want_intense = boss_alive or self.lives <= 5
+            want_intense = boss_alive
             if want_intense != self._music_intense:
                 self._music_intense = want_intense
                 track = "sounds/music_intense.wav" if want_intense else "sounds/music.wav"
@@ -2081,7 +2082,9 @@ class Game:
                 # Trudnosc: mnoznik zlota za zabojstwa (EASY +25%, HARD -15%)
                 _gold_mult = self._diff("gold_mult")
                 if _gold_mult != 1.0:
-                    reward = int(reward * _gold_mult)
+                    # HARD 0.85: Forkman (bazowo 1 zlota) dawalby int(1*0.85) = 0,
+                    # czyli wrog w ogole nie placil. Kazdy zabity wrog placi min. 1.
+                    reward = max(1, int(reward * _gold_mult))
                 # self.money += reward - ODLOZONE: moneta doda zloto przy ladowaniu
                 # Trup zostaje na ziemi (ostatnia klatka animacji smierci)
                 if d.die_imgs:
@@ -2310,7 +2313,7 @@ class Game:
             f"Wave reached: {self.wave + 1} / {len(waves)}",
             f"Monsters slain: {self.stats_kills}",
             f"Damage dealt: {int(round(self.stats_damage))}",
-            f"Gold earned: {self.stats_gold}$   |   Gold spent: {self.stats_gold_spent}$",
+            f"Gold earned: ${self.stats_gold}   |   Gold spent: ${self.stats_gold_spent}",
             f"Towers built: {self.stats_towers_built}   |   Towers lost: {self.stats_towers_lost}",
             f"Abilities used: {self.stats_abilities_used}",
         ]
@@ -2447,7 +2450,7 @@ class Game:
         # Proste statystyki dla victory/forfeit (porazka ma wlasny uklad w _draw_static)
         stats = [
             f"Kills: {self.stats_kills}",
-            f"Gold earned: {self.stats_gold}",
+            f"Gold earned: ${self.stats_gold}",
             f"Damage dealt: {int(round(self.stats_damage))}",
         ]
         def _draw_static():
@@ -2474,8 +2477,8 @@ class Game:
                     f"Wave reached: {self.wave + 1} / {len(waves)}",
                     f"Monsters slain: {self.stats_kills}",
                     f"Damage dealt: {int(round(self.stats_damage))}",
-                    f"Gold earned: {self.stats_gold}$",
-                    f"Gold spent: {self.stats_gold_spent}$",
+                    f"Gold earned: ${self.stats_gold}",
+                    f"Gold spent: ${self.stats_gold_spent}",
                     f"Towers built: {self.stats_towers_built} / lost: {self.stats_towers_lost}",
                     f"Abilities used: {self.stats_abilities_used}",
                 ]
@@ -2840,12 +2843,17 @@ class Game:
             s.draw(self.win)
         for c in self.coins:
             c.draw(self.win)
-        # A4: chmury (wolno, pozycja bazowa + przesuniecie czasowe)
+        # A4: chmury (wolno, pozycja bazowa + przesuniecie czasowe).
+        # NIE rysujemy przy otwartym menu upgradów budynku/namiotu: chmury sa
+        # rysowane PO menu (draw() wywoluje menu przed chmurami), wiec lecialy
+        # po wierzchu panelu i zaslanialy widok.
+        # UWAGA: t = _now_s MUSI zostac poza ifem - uzywaja go tez mewy/liscie ponizej.
         t = self._now_s
-        for i, (base_x, cy, size) in enumerate(self.clouds):
-            cx = (base_x + t * 8) % (self.width + 200) - 100
-            for ox in [-20, 0, 20]:
-                pygame.draw.circle(self.win, (255, 255, 255, 90), (int(cx + ox), int(cy)), size // 2)
+        if not (self._building_menu_open or self._tent_menu_open):
+            for i, (base_x, cy, size) in enumerate(self.clouds):
+                cx = (base_x + t * 8) % (self.width + 200) - 100
+                for ox in [-20, 0, 20]:
+                    pygame.draw.circle(self.win, (255, 255, 255, 90), (int(cx + ox), int(cy)), size // 2)
         # A9: mewy
         for i, (base_x, gy, phase) in enumerate(self.seagulls):
             gx = (base_x + t * 12) % (self.width + 100) - 50
