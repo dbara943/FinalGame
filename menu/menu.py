@@ -80,6 +80,9 @@ class Menu():
         panel_w, panel_h = 240, 160
         px = self.x - panel_w // 2
         py = self.y - 210  # calkowicie nad wieza (wieza w pelni widoczna)
+        # Panel rect (razem z paskiem TOWER.EXE nad panelem) - klik w panel
+        # (nie tylko w przyciski) zjada klik, nie otwiera budynku/namiotu spod menu.
+        self.panel_rect = pygame.Rect(px, py - 10, panel_w, panel_h + 10)
         bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
         pygame.draw.rect(bg, (16, 26, 40, 235), bg.get_rect(), border_radius=8)
         pygame.draw.rect(bg, (*bright, 255), bg.get_rect(), 2, border_radius=8)

@@ -44,6 +44,8 @@ archer_imgs1.append(pygame.transform.scale(
 
 class WoodenTower(Tower):
     buy_price = 100
+    # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
+    upgrade_costs = [150, 300]
     ability_name = "Rapid Fire"
     ability_desc = "2x attack speed for 5s"
     def __init__(self, x, y):
@@ -202,10 +204,8 @@ class WoodenTower(Tower):
                 dmg = int(self.damage * getattr(self, '_synergy', 1.0))
                 # Honor Banner: +10% obrazen globalnie
                 dmg = int(dmg * getattr(self, '_dmg_mult', 1.0))
-                # Lucky Charm: 10% szansy na 2x obrazenia krytyczne
-                self._crit = getattr(self, '_lucky_crit', False) and random.random() < 0.10
-                if self._crit:
-                    dmg *= 2
+                # Kryt: tylko w game.py przy trafieniu (Lucky Charm 10%) -
+                # tu NIE ma rzutu, inaczej krytyki liczyly sie podwojnie.
                 splash = getattr(self, 'splash_radius', 0)
                 # Pocisk leci do wroga zamiast natychmiastowego hita.
                 projectiles.append(Projectile(
@@ -245,6 +245,8 @@ archer_imgs2.append(pygame.transform.scale(
 
 class MetalTower(WoodenTower):
     buy_price = 500
+    # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
+    upgrade_costs = [400, 800]
     ability_name = "Frost Nova"
     ability_desc = "Slows all enemies in range"
     def __init__(self, x, y):
@@ -307,6 +309,8 @@ archer_imgs3 = [_gold_tint(img) for img in archer_imgs3]
 
 class GoldenTower(WoodenTower):
     buy_price = 750
+    # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
+    upgrade_costs = [600, 1200]
     ability_name = "Golden Touch"
     ability_desc = "Double gold for kills for 10s"
     def __init__(self, x, y):
@@ -359,6 +363,8 @@ archer_imgs4.append(pygame.transform.scale(
 
 class FireTower(WoodenTower):
     buy_price = 1000
+    # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
+    upgrade_costs = [800, 1600]
     ability_name = "Meteor"
     ability_desc = "Powerful 3x damage projectile, big splash"
     damage_type = "fire"
@@ -407,6 +413,8 @@ archer_imgs5.append(pygame.transform.scale(
 
 class BlazeTower(WoodenTower):
     buy_price = 2000
+    # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
+    upgrade_costs = [1500, 3000]
     ability_name = "Armageddon"
     ability_desc = "Damage to ALL enemies on map"
     damage_type = "fire"

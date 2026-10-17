@@ -8,6 +8,13 @@ DIFFICULTIES = [
     ("HARD", 12, 150),
 ]
 
+# Co daje kazda trudnosc (wyswietlane pod przyciskami w menu glownym).
+DIFFICULTY_DESC = {
+    "EASY": "EASY: -20% prices, -20% enemy HP, slower enemies, +25% gold",
+    "NORMAL": "NORMAL: standard prices, enemies and gold",
+    "HARD": "HARD: +25% prices, +30% enemy HP, faster enemies, -15% gold",
+}
+
 class StartMenu:
     """Ekran startowy: tytul, wybor trudnosci, dzwiek, pomoc i start gry."""
 
@@ -166,6 +173,12 @@ class StartMenu:
         for key, rect in self.buttons.items():
             self.draw_button(rect, labels[key], rect.collidepoint(mouse))
 
+        # Opis wybranej trudnosci (stopka - co zmienia EASY / NORMAL / HARD)
+        diff_desc = DIFFICULTY_DESC.get(diff_name, "")
+        if diff_desc:
+            dtxt = self.small_font.render(diff_desc, True, (170, 180, 190))
+            self.win.blit(dtxt, (self.rw // 2 - dtxt.get_width() // 2, self.rh - 30))
+
         if self.show_help:
             self.draw_help()
         if self.show_achievements:
@@ -323,10 +336,10 @@ class StartMenu:
         self.win.blit(hint, (px + (pw - hint.get_width()) // 2, py + ph - 35))
 
     def draw_help(self):
-        panel = pygame.Rect(self.rw // 2 - 360, self.rh // 2 - 280, 720, 560)
-        pygame.draw.rect(self.win, (12, 24, 44), panel, border_radius=16)
-        pygame.draw.rect(self.win, (255, 255, 255), panel, 2, border_radius=16)
-        lines = [
+        # Panel: wysokosc DOKLADNIE na miare tresci (wczesniej stale 560,
+        # a tresc potrzebuje 567 - ostatnia linia wystawala poza panel).
+        _steps = {"title": 40, "header": 30, "dim": 30, "text": 26, "spacer": 12}
+        _lines = [
             ("HOW TO PLAY", "title"),
             ("", "spacer"),
             ("Build towers from the right panel, then click", "text"),
@@ -339,7 +352,7 @@ class StartMenu:
             ("S  Sell tower      |  Q  Tower ability", "text"),
             ("T  Target priority |  R  Show all ranges", "text"),
             ("Space  Pause       |  F  Toggle 1x/3x speed", "text"),
-            ("M  Mute            |  C  Filter towers by type", "text"),
+            ("M  Music on/off   |  C  Filter towers by type", "text"),
             ("Shift+Click  Queue build / Quick sell", "text"),
             ("Ctrl+Z  Undo last build or upgrade", "text"),
             ("F5 / F9  Save / Load game", "text"),
@@ -350,6 +363,11 @@ class StartMenu:
             ("", "spacer"),
             ("Click anywhere to go back.", "dim"),
         ]
+        _total = 25 + sum(_steps[s] for _, s in _lines) + 20
+        panel = pygame.Rect(self.rw // 2 - 360, self.rh // 2 - _total // 2, 720, _total)
+        pygame.draw.rect(self.win, (12, 24, 44), panel, border_radius=16)
+        pygame.draw.rect(self.win, (255, 255, 255), panel, 2, border_radius=16)
+        lines = _lines
         y = panel.y + 25
         for line, style in lines:
             if style == "spacer":

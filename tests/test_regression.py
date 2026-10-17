@@ -123,13 +123,20 @@ def test_skip_preserves_enemies():
 
 
 def test_pause_blocks_spawns():
-    """gen_enemies / ship updates must respect pause (spawns accelerated while paused)."""
+    """gen_enemies / ship updates must respect pause; spawns run on logic ticks
+    (scale with 2x/3x), NOT on real time (which ignored speed)."""
     print("Pause blocks spawns:")
     import game as game_mod
     src = open(game_mod.__file__).read()
     check("gen_enemies guarded by pause",
           "not self.paused" in src,
-          "run loop does not check self.paused before gen_enemies")
+          "run loop does not check self.paused before logic")
+    check("spawns tick-based in update_game_logic",
+          "self.gen_enemies()" in src and "_spawn_cd" in src,
+          "spawn not driven by logic-tick countdown")
+    check("no real-time spawn timer",
+          "time.time() - self.timer" not in src,
+          "spawn still uses real-time timer (ignores 2x/3x)")
     g = fresh_game()
     g.paused = True
     check("paused flag settable", g.paused is True)

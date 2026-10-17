@@ -21,7 +21,7 @@ Survive **10 waves** of increasingly dangerous enemies. Each wave arrives by shi
 
 ## Towers
 
-Five unique towers, each with 5 upgrade levels, distinct projectiles, and a special ability:
+Five unique towers, each with 3 levels, distinct projectiles, and a special ability:
 
 | Tower | Cost | Damage | Ability |
 |-------|------|--------|---------|
@@ -44,11 +44,26 @@ Five unique towers, each with 5 upgrade levels, distinct projectiles, and a spec
 War Treasury $1,200, Bounty Board $1,500, Lucky Charm $2,000, Reinforced Docks $2,500, Storm Caller $3,000, Reinforced Walls $3,500, Ammunition Depot $4,000, Repair Drones $5,000, Tesla Coil $6,500, and the secret **Call the Cavalry** $10,000 (endless only). Buying Repair Drones turns its slot into the **Drone Launch Facility** $8,000 (same slot, same icon — no locked/blacked-out entry).
 
 **War Tent** (click it!) — 10 one-time upgrades per run, sorted by price:
-Field Medic $1,500 (barrage destroy chance 50% → 25%), Scout Reports $2,000, Supply Lines $2,500 (towers 15% cheaper), War Drums $3,000, Signal Fire $3,500, Guerrilla Training $4,000, Honor Banner $4,000 (+10% damage, no flag visual), Spike Barricade $4,500, Recon Balloon $5,500, Sabotage $6,000.
+Field Medic $1,500 (barrage destroy chance 50% → 25%), Scout Reports $2,000, Supply Lines $2,500 (towers 15% cheaper), War Drums $3,000, Signal Fire $3,500 (campfire grows 2×, all Fire/Blaze towers shoot 12% faster, dancers guard with bows), Guerrilla Training $4,000, Honor Banner $4,000 (+10% damage, no flag visual), Spike Barricade $4,500, Recon Balloon $5,500, Sabotage $6,000.
 
 ---
 
-## Enemies
+## Difficulty
+
+Three difficulties that actually change the game (shown in the main menu under the buttons):
+
+| | EASY | NORMAL | HARD |
+|---|------|--------|------|
+| Prices (towers, tower upgrades, building/tent upgrades) | −20% | standard | +25% |
+| Enemy HP (incl. bosses) | −20% | standard | +30% |
+| Enemy speed | −15% | standard | +15% |
+| Gold from kills | +25% | standard | −15% |
+| Spawn interval | +30% (slower) | standard | −30% (faster) |
+| Ability cooldowns | −15% | standard | +25% |
+| Starting lives / gold | 30 / 300 | 20 / 200 | 12 / 150 |
+| Storm chance | 20% | 20% | 20% |
+
+Tower upgrade costs scale with the tower tier (not a flat 250/500 for all): Wooden 150/300, Metal 400/800, Golden 600/1200, Fire 800/1600, Blaze 1500/3000 (before difficulty multipliers).
 
 Nine enemy types with full walk, hurt, and death animations:
 
@@ -71,15 +86,21 @@ Nine enemy types with full walk, hurt, and death animations:
 - **Recon Balloon** — a single balloon flies from the start; after the upgrade is bought it drops bombs every 3s straight down onto the player-drawn bomb line (no homing, no enemy targeting)
 - **Spike Barricade** — spikes on the road deal 8 damage per second and can kill enemies on their own
 - **Gold on coin landing** — kill gold is added only when the flying dollar bill lands in the counter, not the moment the enemy dies
-- **Tesla Coil** — visible coil on the facility roof; lightning starts at the electrode ball, range 400 from the ball (300 damage + chain in storms)
+- **Tesla Coil** — visible coil on the facility roof; lightning starts at the electrode ball, range 400 from the ball (300 damage + chain in storms). With the coil bought, storms are more frequent (35% instead of 20%), the zap range grows to 700 during a storm, and visible lightning bolts strike the coil and discharge down it
 - **Repair drone** — flies above the Tesla Coil (never clipped by it)
-- **Drone Launch Facility** — flat rectangular dock on the building roof; launches a combat drone that zigzags across the map at a calmer speed, keeps its distance from enemies while strafing them with an animated minigun (8 dmg/shot, with sound), and fires a rocket launcher every ~20s (150 splash damage in 120px, with launch + explosion sounds). Then kamikazes into a random enemy (400 splash in 140px). Lifetime 2–4 min, then a 3-min rearm. The dock shows only the countdown: KAMIKAZE while the drone flies, NEXT DRONE while rearming. The drone model shows both weapons: minigun on the left, rocket launcher on the right
+- **Drone Launch Facility** — flat rectangular dock on the building roof; launches a combat drone that zigzags across the map at a calmer speed, keeps its distance from enemies while strafing them with an animated minigun (8 dmg/shot, with sound), and fires a rocket launcher every ~20s (150 splash damage in 120px, with launch + explosion sounds). The rocket launcher sits vertical when idle and swings to aim at the target while firing. Then kamikazes into a random enemy (400 splash in 140px). Lifetime 2–4 min, then a 3-min rearm. The dock shows only the countdown: KAMIKAZE while the drone flies, NEXT DRONE while rearming. The drone model shows both weapons: minigun on the left, rocket launcher on the right
 - **Tower upgrade menu** — vivid hologram buttons and brighter text (stronger fill, thicker borders, lightened tower colors)
 - **Particle effects** — muzzle flashes, explosions, damage numbers, glass shards
 - **Glass building destruction** — enemies shatter the facility's glass walls with sound and debris
 - **Kill-streak announcements** and wave banners
 - **Draggable shop panel** with semi-transparent modern UI
-- **Click priority** — tower upgrade/sell buttons and tower selection always beat building/tent clicks underneath them
+- **Click priority** — tower upgrade/sell buttons and tower selection always beat building/tent clicks underneath them; clicking anywhere inside the tower menu panel (not just its buttons) consumes the click
+- **Ability dock** — hidden until you own a tower; shows only the abilities of tower types you actually have on the board, growing/shrinking as types are bought or sold
+- **Enemies panel** — sized exactly to its content (icons + counts), no extra empty space
+- **Guards' tombstones** — Bonnie and Clyde's tombstones stand apart, with the name and kill count fitting inside each stone
+- **Music / Sound Effects** — separate toggles (pause menu, M key = music only): Music covers the normal track and the boss (intense) track; everything else is SFX
+- **Speed** — 2×/3× speeds up everything, including enemy disembark from the ship (tick-based spawning)
+- **Damage dealt** — end-screen stats show rounded whole numbers
 - **Performance optimized** — spatial targeting grid, 60 FPS rendering, 100 Hz logic
 
 ---

@@ -9,6 +9,7 @@ sell_btn = pygame.transform.scale(pygame.image.load(os.path.join("images", "sell
 
 class Tower:
     buy_price = 0
+    upgrade_costs = [250, 500]  # domyslne koszty ulepszen (lvl 1->2, 2->3); klasy je nadpisuja
 
     def __init__(self, x, y):
         self.x = x
@@ -39,7 +40,9 @@ class Tower:
         self.kills = 0  # R5: licznik zabojstw tej wiezy
 
     def _setup_menu(self):
-        self.menu = Menu(self, self.x, self.y, menu_bg, [250, 500, "MAX"])
+        # Koszty ulepszen zaleza od klasy wiezy (nie stale 250/500 dla wszystkich)
+        costs = list(getattr(type(self), "upgrade_costs", [250, 500])) + ["MAX"]
+        self.menu = Menu(self, self.x, self.y, menu_bg, costs)
         self.menu.add_btn(upgrade_btn, "Upgrade", dx=-65, dy=-45)
         self.menu.add_btn(sell_btn, "Sell", dx=15, dy=-45)
 
