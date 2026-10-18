@@ -694,12 +694,11 @@ class Game:
                 self._rainbow_timer = 600
         else:
             # Losowe burze w endless - te same szanse co w kampanii
-            # (20% bazowo, 35% z Tesla Coil, 40% ze Storm Caller).
+            # (20% bazowo, 40% ze Storm Caller). Tesla Coil NIE zwieksza
+            # szansy - daje tylko gwarantowana burze przy zakupie.
             # Jak w kampanii: nie na falach z bossami.
             if "storm" in self.building_upgrades:
                 _chance = 0.4
-            elif "tesla" in self.building_upgrades:
-                _chance = 0.35
             else:
                 _chance = self._diff("storm_chance")
             _dnum = self.wave + 1  # wyswietlany numer fali (self.wave juz zwiekszone)
@@ -826,8 +825,9 @@ class Game:
                     self.current_wave = [int(c * 1.5) for c in self.current_wave]
                     self.wave_banner_text += " [SWARM!]"
             # 7: deszcz na losowych falach (nie na bossach)
-            # Tesla Coil: czestsza szansa na burze (35% zamiast 20%).
-            # Storm Caller: burze trwaja dluzej (2 fale zamiast 1)
+            # Storm Caller: podwaja szanse na burze (20% -> 40%) i burze
+            # trwaja dluzej (2 fale zamiast 1).
+            # Tesla Coil nie zmienia szansy - daje gwarantowana burze przy zakupie.
             was_raining = self.raining
             _tesla_guaranteed = getattr(self, "_tesla_guaranteed_storm", 0) > 0
             if _tesla_guaranteed:
@@ -848,12 +848,11 @@ class Game:
                 self._storm_extra = "storm" in self.building_upgrades
             else:
                 self.raining = False
-                # Szansa na burze: 20% bazowo, 35% z Tesla Coil,
-                # 40% ze Storm Caller (lapacz burz podwaja bazowe 20%).
+                # Szansa na burze: 20% bazowo, 40% ze Storm Caller
+                # (lapacz burz podwaja). Tesla Coil NIE zwieksza szansy -
+                # daje tylko gwarantowana burze przy zakupie.
                 if "storm" in self.building_upgrades:
                     storm_chance = 0.4
-                elif "tesla" in self.building_upgrades:
-                    storm_chance = 0.35
                 else:
                     storm_chance = self._diff("storm_chance")
                 if wave_num % 4 != 0 and wave_num != 10 and random.random() < storm_chance:
