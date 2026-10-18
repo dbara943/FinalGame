@@ -752,6 +752,24 @@ class Game:
     def advance_wave(self):
         """Przechodzi do nastepnej fali: zloto, bonusy, powiadomienie. Wywolywane
         gdy plansza jest wyczyszczona i statek ma wrocic."""
+        # Przerwane bombardowanie/przechwycenie (np. SKIP w trakcie poscigu
+        # kawalerii): reset stanu, zeby zaden stary timeout nie wyrwal statku
+        # z doku w trakcie desantu nowej fali. Bez tego statek wyplywal poza
+        # mape zanim zdazyl rozpakowac wrogow.
+        if self.bombard_active:
+            self.bombard_active = False
+            self.bombard_phase = 0
+            self.bombard_timer = 0
+            self.bombard_index = 0
+            self.bombard_targets = []
+            self.bombard_zoom = 0
+            self.bombard_zoom_tower = None
+            self._interception_timeout = 0
+            self.ship.speed = 3.5
+            # Sojusznik z przechwycenia znika (poscig przerwany); tryb 'strike'
+            # (atak na wrogow) moze zostac - sam odplynie po salwie.
+            if self.ally_ship and getattr(self.ally_ship, "mode", None) != "strike":
+                self.ally_ship = None
         # DEBUG LOG
         try:
             with open("wave_debug.log", "a") as f:
