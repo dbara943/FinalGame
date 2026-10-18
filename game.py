@@ -692,6 +692,24 @@ class Game:
                 self.raining = False
                 sound_rain.stop()
                 self._rainbow_timer = 600
+        else:
+            # Losowe burze w endless - te same szanse co w kampanii
+            # (20% bazowo, 35% z Tesla Coil, 40% ze Storm Caller).
+            # Jak w kampanii: nie na falach z bossami.
+            if "storm" in self.building_upgrades:
+                _chance = 0.4
+            elif "tesla" in self.building_upgrades:
+                _chance = 0.35
+            else:
+                _chance = self._diff("storm_chance")
+            _dnum = self.wave + 1  # wyswietlany numer fali (self.wave juz zwiekszone)
+            if _dnum % 10 != 0 and self.endless_wave % 4 != 0 and random.random() < _chance:
+                self.raining = True
+                # Storm Caller: burza trwaja 2 fale (jak w kampanii)
+                self._endless_rain_left = 2 if "storm" in self.building_upgrades else 1
+                self.raindrops = [(random.randint(0, self.width), random.randint(0, self.height),
+                                   random.randint(8, 14)) for _ in range(100)]
+                sound_rain.play(loops=-1)
         self.gold_notifications.append([f"+{gold} gold (wave {self.wave})", 150])
         # Co 10 fal: ekstra bossowie (fala 20 -> 2, fala 30 -> 3, fala 40 -> 4...).
         # Na falach co 10 zastepuje zwyklego bossa z co-4-falowego cyklu
@@ -830,7 +848,14 @@ class Game:
                 self._storm_extra = "storm" in self.building_upgrades
             else:
                 self.raining = False
-                storm_chance = 0.35 if "tesla" in self.building_upgrades else self._diff("storm_chance")
+                # Szansa na burze: 20% bazowo, 35% z Tesla Coil,
+                # 40% ze Storm Caller (lapacz burz podwaja bazowe 20%).
+                if "storm" in self.building_upgrades:
+                    storm_chance = 0.4
+                elif "tesla" in self.building_upgrades:
+                    storm_chance = 0.35
+                else:
+                    storm_chance = self._diff("storm_chance")
                 if wave_num % 4 != 0 and wave_num != 10 and random.random() < storm_chance:
                     self.raining = True
                     self.wave_banner_text += " [RAIN]"
