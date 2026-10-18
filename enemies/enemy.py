@@ -3,6 +3,10 @@ import math
 import os
 import random
 
+# Pomost (drewniany, przy statku): Reinforced Docks spowalnia wrogow 15%
+# TYLKO w tym prostokacie (x, y, w, h). Poza nim predkosc normalna.
+_PIER_RECT = (240, 600, 340, 120)
+
 def load_anim(folder_num, anim_name, size=(64, 64)):
     """Laduje klatki animacji wroga (np. 'die', 'hurt').
     Pliki: images/enemies/<folder>/<folder>_enemies_1_<anim>_0XX.png"""
@@ -22,6 +26,7 @@ class Enemy:
         self.health = 1
         self.max_health = 0
         self.velocity = 3
+        self._docks_slow = False  # Reinforced Docks: 15% wolniej, tylko na pomoście
         # Punkty dobrane do namalowanej drogi: dolna droga w prawo,
         # zakret w gore, gorna droga z powrotem do bazy.
         self.path = [
@@ -65,7 +70,7 @@ class Enemy:
         self.base_velocity = 3
         self.flash_timer = 0  # V1: bialy blysk przy trafieniu
         self.last_hit_by = None  # R5: wieza ktora zadala ostatni cios
-        self.elite = False  # 6: elitarny wrog (2x HP, 5x zlota)
+        self.elite = False  # 6: elitarny wrog (3x HP, 5x zlota)
 
     def _apply_gold_filter(self, img):
         """Zloty filtr (grayscale -> zloto) - jak posag ze zlota."""
@@ -96,10 +101,10 @@ class Enemy:
                 lst[i] = self._apply_gold_filter(img)
 
     def make_elite(self):
-        """6: Zamienia w elitarnego (2x HP, 5x zlota, wiekszy zlociutki model)."""
+        """6: Zamienia w elitarnego (3x HP, 5x zlota, wiekszy zlociutki model)."""
         if not self.elite:
             self.elite = True
-            self.max_health *= 2
+            self.max_health *= 3
             self.health = self.max_health
             self.money *= 5
             # Kopia list (nie modyfikuj wspoldzielonych!)
@@ -290,6 +295,11 @@ class Enemy:
        if self.slow_timer > 0:
            current_vel = self.velocity * 0.5
            self.slow_timer -= 1
+       # Reinforced Docks: 15% wolniej, ale TYLKO na pomoście (x 240-580,
+       # y 600-720 - drewniany pomost przy statku). Po zejsciu z pomostu
+       # predkosc wraca do normalnej (flaga _docks_slow z gen_enemies).
+       if getattr(self, "_docks_slow", False) and _PIER_RECT[0] <= self.x < _PIER_RECT[0] + _PIER_RECT[2] and _PIER_RECT[1] <= self.y < _PIER_RECT[1] + _PIER_RECT[3]:
+           current_vel *= 0.85
        step_len = current_vel / 3.0
        dist_to_target = math.sqrt((x2 - self.x)**2 + (y2 - self.y)**2)
        step_len = min(step_len, dist_to_target)

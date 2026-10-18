@@ -25,13 +25,13 @@ Five unique towers, each with 3 levels, distinct projectiles, and a special abil
 
 | Tower | Cost | Damage | Ability |
 |-------|------|--------|---------|
-| Wooden Tower | $100 | 1 | **Rapid Fire** — temporary fire-rate boost |
+| Wood Tower | $100 | 1 | **Rapid Fire** — temporary fire-rate boost |
 | Metal Tower | $500 | 3 | **Frost Nova** — slows all enemies in range |
-| Golden Tower | $750 | 5 | **Golden Touch** — marks enemies for double gold |
+| Gold Tower | $750 | 5 | **Golden Touch** — marks enemies for double gold |
 | Fire Tower | $1,000 | 9 | **Meteor** — devastating area strike |
 | Blaze Tower | $2,000 | 12 | **Armageddon** — massive screen-wide damage |
 
-Upgrades add damage per level by tier (Wooden +2, Metal +3, Golden +4, Fire +6, Blaze +8) — pricier towers gain more from upgrades, so saving up for them pays off.
+Upgrades add damage per level by tier (Wood +2, Metal +3, Gold +4, Fire +6, Blaze +8) — pricier towers gain more from upgrades, so saving up for them pays off.
 
 - **Free placement** — no grid snapping; place towers anywhere on valid grass zones
 - **Tower synergy** — adjacent towers of the same type boost each other
@@ -66,12 +66,12 @@ Three difficulties that actually change the game (shown in the main menu under t
 | Starting lives / gold | 30 / 300 | 20 / 200 | 12 / 150 |
 | Storm chance | 20% | 20% | 20% |
 
-Tower upgrade costs scale with the tower tier (not a flat 250/500 for all): Wooden 150/300, Metal 400/800, Golden 600/1200, Fire 800/1600, Blaze 1500/3000 (before difficulty multipliers).
+Tower upgrade costs scale with the tower tier (not a flat 250/500 for all): Wood 150/300, Metal 400/800, Gold 600/1200, Fire 800/1600, Blaze 1500/3000 (before difficulty multipliers).
 
 Nine enemy types with full walk, hurt, and death animations:
 
 - **Goblin, Swordman, Knight, Cyclop, Impostor, Ogre, Evil Villager, Forkman** — each with unique stats and behaviors
-- **Golden (Elite) variants** — 8% spawn chance, 2× HP, 5× gold reward, 1.25× size, rendered in solid gold
+- **Golden (Elite) variants** — 8% spawn chance, 3× HP, 5× gold reward, 1.25× size, rendered in solid gold
 - **Boss** — multi-phase final encounter with enrage mechanic and dedicated health bar
 
 ---
@@ -87,7 +87,7 @@ Nine enemy types with full walk, hurt, and death animations:
 - **Weather system** — rain/storms with splash particles and ambient audio
 - **Ambient life** — campfire with dancers; when Signal Fire is bought, the dancers walk to their guard posts along the road (2× mob speed on the road, half speed for the final stretch) and guard the facility with bows, firing visible arrows; one guard will charge a close enemy and trade their life for it
 - **Recon Balloon** — a single balloon flies from the start; after the upgrade is bought it drops bombs every 3s straight down onto the player-drawn bomb line (no homing, no enemy targeting)
-- **Spike Barricade** — spikes on the road deal 8 damage per second and can kill enemies on their own
+- **Spike Barricade** — spikes on the road deal 8 damage per second and can kill enemies on their own; each of the 3 spike clusters is clickable like a tower, upgradeable by 2 levels (8/14/22 DPS, prices scaled by difficulty) and sellable
 - **Gold on coin landing** — kill gold is added only when the flying dollar bill lands in the counter, not the moment the enemy dies
 - **Tesla Coil** — visible coil on the facility roof; lightning starts at the electrode ball, range 400 from the ball (300 damage + chain in storms). With the coil bought, storms are more frequent (35% instead of 20%), the zap range grows to 700 during a storm, and visible lightning bolts strike the coil and discharge down it
 - **Repair drone** — flies above the Tesla Coil (never clipped by it)

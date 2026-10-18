@@ -1,4 +1,5 @@
 import pygame
+import math
 import os
 pygame.font.init()
 
@@ -62,9 +63,10 @@ class Menu():
     def get_item_cost(self):
         return self.item_cost[self.tower.level - 1]
         
-    def draw(self, win, money=None, discount=1.0):
+    def draw(self, win, money=None, discount=1.0, sell_rate=0.7):
         # Hologram HUD (wariant D) - kolor zalezny od typu wiezy
         # discount: Supply Lines 0.85 - pokazuje przekreslenie
+        # sell_rate: stawka zwrotu wg trudnosci (EASY 0.8 / NORMAL 0.7 / HARD 0.6)
         tw = self.tower
         tname = type(tw).__name__
         colors = {
@@ -73,6 +75,7 @@ class Menu():
             "GoldenTower": (212, 175, 55),
             "FireTower": (220, 80, 40),
             "BlazeTower": (180, 60, 200),
+            "SpikeCluster": (139, 90, 43),
         }
         holo = colors.get(tname, (0, 255, 204))
         # Jasniejsza wersja koloru wiezy do tekstow - surowy kolor byl wymazany
@@ -98,7 +101,8 @@ class Menu():
         pygame.draw.rect(win, (8, 14, 22), (px + 8, py - 10, tag.get_width() + 8, 14))
         win.blit(tag, (px + 12, py - 8))
         name_font = pygame.font.SysFont("consolas, monospace", 15, bold=True)
-        name_text = tw.name if hasattr(tw, 'name') else tname
+        # Nazwa wyswietlana (Wood Tower / Gold Tower), nie klucz logiczny
+        name_text = getattr(tw, 'display_name', None) or (tw.name if hasattr(tw, 'name') else tname)
         label = name_font.render(f"> {name_text.upper()}", True, bright)
         win.blit(label, (px + 14, py + 14))
         lvl, maxlvl = tw.level, tw.max_level
@@ -109,10 +113,28 @@ class Menu():
         lvl_txt = tag_font.render(f"LV.{lvl}/{maxlvl}", True, bright)
         win.blit(lvl_txt, (px + panel_w - lvl_txt.get_width() - 14, py + 32))
         stat_font = pygame.font.SysFont("consolas, monospace", 12)
-        slabel = stat_font.render(f"DMG {tw.damage}  RNG {tw.range}", True, bright)
-        win.blit(slabel, (px + 14, py + 52))
-        klabel = stat_font.render(f"KILLS {tw.kills}", True, bright)
-        win.blit(klabel, (px + 14, py + 68))
+        # Statystyki EFEKTYWNE (na zywo, nie bazowe): Honor Banner +10% (ceil,
+        # min +1), synergia +15%, deszcz -10% zasiegu, predkosc strzelania.
+        # Wczesniej pokazywano surowe damage/range - upgrade'y budynkow
+        # niby dzialaly, ale menu tego nie pokazywalo.
+        if tname == "SpikeCluster":
+            # Kolce: damage TO juz DPS (obrazenia na sekunde), bez strzalow
+            slabel = stat_font.render(f"DPS {tw.damage:.0f}/s  RNG {tw.range}", True, bright)
+            win.blit(slabel, (px + 14, py + 52))
+        else:
+            eff_dmg = math.ceil(int(tw.damage * getattr(tw, '_synergy', 1.0)) * getattr(tw, '_dmg_mult', 1.0))
+            shots_per_s = 100.0 * getattr(tw, '_fire_rate_mult', 1.0) / 60.0
+            dps = eff_dmg * shots_per_s
+            eff_rng = int(tw.range * getattr(tw, '_rain_mod', 1.0))
+            slabel = stat_font.render(f"DMG {eff_dmg}  RNG {eff_rng}", True, bright)
+            win.blit(slabel, (px + 14, py + 52))
+            dlabel = stat_font.render(f"DPS {dps:.1f}", True, bright)
+            win.blit(dlabel, (px + 14, py + 68))
+            klabel = stat_font.render(f"KILLS {tw.kills}", True, bright)
+            win.blit(klabel, (px + 122, py + 68))
+        if tname == "SpikeCluster":
+            klabel = stat_font.render(f"KILLS {tw.kills}", True, bright)
+            win.blit(klabel, (px + 14, py + 68))
         btn_y, btn_h = py + 92, 52
         is_max = tw.level >= tw.max_level
         if not is_max:
@@ -130,7 +152,7 @@ class Menu():
                                     holo, not affordable)
         else:
             self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "MAX LEVEL", "", (100, 110, 120), True)
-        sell_val = tw.sell_value()
+        sell_val = tw.sell_value(sell_rate)
         self._draw_holo_btn(win, px + 122, btn_y, 106, btn_h, "SELL", f"+${sell_val}", (255, 100, 100), False)
         if len(self.buttons) >= 2:
             if not is_max:
@@ -284,7 +306,7 @@ class VerticalMenu(Menu):
             nfont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
             dfont = pygame.font.SysFont("segoe ui, calibri, arial", 12)
             pfont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
-            names = ["Wooden Tower", "Metal Tower", "Golden Tower", "Fire Tower", "Blaze Tower"]
+            names = ["Wood Tower", "Metal Tower", "Gold Tower", "Fire Tower", "Blaze Tower"]
             tx = bx + 60 - px  # wspolna lewa krawedz tekstu
             nm = nfont.render(names[idx] if idx < len(names) else item.name, True, (230, 235, 240))
             surf.blit(nm, (tx, by + 6 - py))

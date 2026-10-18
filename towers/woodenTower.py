@@ -44,6 +44,8 @@ archer_imgs1.append(pygame.transform.scale(
 
 class WoodenTower(Tower):
     buy_price = 100
+    display_name = "Wood Tower"
+    base_damage = 1
     upgrade_dmg = 2
     # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
     upgrade_costs = [150, 300]
@@ -58,7 +60,7 @@ class WoodenTower(Tower):
         self.inRange = False
         self.facing_left = False
         self.timer = time.time()      
-        self.damage = 1
+        self.damage = self.base_damage
         self.width = 0
         self._setup_menu()
         self.moving = False
@@ -203,8 +205,9 @@ class WoodenTower(Tower):
                 shoot_snd.get(type(self).__name__, sound_2).play()
                 # 5: synergia +15% jesli sasiad tego samego typu
                 dmg = int(self.damage * getattr(self, '_synergy', 1.0))
-                # Honor Banner: +10% obrazen globalnie
-                dmg = int(dmg * getattr(self, '_dmg_mult', 1.0))
+                # Honor Banner: +10% obrazen globalnie - ZAWSZE w gore
+                # (min +1: Wood 1 -> 2, Blaze L3 28 -> 31, nie 30 po int()).
+                dmg = math.ceil(dmg * getattr(self, '_dmg_mult', 1.0))
                 # Kryt: tylko w game.py przy trafieniu (Lucky Charm 10%) -
                 # tu NIE ma rzutu, inaczej krytyki liczyly sie podwojnie.
                 splash = getattr(self, 'splash_radius', 0)
@@ -246,6 +249,8 @@ archer_imgs2.append(pygame.transform.scale(
 
 class MetalTower(WoodenTower):
     buy_price = 500
+    display_name = "Metal Tower"
+    base_damage = 3
     upgrade_dmg = 3
     # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
     upgrade_costs = [400, 800]
@@ -260,7 +265,7 @@ class MetalTower(WoodenTower):
         self.inRange = False
         self.facing_left = False
         self.timer = time.time()      
-        self.damage = 3
+        self.damage = self.base_damage
         self.slow_on_hit = True  # Spowalnia trafionych wrogow
         self._setup_menu()
         self.name = "metalTower"
@@ -311,6 +316,8 @@ archer_imgs3 = [_gold_tint(img) for img in archer_imgs3]
 
 class GoldenTower(WoodenTower):
     buy_price = 750
+    display_name = "Gold Tower"
+    base_damage = 5
     upgrade_dmg = 4
     # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
     upgrade_costs = [600, 1200]
@@ -325,7 +332,7 @@ class GoldenTower(WoodenTower):
         self.inRange = False
         self.facing_left = False
         self.timer = time.time()      
-        self.damage = 5
+        self.damage = self.base_damage
         self._setup_menu()
         self.name = "goldenTower"
 
@@ -366,6 +373,8 @@ archer_imgs4.append(pygame.transform.scale(
 
 class FireTower(WoodenTower):
     buy_price = 1000
+    display_name = "Fire Tower"
+    base_damage = 9
     upgrade_dmg = 6
     # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
     upgrade_costs = [800, 1600]
@@ -381,7 +390,7 @@ class FireTower(WoodenTower):
         self.inRange = False
         self.facing_left = False
         self.timer = time.time()      
-        self.damage = 9
+        self.damage = self.base_damage
         self.splash_radius = 60  # Obrazenia obszarowe
         self._setup_menu()
         self.name = "fireTower"
@@ -417,6 +426,8 @@ archer_imgs5.append(pygame.transform.scale(
 
 class BlazeTower(WoodenTower):
     buy_price = 2000
+    display_name = "Blaze Tower"
+    base_damage = 12
     upgrade_dmg = 8
     # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
     upgrade_costs = [1500, 3000]
@@ -432,7 +443,7 @@ class BlazeTower(WoodenTower):
         self.inRange = False
         self.facing_left = False
         self.timer = time.time()      
-        self.damage = 12
+        self.damage = self.base_damage
         self.splash_radius = 80  # Wieksze obrazenia obszarowe
         self._setup_menu()
         self.name = "blazeTower"

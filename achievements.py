@@ -69,7 +69,7 @@ ACHIEVEMENTS = [
      lambda s: s.get("max_level_at_once", 0) >= 5),
     ("pyromaniac", "Pyromaniac", "Build 5 Fire towers in one game.", "tower",
      lambda s: s.get("fire_towers", 0) >= 5),
-    ("golden_army", "Golden Army", "Build 5 Golden towers in one game.", "tower",
+    ("golden_army", "Gold Army", "Build 5 Gold towers in one game.", "tower",
      lambda s: s.get("golden_towers", 0) >= 5),
     ("speed_demon", "Speed Demon", "Use 10 tower abilities.", "special",
      lambda s: s.get("abilities_used", 0) >= 10),
