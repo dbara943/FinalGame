@@ -30,6 +30,7 @@ from enemies.impostor import Impostor
 from enemies.ogre import Ogre
 from enemies.evilVillager import EvilVillager
 from enemies.boss import Boss
+from enemies.enemy import _PIER_RECT  # pomost: kraby i fale go omijaja (jest NAD woda)
 from towers.woodenTower import (WoodenTower, MetalTower, GoldenTower, FireTower, BlazeTower,
                                 _gold_tint,
                                 sound_1 as tower_sound_1, sound_2 as tower_sound_2,
@@ -3483,11 +3484,16 @@ class Game:
             pygame.draw.ellipse(self.win, (min(255, col[0]+40), min(255, col[1]+40), col[2]), (px - 9, py - 8 + flap * 0.3, 12, 6))
 
         # 17: kraby na plazy
+        _px0, _py0, _pw, _ph = _PIER_RECT
         for cr in self.crabs:
             cr[2] += 0.05 * cr[3]
             cr[0] += 0.6 * cr[3]
             if cr[0] > 1050: cr[3] = -1
             if cr[0] < 80: cr[3] = 1
+            # Pomost jest NAD woda - krab przechodzi POD nim (nie rysujemy
+            # na pomoście; ruch idzie dalej, wiec wylania sie z drugiej strony)
+            if _px0 - 15 < cr[0] < _px0 + _pw + 15 and _py0 < cr[1] < _py0 + _ph:
+                continue
             wob = 3 * math.sin(cr[2] * 8)
             pygame.draw.ellipse(self.win, (200, 80, 60), (cr[0] - 9, cr[1] - 6 + wob * 0.3, 18, 12))
             # Szczypce
@@ -4156,11 +4162,14 @@ class Game:
     def draw_water_effects(self):
         """Wizualne: woda (fale, odbicia, kilwater, pecherzyki)."""
         t = self._now_s
-        # Fale (3 warstwy)
+        # Fale (3 warstwy) - omijaja pomost (jest NAD woda, fale pod nim)
+        _px0, _py0, _pw, _ph = _PIER_RECT
         for layer in range(3):
             for i in range(20):
                 wx = (i * 60 + t * (10 + layer * 5)) % (self.width + 60) - 30
                 wy = 640 + layer * 25 + 8 * math.sin(t * 1.5 + i + layer)
+                if wx + 25 > _px0 and wx - 25 < _px0 + _pw and wy + 8 > _py0 and wy - 8 < _py0 + _ph:
+                    continue
                 alpha = 80 - layer * 20
                 pygame.draw.arc(self.win, (255, 255, 255, alpha),
                               (wx - 25, wy - 8, 50, 16), math.pi, 2 * math.pi, 2)
