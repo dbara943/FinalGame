@@ -68,6 +68,16 @@ Three difficulties that actually change the game (shown in the main menu under t
 
 Tower upgrade costs scale with the tower tier (not a flat 250/500 for all): Wood 150/300, Metal 400/800, Gold 600/1200, Fire 800/1600, Blaze 1500/3000 (before difficulty multipliers).
 
+---
+
+## Languages
+
+The full UI is available in **7 languages**: English, Polski (Polish), Deutsch (German), Español (Spanish), Français (French), Português (Brazilian Portuguese) and Русский (Russian).
+
+- Pick your language in the **main menu** — click one of the small flags in the top-right corner. The menu switches instantly, and the choice is remembered for the next launch (saved in `language.json`).
+- Everything is localized: menus, HUD, shop, tower and upgrade menus, wave banners, announcements, notifications, pause and help screens, end screens, and all 50 achievements — 303 strings per language.
+- English is the source language and the automatic fallback. Translations live in `lang/*.json`; adding a language means adding one file there.
+
 Nine enemy types with full walk, hurt, and death animations:
 
 - **Goblin, Swordman, Knight, Cyclop, Impostor, Ogre, Evil Villager, Forkman** — each with unique stats and behaviors
@@ -82,6 +92,7 @@ Nine enemy types with full walk, hurt, and death animations:
 - **Cannon barrage** — on waves 4 and 8 (with enough lives), the ship sails to a bombardment position and fires cannonballs at your towers; during the barrage all menus close so the cinematic is visible (ESC still opens pause)
 - **Call the Cavalry** — an allied ship intercepts the pirate ship, cripples it, then bombards enemies in endless mode; once the chase starts, input is no longer blocked
 - **50 achievements** — tracked across runs with unlock popups, persistent save, and a gallery in the main menu
+- **7 languages** — full UI localization (EN / PL / DE / ES / FR / PT-BR / RU) with a flag picker in the main menu; the choice persists between launches
 - **Resolution options** — 1124×720, 1280×720, 1600×900, 1920×1080, or native fullscreen
 - **Dynamic day/night cycle** with smooth transitions
 - **Weather system** — rain/storms with splash particles and ambient audio; random storm chance per wave is 20% in campaign and endless alike (40% with Storm Caller — never on boss waves)
@@ -118,14 +129,14 @@ Nine enemy types with full walk, hurt, and death animations:
 | **Q** | Activate selected tower's ability |
 | **U** | Upgrade selected tower |
 | **S** | Sell selected tower |
-| **M** | Mute all audio |
+| **M** | Music on/off |
 | **F11** | Toggle fullscreen |
 | **SPACE** | Pause/unpause |
 | **Shift+click** | Quick-sell selected tower |
 | **Ctrl+Z** | Undo last tower placement / upgrade |
 
 ### Pause Menu (ESC)
-- Resume / Restart Game / How to Play
+- Resume / Restart Game / Forfeit Run / How to Play
 - Music and Sound Effects toggles (with checkmarks)
 - Fullscreen toggle
 - Game speed: 1× / 2× / 3×
@@ -152,6 +163,8 @@ python game.py
 FinalGame/
 ├── game.py              # Main game loop, UI, wave management
 ├── achievements.py      # 50 achievements system
+├── i18n.py              # Localization: loads lang/*.json, persists the choice
+├── lang/                # Translation files (en, pl, de, es, fr, pt, ru)
 ├── enemies/             # Enemy classes with animations
 ├── towers/              # Tower classes, projectiles, abilities
 ├── ships/               # Pirate ship and allied ship
@@ -159,7 +172,8 @@ FinalGame/
 ├── effects/             # Particle system, floating text
 ├── images/              # Sprites, backgrounds, UI assets
 │   ├── upgrades/        # Building/tent upgrade icons
-│   └── achievements/    # Achievement category icons
+│   ├── achievements/    # Achievement category icons
+│   └── flags/           # Language-picker flags
 └── sounds/              # Music and sound effects
 ```
 
