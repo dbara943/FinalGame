@@ -2302,34 +2302,36 @@ class Game:
                 self.particles.burst(300, 350, (180, 220, 255), count=15, speed=3, life=40, size=4, gravity=0.3)
                 # Q6: auto-pauza przy 3 zyciach - usunieta na prosbe gracza
             else:
-                # Wrog zabity pociskiem - kasa za niego.
+                # Wrog zabity - kasa za niego. WSZYSTKIE mnozniki skladaja sie
+                # multiplikatywnie na bazie i zaokraglaja RAZ, w gore (ceil),
+                # na samym koncu - wczesniej int() po kazdym kroku zjadal
+                # procenty (1 zlota x 1.25 na EASY dawal 1 zamiast 2, a stack
+                # bonusow tracil po kilka zlota na kazdym ucienciu).
+                # Podloga: zabity wrog NIGDY nie daje mniej niz 1 zlota
+                # (tez na HARD: 1 x 0.85 -> ceil = 1).
+                _mult = 1.0
                 # Golden Touch: podwojna kasa (oznaczeni lub globalny buff)
-                reward = d.money
                 if getattr(d, '_gold_marked', False):
-                    reward *= 2
+                    _mult *= 2.0
                 # Link Gold (Midas): zabojstwo zaliczone zlinkowanej wiezy
                 # Gold placi +50% zlota
                 if getattr(getattr(d, 'last_hit_by', None), '_link', None) == 'gold':
-                    reward = int(reward * 1.5)
+                    _mult *= 1.5
                 # Bounty Board: bossowie i elity +50% zlota
                 if "bounty" in self.building_upgrades and (isinstance(d, Boss) or d.elite):
-                    reward = int(reward * 1.5)
+                    _mult *= 1.5
                 # U8: RICH - +50% zlota
                 if self.wave_modifier == "rich":
-                    reward = int(reward * 1.5)
+                    _mult *= 1.5
                 # 7: deszcz +15% zlota (Storm Caller: +25%)
                 if self.raining:
-                    rain_bonus = 1.25 if "storm" in self.building_upgrades else 1.15
-                    reward = int(reward * rain_bonus)
-                # War Treasury: +25% zlota (multiplikatywnie, po bazowym)
+                    _mult *= 1.25 if "storm" in self.building_upgrades else 1.15
+                # War Treasury: +25% zlota
                 if "treasury" in self.building_upgrades:
-                    reward = int(reward * 1.25)
+                    _mult *= 1.25
                 # Trudnosc: mnoznik zlota za zabojstwa (EASY +25%, HARD -15%)
-                _gold_mult = self._diff("gold_mult")
-                if _gold_mult != 1.0:
-                    # HARD 0.85: Forkman (bazowo 1 zlota) dawalby int(1*0.85) = 0,
-                    # czyli wrog w ogole nie placil. Kazdy zabity wrog placi min. 1.
-                    reward = max(1, int(reward * _gold_mult))
+                _mult *= self._diff("gold_mult")
+                reward = max(1, math.ceil(d.money * _mult))
                 # self.money += reward - ODLOZONE: moneta doda zloto przy ladowaniu
                 # Trup zostaje na ziemi (ostatnia klatka animacji smierci)
                 if d.die_imgs:
