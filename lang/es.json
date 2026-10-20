@@ -14,7 +14,7 @@
  "diff.easy": "FÁCIL",
  "diff.normal": "NORMAL",
  "diff.hard": "DIFÍCIL",
- "diff.easy.desc": "FÁCIL: precios -20%, PV enemigos -20%, enemigos más lentos, +25% oro",
+ "diff.easy.desc": "FÁCIL: precios -20%, PV enemigos -20%, velocidad enemiga normal, +25% oro",
  "diff.normal.desc": "NORMAL: precios, enemigos y oro estándar",
  "diff.hard.desc": "DIFÍCIL: precios +25%, PV enemigos +30%, enemigos más rápidos, -15% oro",
  "ach.title": "LOGROS PIRATAS",

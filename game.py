@@ -118,7 +118,7 @@ TENT_UPGRADES = [
 # ability_cd_mult: czasy odnowienia umiejetnosci wiez. storm_chance: bazowa szansa na burze.
 # sell_mult: zwrot przy sprzedazy wiezy (zakup + ulepszenia).
 DIFFICULTY_CONFIG = {
-    "EASY": {"price_mult": 0.8, "enemy_hp_mult": 0.8, "enemy_speed_mult": 0.85,
+    "EASY": {"price_mult": 0.8, "enemy_hp_mult": 0.8, "enemy_speed_mult": 1.0,
              "gold_mult": 1.25, "spawn_mult": 1.3, "ability_cd_mult": 0.85, "storm_chance": 0.2,
              "sell_mult": 0.8},
     "NORMAL": {"price_mult": 1.0, "enemy_hp_mult": 1.0, "enemy_speed_mult": 1.0,

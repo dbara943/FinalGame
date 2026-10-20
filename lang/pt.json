@@ -14,7 +14,7 @@
  "diff.easy": "FÁCIL",
  "diff.normal": "NORMAL",
  "diff.hard": "DIFÍCIL",
- "diff.easy.desc": "FÁCIL: preços -20%, PV dos inimigos -20%, inimigos mais lentos, +25% de ouro",
+ "diff.easy.desc": "FÁCIL: preços -20%, PV dos inimigos -20%, velocidade inimiga normal, +25% de ouro",
  "diff.normal.desc": "NORMAL: preços, inimigos e ouro padrão",
  "diff.hard.desc": "DIFÍCIL: preços +25%, PV dos inimigos +30%, inimigos mais rápidos, -15% de ouro",
  "ach.title": "CONQUISTAS PIRATAS",

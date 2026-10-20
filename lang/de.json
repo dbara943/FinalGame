@@ -14,7 +14,7 @@
  "diff.easy": "LEICHT",
  "diff.normal": "NORMAL",
  "diff.hard": "SCHWER",
- "diff.easy.desc": "LEICHT: -20% Preise, -20% Gegner-HP, langsamere Gegner, +25% Gold",
+ "diff.easy.desc": "LEICHT: -20% Preise, -20% Gegner-HP, normale Gegnergeschwindigkeit, +25% Gold",
  "diff.normal.desc": "NORMAL: Standardpreise, Gegner und Gold",
  "diff.hard.desc": "SCHWER: +25% Preise, +30% Gegner-HP, schnellere Gegner, -15% Gold",
  "ach.title": "PIRATEN-ERFOLGE",

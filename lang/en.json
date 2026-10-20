@@ -14,7 +14,7 @@
  "diff.easy": "EASY",
  "diff.normal": "NORMAL",
  "diff.hard": "HARD",
- "diff.easy.desc": "EASY: -20% prices, -20% enemy HP, slower enemies, +25% gold",
+ "diff.easy.desc": "EASY: -20% prices, -20% enemy HP, normal enemy speed, +25% gold",
  "diff.normal.desc": "NORMAL: standard prices, enemies and gold",
  "diff.hard.desc": "HARD: +25% prices, +30% enemy HP, faster enemies, -15% gold",
  "ach.title": "PIRATE ACHIEVEMENTS",

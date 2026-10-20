@@ -14,7 +14,7 @@
  "diff.easy": "FACILE",
  "diff.normal": "NORMAL",
  "diff.hard": "DIFFICILE",
- "diff.easy.desc": "FACILE : prix -20 %, PV ennemis -20 %, ennemis plus lents, +25 % d'or",
+ "diff.easy.desc": "FACILE : prix -20 %, PV ennemis -20 %, vitesse ennemie normale, +25 % d'or",
  "diff.normal.desc": "NORMAL : prix, ennemis et or standard",
  "diff.hard.desc": "DIFFICILE : prix +25 %, PV ennemis +30 %, ennemis plus rapides, -15 % d'or",
  "ach.title": "SUCCÈS PIRATES",
