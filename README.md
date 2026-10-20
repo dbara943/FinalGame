@@ -34,7 +34,7 @@ Five unique towers, each with 3 levels, distinct projectiles, and a special abil
 Upgrades add damage per level by tier (Wood +2, Metal +3, Gold +4, Fire +6, Blaze +8) — pricier towers gain more from upgrades, so saving up for them pays off.
 
 - **Free placement** — no grid snapping; place towers anywhere on valid grass zones
-- **Tower synergy** — adjacent towers of the same type boost each other
+- **Tower links** — two towers of the same type within 100px link up (gold line between them), and each type gains a unique bonus instead of a flat damage boost: Wood +30% fire rate, Metal +25% range and much longer slows, Gold +50% gold from its kills, Fire +70% splash radius, Blaze chains 50% damage to a second nearby enemy. The active bonus is shown in the tower's menu
 - **Sell back** towers you no longer need
 - **Range preview** with green/red validity indicator while placing
 
@@ -98,9 +98,9 @@ Nine enemy types with full walk, hurt, and death animations:
 - **Weather system** — rain/storms with splash particles and ambient audio; random storm chance per wave is 20% in campaign and endless alike (40% with Storm Caller — never on boss waves)
 - **Ambient life** — campfire with dancers; when Signal Fire is bought, the dancers walk to their guard posts along the road (2× mob speed on the road, half speed for the final stretch) and guard the facility with bows, firing visible arrows; one guard will charge a close enemy and trade their life for it
 - **Recon Balloon** — a single balloon flies from the start; after the upgrade is bought it drops bombs every 3s straight down onto the player-drawn bomb line (no homing, no enemy targeting)
-- **Spike Barricade** — spikes on the road deal 8 damage per second and can kill enemies on their own; each of the 3 spike clusters is clickable like a tower, upgradeable by 2 levels (8/14/22 DPS, prices scaled by difficulty) and sellable
-- **Gold on coin landing** — kill gold is added only when the flying dollar bill lands in the counter, not the moment the enemy dies
-- **Tesla Coil** — visible coil on the facility roof; lightning starts at the electrode ball, range 400 from the ball (300 damage + chain in storms). Buying the coil guarantees a storm next round (2 rounds if Storm Caller was bought earlier); the zap range grows to 700 during a storm, and visible lightning bolts strike the coil and discharge down it
+- **Spike Barricade** — spikes on the road deal 8 damage per second and can kill enemies on their own (damage is checked against the enemy sprite's hitbox, and kills pay out a flying coin like tower kills); each of the 3 spike clusters is clickable like a tower, upgradeable by 2 levels (8/14/22 DPS, prices scaled by difficulty) and sellable
+- **Gold on coin landing** — kill gold is added only when the flying gold coin lands in the counter, not the moment the enemy dies
+- **Tesla Coil** — visible coil on the facility roof; zaps start at the electrode ball and never target enemies still on the pier. In clear weather it fires every 1.8s: 75 damage, range 400, single target. During a storm there is no timed fire — lightning strikes the coil (bolt from the sky, then the charge travels down the coil, roughly every 2.5s at random), and only then does it discharge: 100 damage, range 700, up to 3 targets (main + 2 chained). Buying the coil guarantees a storm next round (2 rounds if Storm Caller was bought earlier)
 - **Repair drone** — flies above the Tesla Coil (never clipped by it)
 - **Drone Launch Facility** — flat rectangular dock on the building roof; launches a combat drone that zigzags across the map at a calmer speed, keeps its distance from enemies while strafing them with an animated minigun (8 dmg/shot, with sound), and fires a rocket launcher every ~20s (150 splash damage in 120px, with launch + explosion sounds). The rocket launcher sits vertical when idle and swings to aim at the target while firing. Then kamikazes into a random enemy (400 splash in 140px). Lifetime 2–4 min, then a 3-min rearm. The dock shows only the countdown: KAMIKAZE while the drone flies, NEXT DRONE while rearming. The drone model shows both weapons: minigun on the left, rocket launcher on the right
 - **Tower upgrade menu** — vivid hologram buttons and brighter text (stronger fill, thicker borders, lightened tower colors)
@@ -114,6 +114,7 @@ Nine enemy types with full walk, hurt, and death animations:
 - **Guards' tombstones** — Bonnie and Clyde's tombstones stand apart, with the name and kill count fitting inside each stone
 - **Music / Sound Effects** — separate toggles (pause menu, M key = music only): Music covers the normal track and the boss (intense) track; everything else is SFX. The intense track plays only while a boss is alive
 - **Speed** — 2×/3× speeds up everything, including enemy disembark from the ship (tick-based spawning)
+- **Group disembark** — each spawn tick can land a whole group at once: 64% single, 20% two, 10% three, 5% four, 1% five enemies (types drawn randomly from the wave pool)
 - **Damage dealt** — end-screen stats show rounded whole numbers
 - **Performance optimized** — spatial targeting grid, 60 FPS rendering, 100 Hz logic
 

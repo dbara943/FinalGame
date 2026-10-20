@@ -6,7 +6,7 @@ pygame.font.init()
 import i18n
 from i18n import t as _t
 
-money_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "money.png")), (20, 20))
+money_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "coin.png")), (20, 20))
 
 class Button():
     def __init__(self, menu, img, name, dx=0, dy=0):
@@ -83,7 +83,7 @@ class Menu():
         holo = colors.get(tname, (0, 255, 204))
         # Jasniejsza wersja koloru wiezy do tekstow - surowy kolor byl wymazany
         bright = tuple(min(255, int(c * 1.4 + 45)) for c in holo)
-        panel_w, panel_h = 240, 160
+        panel_w, panel_h = 240, 176
         px = self.x - panel_w // 2
         py = self.y - 210  # calkowicie nad wieza (wieza w pelni widoczna)
         # Panel rect (razem z paskiem TOWER.EXE nad panelem) - klik w panel
@@ -127,9 +127,15 @@ class Menu():
             win.blit(slabel, (px + 14, py + 52))
         else:
             eff_dmg = math.ceil(int(tw.damage * getattr(tw, '_synergy', 1.0)) * getattr(tw, '_dmg_mult', 1.0))
-            shots_per_s = 100.0 * getattr(tw, '_fire_rate_mult', 1.0) / 60.0
+            _frm = getattr(tw, '_fire_rate_mult', 1.0)
+            if getattr(tw, '_link', None) == 'wood':
+                _frm *= 1.3  # Link Wood w wyswietlanym DPS
+            shots_per_s = 100.0 * _frm / 60.0
             dps = eff_dmg * shots_per_s
-            eff_rng = int(tw.range * getattr(tw, '_rain_mod', 1.0))
+            _rngm = getattr(tw, '_rain_mod', 1.0)
+            if getattr(tw, '_link', None) == 'metal':
+                _rngm *= 1.25  # Link Metal w wyswietlanym zasiegu
+            eff_rng = int(tw.range * _rngm)
             slabel = stat_font.render(_t("tm.stats1", dmg=eff_dmg, rng=eff_rng), True, bright)
             win.blit(slabel, (px + 14, py + 52))
             dlabel = stat_font.render(_t("tm.stats2", dps=f"{dps:.1f}"), True, bright)
@@ -158,6 +164,12 @@ class Menu():
             self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, _t("tm.max_level"), "", (100, 110, 120), True)
         sell_val = tw.sell_value(sell_rate)
         self._draw_holo_btn(win, px + 122, btn_y, 106, btn_h, _t("tm.sell"), f"+${sell_val}", (255, 100, 100), False)
+        # Linia linku sasiada (unikatowy bonus per typ) - zlota, pod przyciskami
+        _link = getattr(tw, '_link', None) if tname != "SpikeCluster" else None
+        if _link:
+            link_font = pygame.font.SysFont("consolas, monospace", 11, bold=True)
+            ltxt = link_font.render(_t(f"link.{_link}"), True, (255, 215, 100))
+            win.blit(ltxt, (px + (panel_w - ltxt.get_width()) // 2, py + 152))
         if len(self.buttons) >= 2:
             if not is_max:
                 self.buttons[0].x, self.buttons[0].y = px + 12, btn_y

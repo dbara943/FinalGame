@@ -1,6 +1,20 @@
 import pygame
 import random
 import math
+import os
+
+_coin_img = None
+
+def _get_coin_img():
+    """Grafika zlotej monety (ladowana raz, leniwie - modul importowany
+    przed ustawieniem trybu wideo w niektorych testach)."""
+    global _coin_img
+    if _coin_img is None:
+        try:
+            _coin_img = pygame.image.load(os.path.join("images", "coin.png")).convert_alpha()
+        except Exception:
+            _coin_img = False  # brak pliku -> proceduralny fallback w draw()
+    return _coin_img or None
 
 class ParticleSystem:
     """Prosty system czasteczek do eksplozji, iskier, kurzu itd."""
@@ -52,7 +66,7 @@ class ParticleSystem:
             win.blit(s, (x - size, y - size))
 
 class FloatingCoin:
-    """Banknot dolarowy lecacy do HUD po zabiciu."""
+    """Zlota moneta lecaca do HUD po zabiciu (obrot jak wirujaca moneta)."""
     def __init__(self, x, y, target_x, target_y, amount):
         self.x, self.y = x, y
         self.tx, self.ty = target_x, target_y
@@ -70,16 +84,19 @@ class FloatingCoin:
         # Krzywa: w gore potem do celu
         x = self.sx + (self.tx - self.sx) * p
         y = self.sy + (self.ty - self.sy) * p - math.sin(p * math.pi) * 60
-        # Banknot dolarowy (obrocony lekko w locie)
-        w, h = 22, 12
-        bill = pygame.Surface((w, h), pygame.SRCALPHA)
-        pygame.draw.rect(bill, (85, 160, 85), bill.get_rect(), border_radius=2)
-        pygame.draw.rect(bill, (45, 110, 45), bill.get_rect(), 2, border_radius=2)
-        pygame.draw.circle(bill, (200, 230, 200), (w // 2, h // 2), 4)
-        pygame.draw.circle(bill, (45, 110, 45), (w // 2, h // 2), 4, 1)
-        ang = 25 * math.sin(p * math.pi * 2)
-        bill = pygame.transform.rotate(bill, ang)
-        win.blit(bill, (int(x) - bill.get_width() // 2, int(y) - bill.get_height() // 2))
+        img = _get_coin_img()
+        size = 26
+        if img is not None:
+            # Wirowanie: szerokosc pulsuje jak obracajaca sie moneta (3 pelne obroty)
+            squash = 0.25 + 0.75 * abs(math.sin(p * math.pi * 3))
+            wpx = max(4, int(size * squash))
+            coin = pygame.transform.smoothscale(img, (wpx, size))
+        else:
+            # Fallback proceduralny: zlote kolko z obramowaniem
+            coin = pygame.Surface((size, size), pygame.SRCALPHA)
+            pygame.draw.circle(coin, (255, 200, 60), (size // 2, size // 2), size // 2)
+            pygame.draw.circle(coin, (190, 140, 30), (size // 2, size // 2), size // 2, 2)
+        win.blit(coin, (int(x) - coin.get_width() // 2, int(y) - coin.get_height() // 2))
 
 class Shockwave:
     """Rozchodzacy sie krag."""

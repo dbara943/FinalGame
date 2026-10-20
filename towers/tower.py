@@ -27,6 +27,7 @@ class Tower:
         self.total_spent = self.buy_price
         # Cache na gorace petle (wydajnosc) - bez getattr
         self._synergy = 1.0
+        self._link = None  # typ linku sasiada tego samego typu ("wood"/"metal"/...)
         self._rain_mod = 1.0
         self._target_buf = []  # reuzywalny bufor celow (bez alokacji co tick)
         self._setup_menu()
@@ -147,15 +148,28 @@ class Tower:
         return self.price[self.level - 1]
 
     def get_synergy_bonus(self, towers):
-        """5: +15% obrazen jesli obok stoi wieza tego samego typu (100px)."""
+        """Stary plaski bonus +15% obrazen - ZASTAPIONY unikatowymi linkami
+        (get_link_type). Zostawione dla kompatybilnosci: zwraca 1.0."""
+        return 1.0
+
+    _LINK_KEYS = {"WoodenTower": "wood", "MetalTower": "metal",
+                  "GoldenTower": "gold", "FireTower": "fire",
+                  "BlazeTower": "blaze"}
+
+    def get_link_type(self, towers):
+        """Link sasiada: wieza tego samego typu w promieniu 100px ->
+        klucz unikatowego bonusu dla tego typu (None gdy brak sasiada).
+        Bonusy: Wood +30% szybkostrzelnosci, Metal +25% zasiegu i dluzsze
+        spowolnienie, Gold +50% zlota za zabojstwa, Fire +70% splash,
+        Blaze lancuch na 2. wroga (50% dmg)."""
         for tw in towers:
             if tw is self:
                 continue
             if type(tw).__name__ == type(self).__name__:
                 dx, dy = tw.x - self.x, tw.y - self.y
                 if dx*dx + dy*dy < 10000:
-                    return 1.15
-        return 1.0
+                    return self._LINK_KEYS.get(type(self).__name__)
+        return None
 
     def move(self, x, y):
         self.x = x

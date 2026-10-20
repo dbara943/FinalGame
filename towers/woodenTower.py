@@ -154,7 +154,10 @@ class WoodenTower(Tower):
         shot_fired = False
 
         # 7: deszcz zmniejsza zasieg (liczone raz, nie w petli)
+        # Link Metal: +25% zasiegu
         eff_range = self.range * self._rain_mod
+        if getattr(self, '_link', None) == 'metal':
+            eff_range *= 1.25
         eff_range_sq = eff_range * eff_range
         # Kandydaci: z siatki przestrzennej (tylko pobliskie komorki) lub wszyscy
         # Margines na hitboxy: sprite (np. boss 160px) moze wystawac poza
@@ -198,7 +201,10 @@ class WoodenTower(Tower):
         if first_enemy is not None:
             self.current_target = first_enemy  # R3: zapamietaj cel
             # Ammunition Depot: +15% szybkosci strzelania
+            # Link Wood (Crossfire): +30% szybkosci strzelania
             fire_mult = getattr(self, '_fire_rate_mult', 1.0)
+            if getattr(self, '_link', None) == 'wood':
+                fire_mult *= 1.3
             cooldown_ticks = int(60 / fire_mult)  # 1s bazowo
             if self.attack_cooldown <= 0:
                 self.attack_cooldown = cooldown_ticks
@@ -211,6 +217,9 @@ class WoodenTower(Tower):
                 # Kryt: tylko w game.py przy trafieniu (Lucky Charm 10%) -
                 # tu NIE ma rzutu, inaczej krytyki liczyly sie podwojnie.
                 splash = getattr(self, 'splash_radius', 0)
+                # Link Fire (Wildfire): +70% promienia splash
+                if splash and getattr(self, '_link', None) == 'fire':
+                    splash = int(splash * 1.7)
                 # Pocisk leci do wroga zamiast natychmiastowego hita.
                 projectiles.append(Projectile(
                     self.x, self.y - 30,

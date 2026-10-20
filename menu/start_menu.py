@@ -326,17 +326,49 @@ class StartMenu:
                         cur = test
                 if cur:
                     lines.append(cur)
-                if len(lines) > 2:
-                    lines = lines[:2]
+                full_lines = lines
+                truncated = len(full_lines) > 2
+                # Hover-scroll: najedzona karta z dluzszym opisem przewija go
+                # w dol w oknie 2 linii (0.5 s zwloki, 26 px/s), zeby dalo sie
+                # przeczytac calosc w kazdym jezyku; po wyjechaniu myszy
+                # wraca forma ucieta z "..."
+                if not hasattr(self, "_ach_hover"):
+                    self._ach_hover = {}
+                _now = pygame.time.get_ticks() / 1000.0
+                if card.collidepoint(pygame.mouse.get_pos()):
+                    self._ach_hover.setdefault(aid, _now)
+                    _hstart = self._ach_hover[aid]
+                else:
+                    self._ach_hover.pop(aid, None)
+                    _hstart = None
+                scroll_off = 0.0
+                if truncated and _hstart is not None:
+                    scroll_off = min((len(full_lines) - 2) * 20,
+                                     max(0.0, (_now - _hstart - 0.5)) * 26.0)
+                if truncated and scroll_off <= 0:
+                    lines = full_lines[:2]
                     while len(lines) > 1 and self.small_font.size(lines[1] + "…")[0] > max_desc_w and len(lines[1]) > 1:
                         lines[1] = lines[1][:-1].rstrip()
                     lines[1] = lines[1] + "…"
-                if len(lines) >= 1:
-                    d1 = self.small_font.render(lines[0], True, dcol)
-                    self.win.blit(d1, (cx + 88, y + 40))
-                if len(lines) >= 2:
-                    d2 = self.small_font.render(lines[1], True, dcol)
-                    self.win.blit(d2, (cx + 88, y + 60))
+                else:
+                    lines = full_lines
+                if scroll_off > 0:
+                    _clip = pygame.Rect(cx + 88, y + 40, max_desc_w + 4, 40)
+                    _prev_clip = self.win.get_clip()
+                    self.win.set_clip(_clip)
+                    for li, ln in enumerate(full_lines):
+                        ly = y + 40 + li * 20 - int(scroll_off)
+                        if ly + 20 < _clip.top or ly > _clip.bottom:
+                            continue
+                        self.win.blit(self.small_font.render(ln, True, dcol), (cx + 88, ly))
+                    self.win.set_clip(_prev_clip)
+                else:
+                    if len(lines) >= 1:
+                        d1 = self.small_font.render(lines[0], True, dcol)
+                        self.win.blit(d1, (cx + 88, y + 40))
+                    if len(lines) >= 2:
+                        d2 = self.small_font.render(lines[1], True, dcol)
+                        self.win.blit(d2, (cx + 88, y + 60))
             y += row_h + 12
         self.win.set_clip(None)
         # Scrollbar: lina

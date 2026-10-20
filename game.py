@@ -47,7 +47,7 @@ import time
 import random
 
 lives_img = pygame.image.load(os.path.join("images", "heart.png"))
-money_img = pygame.image.load(os.path.join("images", "money.png"))
+money_img = pygame.image.load(os.path.join("images", "coin.png"))
 side_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "side_menu.png")), (375, 475))
 t1_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t2.png")), (30, 30))
 t2_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t1.png")), (30, 30))
@@ -614,52 +614,63 @@ class Game:
                 else:
                     self.ship.sail_out()
         else:
-            # Losowa kolejnosc spawnu (nie od najslabszego) - mniej przewidywalnie
-            available = [i for i, c in enumerate(self.current_wave) if c > 0]
-            if available:
-                i = random.choice(available)
-                self.current_wave[i] -= 1
-                en = self.enemy_classes[i]()
-                # U8: SWIFT - +30% predkosci
-                if self.wave_modifier == "swift":
-                    en.velocity *= 1.3
-                # 6: 8% szansy na elitarnego (nie boss)
-                if not isinstance(en, Boss) and random.random() < 0.08:
-                    en.make_elite()
-                # Endless: 5x HP bazowo + 5% co fale (compound), minimum +1 HP na fale
-                # Reinforced Docks: wrogowie 15% wolniejsi, ale TYLKO na pomoście
-                # (flaga _docks_slow; predkosc liczona w Enemy.move() wg pozycji).
-                # Sabotage: wrogowie spawnuja sie z -15% HP
-                if self.endless:
-                    scaled = self._endless_hp(en.max_health, self.endless_wave)
-                    en.max_health = scaled
-                    en.health = scaled
-                # Trudnosc: HP i predkosc zwyklych wrogow (EASY slabsze/wolniejsze, HARD mocniejsze/szybsze)
-                _hp_mult = self._diff("enemy_hp_mult")
-                if _hp_mult != 1.0:
-                    en.max_health = int(en.max_health * _hp_mult)
-                    en.health = int(en.health * _hp_mult)
-                en.velocity *= self._diff("enemy_speed_mult")
-                if "sabotage" in self.tent_upgrades:
-                    # Tylko aktualne HP (widoczne na pasku), max zostaje
-                    en.health = int(en.health * 0.85)
-                if "docks" in self.building_upgrades:
-                    en._docks_slow = True
-                en._spawn_tick = self._logic_tick  # Scout Reports: ambush (ticki logiki, nie czas rzeczywisty)
-                self.enemies.append(en)
-                # Call the Cavalry: licz rozladowanych, sojusznik wplywa w 1. polowie fali
-                if self._ally_strike_at is not None:
-                    self._ally_unloaded = getattr(self, "_ally_unloaded", 0) + 1
-                    if (self._ally_unloaded >= self._ally_strike_at
-                            and (not self.ally_ship or self.ally_ship.state == AllyShip.AWAY)):
-                        self._ally_strike_at = None  # tylko raz na fale
-                        self.ally_ship = AllyShip(os.path.join("images", "ship_ally.png"),
-                                                  screen_w=self.width)
-                        # Baraz z miejsca pirata (867, 603), nie z portu
-                        self.ally_ship.sail_in("strike", fire_x=867)
-                        self.ally_ship.y = 603
-                        self.wave_banner_text = tr("banner.ally")
-                        self.wave_banner_timer = 150
+            # Spawn grupowy: rzut na liczbe wrogow w jednym desancie -
+            # 64% x1, 20% x2, 10% x3, 5% x4, 1% x5 (typy losowe z puli fali)
+            _r = random.random()
+            _n = 5 if _r < 0.01 else 4 if _r < 0.06 else 3 if _r < 0.16 else 2 if _r < 0.36 else 1
+            for _ in range(_n):
+                if sum(self.current_wave) == 0:
+                    break
+                self._spawn_one_from_pool()
+
+    def _spawn_one_from_pool(self):
+        """Jeden wrog z puli biezacej fali (losowy typ) - dawne cialo gen_enemies."""
+        # Losowa kolejnosc spawnu (nie od najslabszego) - mniej przewidywalnie
+        available = [i for i, c in enumerate(self.current_wave) if c > 0]
+        if available:
+            i = random.choice(available)
+            self.current_wave[i] -= 1
+            en = self.enemy_classes[i]()
+            # U8: SWIFT - +30% predkosci
+            if self.wave_modifier == "swift":
+                en.velocity *= 1.3
+            # 6: 8% szansy na elitarnego (nie boss)
+            if not isinstance(en, Boss) and random.random() < 0.08:
+                en.make_elite()
+            # Endless: 5x HP bazowo + 5% co fale (compound), minimum +1 HP na fale
+            # Reinforced Docks: wrogowie 15% wolniejsi, ale TYLKO na pomoście
+            # (flaga _docks_slow; predkosc liczona w Enemy.move() wg pozycji).
+            # Sabotage: wrogowie spawnuja sie z -15% HP
+            if self.endless:
+                scaled = self._endless_hp(en.max_health, self.endless_wave)
+                en.max_health = scaled
+                en.health = scaled
+            # Trudnosc: HP i predkosc zwyklych wrogow (EASY slabsze/wolniejsze, HARD mocniejsze/szybsze)
+            _hp_mult = self._diff("enemy_hp_mult")
+            if _hp_mult != 1.0:
+                en.max_health = int(en.max_health * _hp_mult)
+                en.health = int(en.health * _hp_mult)
+            en.velocity *= self._diff("enemy_speed_mult")
+            if "sabotage" in self.tent_upgrades:
+                # Tylko aktualne HP (widoczne na pasku), max zostaje
+                en.health = int(en.health * 0.85)
+            if "docks" in self.building_upgrades:
+                en._docks_slow = True
+            en._spawn_tick = self._logic_tick  # Scout Reports: ambush (ticki logiki, nie czas rzeczywisty)
+            self.enemies.append(en)
+            # Call the Cavalry: licz rozladowanych, sojusznik wplywa w 1. polowie fali
+            if self._ally_strike_at is not None:
+                self._ally_unloaded = getattr(self, "_ally_unloaded", 0) + 1
+                if (self._ally_unloaded >= self._ally_strike_at
+                        and (not self.ally_ship or self.ally_ship.state == AllyShip.AWAY)):
+                    self._ally_strike_at = None  # tylko raz na fale
+                    self.ally_ship = AllyShip(os.path.join("images", "ship_ally.png"),
+                                              screen_w=self.width)
+                    # Baraz z miejsca pirata (867, 603), nie z portu
+                    self.ally_ship.sail_in("strike", fire_x=867)
+                    self.ally_ship.y = 603
+                    self.wave_banner_text = tr("banner.ally")
+                    self.wave_banner_timer = 150
 
     def _setup_endless_wave(self):
         """Generuje kolejna fale endless (proceduralnie, rosnace HP)."""
@@ -1123,14 +1134,17 @@ class Game:
 
     def _update_spikes(self):
         """Kolce rania przechodzacych wrogow (dps wg poziomu klastra: 8/14/22).
-        Uzywa hit(), wiec moga zabijac (kills liczone do menu klastra)."""
+        Uzywa hit(), wiec moga zabijac (kills liczone do menu klastra,
+        zloto z monety ladowanej przy smierci wroga - jak przy wiezach).
+        Zasieg po HITBOXIE sprite'a (promien 55), nie po srodku wroga -
+        wczesniej szybcy/grubsi wrogowie przechodzili niemal bez obrazen."""
         if "spikes" not in self.tent_upgrades or not self._spikes:
             return
         for sp in self._spikes:
             for en in self.enemies:
                 if en.dying or en.dead or en.reached_end:
                     continue
-                if (en.x - sp.x) ** 2 + (en.y - sp.y) ** 2 < 40 ** 2:
+                if en.hitbox_in_radius(sp.x, sp.y, 55):
                     dmg = sp.damage / 100.0  # dps przy logice 100 Hz
                     was_dying = en.dying
                     try:
@@ -2018,34 +2032,44 @@ class Game:
         self.ship.sail_in()
 
     def _recalc_synergy(self):
-        """5: przelicza bonus synergii - tylko gdy wieze sie zmienia, nie co tick."""
+        """Linki sasiadow - tylko gdy wieze sie zmienia, nie co tick.
+        Plaskie +15% dmg usuniete: kazdy typ ma unikatowy bonus linku."""
         for tw in self.towers:
-            tw._synergy = tw.get_synergy_bonus(self.towers)
+            tw._synergy = 1.0
+            tw._link = tw.get_link_type(self.towers)
 
-    def _tesla_zap(self):
-        """Tesla Coil: piorun w najblizszego wroga. W burze: 2x dmg + lancuch
-        + O WIELE wiekszy zasieg (700 zamiast 400)."""
+    def _tesla_zap(self, storm=False):
+        """Tesla Coil: piorun z kuli (308,123) w najblizszego wroga.
+        Pogoda: 75 dmg, zasieg 400, pojedynczy cel (strzal z cooldownu).
+        Burza: 100 dmg, zasieg 700, do 3 celow (glowny + 2 w lancuchu) -
+        wywolywane TYLKO z konca animacji uderzenia pioruna w cewke.
+        Wrogowie wciaz na pomoście (_PIER_RECT) sa ZAWSZE pomijani."""
         bx, by = 308, 123  # electrode ball (z drag tool, 2026-10-14) - zasieg od kuli
-        storm = self.raining
         zap_r = 700 if storm else 400  # zasieg w burze: o wiele wiekszy
+        _px0, _py0, _pw, _ph = _PIER_RECT
+
+        def _on_pier(en):
+            return _px0 <= en.x < _px0 + _pw and _py0 <= en.y < _py0 + _ph
+
         best, best_d2 = None, zap_r ** 2  # radius z drag tool (bylo 450 od srodka budynku)
         for en in self.enemies:
-            if en.dying or en.dead or en.reached_end:
+            if en.dying or en.dead or en.reached_end or _on_pier(en):
                 continue
             d2 = (en.x - bx) ** 2 + (en.y - by) ** 2
             if d2 < best_d2:
                 best, best_d2 = en, d2
         if not best:
             return
-        dmg = 300 if storm else 150
+        dmg = 100 if storm else 75
         targets = [best]
         if storm:
-            # Lancuch na 3 pobliskich
+            # Lancuch: +2 najblizszych od glownego celu (razem max 3)
             near = sorted(
                 (en for en in self.enemies
                  if en is not best and not en.dying and not en.dead and not en.reached_end
+                 and not _on_pier(en)
                  and (en.x - best.x) ** 2 + (en.y - best.y) ** 2 < 200 ** 2),
-                key=lambda e: (e.x - best.x) ** 2 + (e.y - best.y) ** 2)[:3]
+                key=lambda e: (e.x - best.x) ** 2 + (e.y - best.y) ** 2)[:2]
             targets.extend(near)
         prev = (308, 123)  # zap origin z drag tool (electrode ball: coil 308,198 - 75)
         for tgt in targets:
@@ -2084,6 +2108,9 @@ class Game:
                 st["t"] = 16
             elif st["phase"] == "travel" and st["t"] <= 0:
                 self._coil_strikes.remove(st)
+                # Cewka naladowana uderzeniem - wyladowanie idzie we wrogow
+                # (to jedyny sposob strzalu Tesli podczas burzy)
+                self._tesla_zap(storm=True)
 
     def update_game_logic(self):
         """Jedna iteracja logiki gry (ruch wrogow, ataki, pociski)."""
@@ -2098,15 +2125,19 @@ class Game:
         # V3: banner fali
         if self.wave_banner_timer > 0:
             self.wave_banner_timer -= 1
-        # Tesla Coil: raz na 1.8s razi najblizszego wroga (180 tickow przy 100Hz)
+        # Tesla Coil: bez burzy strzal co 180 tickow (75 dmg, 1 cel).
+        # W burze NIE ma strzalu z cooldownu - piorun musi najpierw uderzyc
+        # w cewke (animacja: bolt z nieba -> travel po cewce), dopiero koniec
+        # fazy travel w _update_coil_strikes odpala zap (100 dmg, do 3 celow).
+        # Szansa uderzenia 0.004/tick = srednio co ~2.5 s (losowo).
         if "tesla" in self.building_upgrades:
-            self._tesla_cooldown -= 1
-            if self._tesla_cooldown <= 0:
-                self._tesla_cooldown = 180
-                self._tesla_zap()
-            # Uderzenia piorunow W cewke podczas burzy (wizualne)
             if self.raining:
                 self._update_coil_strikes()
+            else:
+                self._tesla_cooldown -= 1
+                if self._tesla_cooldown <= 0:
+                    self._tesla_cooldown = 180
+                    self._tesla_zap()
         # Spike Barricade: kolce rania wrogow
         self._update_spikes()
         # Straznicy przy budynku strzelaja z lukow
@@ -2276,6 +2307,10 @@ class Game:
                 reward = d.money
                 if getattr(d, '_gold_marked', False):
                     reward *= 2
+                # Link Gold (Midas): zabojstwo zaliczone zlinkowanej wiezy
+                # Gold placi +50% zlota
+                if getattr(getattr(d, 'last_hit_by', None), '_link', None) == 'gold':
+                    reward = int(reward * 1.5)
                 # Bounty Board: bossowie i elity +50% zlota
                 if "bounty" in self.building_upgrades and (isinstance(d, Boss) or d.elite):
                     reward = int(reward * 1.5)
@@ -2447,9 +2482,30 @@ class Game:
                     dmg_color = (255, 220, 50) if is_crit else None
                     self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 40, dmg_text, 30, dmg_color])
                     self.stats_damage += int(dmg)
+                # Link Blaze: lancuch na najblizszego INNEGO wroga w 140px
+                # od trafionego - 50% obrazen pocisku (zwykle trafienia,
+                # nie umiejetnosci specjalne)
+                if proj.special is None and getattr(proj.source_tower, '_link', None) == 'blaze':
+                    _chain, _chain_d2 = None, 140 ** 2
+                    for en in self.enemies:
+                        if en is hit_enemy or en.dying or en.dead or en.reached_end:
+                            continue
+                        _d2 = (en.x - hit_enemy.x) ** 2 + (en.y - hit_enemy.y) ** 2
+                        if _d2 < _chain_d2:
+                            _chain, _chain_d2 = en, _d2
+                    if _chain is not None:
+                        _cdmg = max(1, int(proj.damage * 0.5)) * _chain.get_damage_mult(proj.damage_type)
+                        _cdmg *= self._tent_damage_mult(_chain)
+                        if _chain.hit(_cdmg):
+                            tower_sound_3.play()
+                        self.damage_numbers.append([_chain.x, _chain.y - 40, str(int(_cdmg)), 30, (255, 170, 80)])
+                        self.stats_damage += int(_cdmg)
+                        self.particles.burst(_chain.x, _chain.y - 30, (255, 150, 60), count=6, speed=3, size=3)
                 # Slow: MetalTower spowalnia trafionych.
+                # Link Metal: spowolnienie trzyma duzo dluzej (240 zamiast 90).
                 if proj.slow_on_hit:
-                    hit_enemy.apply_slow(90)  # 1.5 sekundy przy 60 FPS
+                    _slow_dur = 240 if getattr(proj.source_tower, '_link', None) == 'metal' else 90
+                    hit_enemy.apply_slow(_slow_dur)
             if proj.done:
                 self.projectiles.remove(proj)
         # Aktualizacja latajacych liczb obrazen
@@ -2779,7 +2835,7 @@ class Game:
             # Q15: filtr - przyciemnij niepasujace
             if self.tower_filter and not type(tw).__name__.startswith(self.tower_filter):
                 continue
-            if tw._synergy > 1.0:
+            if getattr(tw, "_link", None):
                 for tw2 in self.towers:
                     if tw2 is not tw and type(tw2).__name__ == type(tw).__name__:
                         _dx, _dy = tw2.x - tw.x, tw2.y - tw.y
@@ -3115,8 +3171,9 @@ class Game:
         tlabel = qfont.render(f"{mins:02d}:{secs:02d}", True, (200, 200, 200))
         self.win.blit(tlabel, (self.width - 70, self.height - 30))
         
-        # 8: wskaznik pauzy z informacja o budowaniu
-        if self.paused:
+        # 8: wskaznik pauzy z informacja o budowaniu - tylko dla pauzy bez
+        # menu ESC; z menu widoczna jest jedna PAUSED (ta z menu)
+        if self.paused and not self.show_menu:
             pfont = self.font_p36
             plabel = self._txt_paused
             sfont = self.font_s16
@@ -3157,9 +3214,6 @@ class Game:
             _btn.damage = math.ceil(_cls.base_damage * _dmgm)
         self.menu.draw(self.win, self._mouse_pos(), discount=discount)
         self.draw_hud()
-        # Menu ESC (na wierzchu)
-        if self.show_menu:
-            self.draw_pause_menu()
         # Cinematic bombardowania - zoom na wieze
         self._draw_bombard_zoom()
         # Menu wybranej wiezy NA SAMYM KONCU - nad wrogami, pociskami, HUDem, wszystkim
@@ -3174,6 +3228,11 @@ class Game:
             # Podswietlenie wybranego klastra (okrag, jak zasieg wiezy)
             pygame.draw.circle(self.win, (255, 200, 80),
                                (int(self.selected_spike.x), int(self.selected_spike.y)), 34, 2)
+
+        # Menu ESC rysowane OSTATNIE - pauza ma priorytet na ekranie nad
+        # menu wiezy i kolcow (wczesniej menu kolcow wchodzilo na pauze)
+        if self.show_menu:
+            self.draw_pause_menu()
 
         self._present()
 
@@ -3477,7 +3536,10 @@ class Game:
         # 15: wieloryb
         self.whale_timer -= 1
         if self.whale_timer <= 0 and self.whale is None:
-            self.whale = [random.randint(200, 900), 0]
+            # Wynurzenie TYLKO poza pomostem (pomost: x 240-580) - ciemne
+            # cielsko na tle desek wygladalo jak przeciecie grafiki pomostu
+            _wx = random.randint(90, 180) if random.random() < 0.3 else random.randint(650, 1000)
+            self.whale = [_wx, 0]
             self.whale_timer = random.randint(2800, 4500)
         if self.whale:
             self.whale[1] += 1
@@ -3525,7 +3587,10 @@ class Game:
         # 18: macka osmiornicy
         self.octo_timer -= 1
         if self.octo_timer <= 0 and self.octo is None:
-            self.octo = [random.randint(150, 950), 0]
+            # Jak wieloryb: poza pomostem (x 240-580), zeby macka nie
+            # wyrastala przez deski pomostu
+            _ox = random.randint(90, 180) if random.random() < 0.3 else random.randint(650, 1000)
+            self.octo = [_ox, 0]
             self.octo_timer = random.randint(3500, 5500)
         if self.octo:
             self.octo[1] += 1
@@ -3742,27 +3807,35 @@ class Game:
             pygame.draw.ellipse(self.win, (50, 50, 50), (cx - w // 2, cy - 6, w, 10))
             rect = pygame.Rect(cx - w // 2, cy - h, w, h)
             pygame.draw.rect(self.win, (195, 195, 200), rect, border_radius=16)
-            pygame.draw.rect(self.win, (120, 120, 130), rect, 2, border_radius=16)
+            pygame.draw.rect(self.win, (100, 100, 110), rect, 2, border_radius=16)
             lines = ["R.I.P.", tb["name"]]
             kills_parts = (tr("tomb.kills"), str(tb['d'].get('kills', 0)))
             font = self._tomb_fonts[5]
-            for s in (12, 11, 10, 9, 8, 7, 6, 5):
+            for s in (13, 12, 11, 10, 9, 8, 7, 6, 5):
                 f = self._tomb_fonts[s]
                 kills_w = f.size(kills_parts[0])[0] + 2 + f.size(kills_parts[1])[0]
                 if max([f.size(ln)[0] for ln in lines] + [kills_w]) <= w - 10:
                     font = f
                     break
+            # Tekst rzezbiony w kamieniu: ciemne litery (30,30,40) na jasnym
+            # kamieniu + jasny offset +1px w dol = efekt dluta, wysoki kontrast
+            # (wczesniej 60,60,70 na 195,195,200 byl prawie niewidoczny)
+            def _carve(txt, lx, ly):
+                lite = font.render(txt, True, (238, 238, 242))
+                self.win.blit(lite, (lx, ly + 1))
+                dark = font.render(txt, True, (30, 30, 40))
+                self.win.blit(dark, (lx, ly))
             ty = cy - h + 7
             for ln in lines:
-                surf = font.render(ln, True, (60, 60, 70))
-                self.win.blit(surf, (cx - surf.get_width() // 2, ty))
+                lw = font.size(ln)[0]
+                _carve(ln, cx - lw // 2, ty)
                 ty += font.get_height() + 1
             # Kills: dwie czesci z 2px przerwa (nie pelna spacja)
-            s1 = font.render(kills_parts[0], True, (60, 60, 70))
-            s2 = font.render(kills_parts[1], True, (60, 60, 70))
-            total = s1.get_width() + 2 + s2.get_width()
-            self.win.blit(s1, (cx - total // 2, ty))
-            self.win.blit(s2, (cx - total // 2 + s1.get_width() + 2, ty))
+            w1 = font.size(kills_parts[0])[0]
+            w2 = font.size(kills_parts[1])[0]
+            total = w1 + 2 + w2
+            _carve(kills_parts[0], cx - total // 2, ty)
+            _carve(kills_parts[1], cx - total // 2 + w1 + 2, ty)
 
     # Sciezka wrogow (kopia z enemies/enemy.py) - straznicy ida do posterunkow DROGA
     _GUARD_PATH = [
@@ -4477,26 +4550,60 @@ class Game:
                     cur = test
             if cur:
                 lines.append(cur)
-            if len(lines) > 2:
-                # Awaryjnie: 2 linie + wielokropek (obecne opisy mieszcza sie w 2)
-                lines = lines[:2]
+            full_lines = lines
+            truncated = len(full_lines) > 2
+            # Hover-scroll: karta z opisem dluzszym niz 2 linie przewija go
+            # plynnie w dol po najechaniu (0.5 s zwloki, 30 px/s), zeby dalo
+            # sie przeczytac calosc w KAZDYM jezyku; po wyjechaniu myszy
+            # wraca na gore z forma ucieta ("...").
+            if not hasattr(self, "_upg_hover"):
+                self._upg_hover = {}
+            if rect.collidepoint(mx, my):
+                self._upg_hover.setdefault(upg["id"], self._now_s)
+                _hstart = self._upg_hover[upg["id"]]
+            else:
+                self._upg_hover.pop(upg["id"], None)
+                _hstart = None
+            scroll_off = 0.0
+            if truncated and _hstart is not None:
+                scroll_off = min((len(full_lines) - 2) * desc_step,
+                                 max(0.0, (self._now_s - _hstart - 0.5)) * 30.0)
+            if truncated and scroll_off <= 0:
+                # Forma ucieta: 2 linie + wielokropek
+                lines = full_lines[:2]
                 while len(lines) > 1 and desc_font.size(lines[1] + "…")[0] > max_desc_w and len(lines[1]) > 1:
                     lines[1] = lines[1][:-1].rstrip()
                 lines[1] = lines[1] + "…"
+            else:
+                lines = full_lines
             # Tytul + tekst WYCOWANE W PIONIE wzgledem obrazka (ikonka jest
             # wycentrowana w karcie; wczesniej tytul byl przyklejony do gory,
             # a cena do dolu - tekst wygladal na niewycentrowany).
             icon_cy = sy + (row_h - 56) // 2 + 28  # srodek ikonki 56x56
             name_h = self.font_btn18.get_height()
-            block_h = name_h + 4 + len(lines[:2]) * desc_step
+            block_h = name_h + 4 + min(2, len(full_lines)) * desc_step
             block_top = icon_cy - block_h // 2
             # Nazwa
             name_col = (150, 150, 160) if mystery else (240, 240, 240)
             name_lbl = self.font_btn18.render(name, True, name_col)
             self.win.blit(name_lbl, (sx + 76, block_top))
-            for li, ln in enumerate(lines[:2]):
-                d_lbl = desc_font.render(ln, True, desc_col)
-                self.win.blit(d_lbl, (sx + 76, block_top + name_h + 4 + li * desc_step))
+            if scroll_off > 0:
+                # Przewijany opis w oknie 2 linii (clip), reszta wyjezdza nizej
+                _clip = pygame.Rect(sx + 76, block_top + name_h + 4,
+                                    max_desc_w + 4, 2 * desc_step)
+                _prev_clip = self.win.get_clip()
+                self.win.set_clip(_clip)
+                for li, ln in enumerate(full_lines):
+                    ly = block_top + name_h + 4 + li * desc_step - int(scroll_off)
+                    if ly + desc_step < _clip.top or ly > _clip.bottom:
+                        continue
+                    d_lbl = desc_font.render(ln, True, desc_col)
+                    self.win.blit(d_lbl, (sx + 76, ly))
+                self.win.set_clip(_prev_clip)
+            else:
+                for li, ln in enumerate(lines[:2]):
+                    d_lbl = desc_font.render(ln, True, desc_col)
+                    self.win.blit(d_lbl, (sx + 76, block_top + name_h + 4 + li * desc_step))
             # Cena / status (prawy GORNY rog, w wierszu tytulu - nie koliduje z opisem)
             if owned:
                 st = self.font_btn18.render(tr("upg.owned"), True, (100, 220, 130))
