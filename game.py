@@ -238,6 +238,11 @@ class Game:
         self._show_help = False  # pod-ekran "How to Play"
         self._forfeit = False  # rezygnacja z gry (ESC -> Forfeit Run)
         self._menu_buttons = []  # [rect, action] - budowane w draw_menu
+        # Skok do fali endless z menu pauzy: pole tekstowe + przycisk
+        self._pause_wave_txt = ""
+        self._pause_wave_focus = False
+        self._pause_jump_input = None
+        self._pause_jump_btn = None
         # Strefy stawiania wiez (narysowane przez gracza)
         self._placement_zones = [
             [(96, 369), (2, 387), (0, 441), (143, 483), (314, 489), (428, 505), (465, 529), (487, 547), (494, 556), (970, 496), (118, 369), (101, 370), (101, 369)],
@@ -697,10 +702,60 @@ class Game:
 
     def setup_endless_jump(self, n):
         """Teleport z menu glownego: start gry od wybranej fali endless.
-        n >= 11: sklad/HP/bonus jak przy naturalnym dojsciu do tej fali
-        (przez _setup_endless_wave z licznikow ustawionych o 1 nizej).
+        Ta sama logika co skok w trakcie gry (jump_to_wave), tylko bez
+        resetu statku - gra dopiero powstala, statek juz wplywa."""
+        self.jump_to_wave(n, reset_ship=False)
+
+    def jump_to_wave(self, n, reset_ship=True):
+        """Skok do fali endless z ZACHOWANIEM stanu gry: wieze, pieniadze,
+        zycia i ulepszenia zostaja. Plansza jest czyszczona (wrogowie,
+        bossowie w kolejce, pociski, mozdzierze), statek wplywa od nowa
+        i fala czeka na start - jak przed rozpoczeciem fali. Skoczona
+        fala NIE placi bonusu startowego (tylko ten jeden raz); po jej
+        ukonczeniu nastepna fala placi juz normalnie.
+        n >= 11: sklad/HP jak przy naturalnym dojsciu do tej fali.
         n == 10: EASTER EGG - rewanz z bossem finalnym z 100x HP;
-        po jego falii gra przechodzi w endless od fali 11."""
+        po jego fali gra przechodzi w endless od fali 11."""
+        # Anuluj stawianie wiezy ze zwrotem (jak ESC)
+        if getattr(self, "moving_object", None) is not None:
+            try:
+                self.money += self.shop_price(self.moving_object.name)
+            except Exception:
+                pass
+            try:
+                self.moving_object.moving = False
+            except Exception:
+                pass
+            self.moving_object = None
+        # Czyszczenie planszy i stanow bojowych
+        self.enemies = []
+        self.pending_bosses = []
+        self.projectiles = []
+        self.mortar_shots = []
+        self._facility_rockets = []
+        if self._combat_drone is not None:
+            self._combat_drone["target"] = None
+            if self._combat_drone["state"] == "engage":
+                self._combat_drone["state"] = "wander"
+        self.bombard_active = False
+        self.bombard_phase = 0
+        self.waiting_for_clear = False
+        self.last_wave_done = False
+        self._spawn_cd = 0
+        if self.selected_tower is not None:
+            try:
+                self.selected_tower.selected = False
+            except Exception:
+                pass
+        self.selected_tower = None
+        self.selected_spike = None
+        self._building_menu_open = False
+        self._tent_menu_open = False
+        if reset_ship:
+            # Statek od nowa: wplywa jak na poczatku gry i desantuje fale
+            self.ship = Ship(os.path.join("images", "ship.png"),
+                             dock_x=278, dock_y=669, screen_w=self.width)
+            self.ship.sail_in()
         if n <= 10:
             self.endless = True
             self.endless_wave = 0
@@ -715,11 +770,27 @@ class Game:
             self.endless = True
             self.endless_wave = n - 11
             self.wave = n - 2
-            self._setup_endless_wave()
+            self._setup_endless_wave(grant_gold=False)
             self._wave_start_lives = self.lives
 
-    def _setup_endless_wave(self):
-        """Generuje kolejna fale endless (proceduralnie, rosnace HP)."""
+    def _do_pause_jump(self):
+        """SKOCZ z menu pauzy: skok do wpisanej fali i powrot do gry."""
+        try:
+            n = int(self._pause_wave_txt)
+        except ValueError:
+            return
+        n = max(10, min(999, n))
+        self.jump_to_wave(n)
+        self._pause_wave_txt = ""
+        self._pause_wave_focus = False
+        self.show_menu = False
+        self.paused = False
+
+    def _setup_endless_wave(self, grant_gold=True):
+        """Generuje kolejna fale endless (proceduralnie, rosnace HP).
+        grant_gold=False przy skoku do fali (menu glowne / menu pauzy):
+        skocznia fala nie placi bonusu startowego - tylko ten jeden raz,
+        kolejne fale znowu placa normalnie."""
         self.endless_wave += 1
         self.wave += 1
         self._ach_stats['max_wave'] = max(self._ach_stats.get('max_wave', 0), self.wave + 1)
@@ -736,11 +807,13 @@ class Game:
         _weights = [b * (1 + 0.06 * _w) ** i for i, b in enumerate(_base)]
         _wsum = sum(_weights)
         self.current_wave = [max(1, int(_total * wt / _wsum)) for wt in _weights]
-        # Bonus: numer fali x $100 (fala 11 = $1100)
+        # Bonus: numer fali x 100 (fala 11 = 1100). Przy SKOKU do fali
+        # (grant_gold=False) bonus nie jest wyplacany - tylko ten jeden raz.
         gold = self.wave * 100
-        self.money += gold
-        self._ach_stats["gold_earned"] = self._ach_stats.get("gold_earned", 0) + gold
-        self.gold_notifications.append([tr("notif.gold_wave", gold=gold, wave=self.wave), 150])
+        if grant_gold:
+            self.money += gold
+            self._ach_stats["gold_earned"] = self._ach_stats.get("gold_earned", 0) + gold
+            self.gold_notifications.append([tr("notif.gold_wave", gold=gold, wave=self.wave), 150])
         # Deszcz w endless: brak losowych burz, ale gwarantowana burza
         # z Tesla Coil dziala (1 runda, 2 ze Storm Caller). Deszcz
         # przeniesiony z kampanii gasnie po 1 fali endless (wczesniej
@@ -1661,6 +1734,15 @@ class Game:
                     # Blokada wszystkich klawiszy podczas cinematic (faza 12 - poscig - nie blokuje)
                     if self.bombard_active and self.bombard_phase != 12:
                         continue
+                    # Pole fali w menu pauzy ma fokus: klawisze edytuja numer
+                    if self.show_menu and getattr(self, "_pause_wave_focus", False):
+                        if event.key == pygame.K_BACKSPACE:
+                            self._pause_wave_txt = self._pause_wave_txt[:-1]
+                        elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                            self._do_pause_jump()
+                        elif event.unicode and event.unicode.isdigit() and len(self._pause_wave_txt) < 3:
+                            self._pause_wave_txt += event.unicode
+                        continue
                     # Gdy menu otwarte: blokuj wszystkie akcje wiez
                     if self.show_menu:
                         continue
@@ -1760,7 +1842,12 @@ class Game:
                     if self.show_menu:
                         if self._show_help:
                             self._show_help = False
+                        elif self._pause_jump_input and self._pause_jump_input.collidepoint(pos):
+                            self._pause_wave_focus = True
+                        elif self._pause_jump_btn and self._pause_jump_btn.collidepoint(pos):
+                            self._do_pause_jump()
                         else:
+                            self._pause_wave_focus = False
                             for rect, action in self._menu_buttons:
                                 if rect.collidepoint(pos):
                                     self._menu_action(action)
@@ -3403,7 +3490,7 @@ class Game:
             (tr("pause.quit"), "quit"),
         ]
         pw = 340
-        ph = 70 + (len(_items) - 1) * 54 + 44 + 16  # tytul + przyciski 44px co 54px + dolny margines
+        ph = 70 + (len(_items) - 1) * 54 + 44 + 16 + 78  # tytul + przyciski 44px co 54px + wiersz skoku do fali + margines
         px, py = (self.width - pw) // 2, (self.height - ph) // 2
         pygame.draw.rect(self.win, (25, 30, 38), (px, py, pw, ph), border_radius=16)
         pygame.draw.rect(self.win, (70, 80, 95), (px, py, pw, ph), 2, border_radius=16)
@@ -3445,6 +3532,31 @@ class Game:
                                     rect.y + (rect.h - txt.get_height()) // 2))
             self._menu_buttons.append((rect, action))
             by += 54
+        # Wiersz skoku do fali endless (jak w menu glownym): etykieta, pole
+        # z numerem fali i przycisk SKOCZ. Skok czysci plansze i zachowuje
+        # setup; skoczona fala nie placi bonusu startowego.
+        jy = by + 6
+        lbl = self.font_btn18.render(tr("menu.endless_title"), True, (255, 215, 100))
+        self.win.blit(lbl, (px + 40, jy))
+        self._pause_jump_input = pygame.Rect(px + 40, jy + 26, 120, 38)
+        self._pause_jump_btn = pygame.Rect(px + 168, jy + 26, pw - 208, 38)
+        r = self._pause_jump_input
+        pygame.draw.rect(self.win, (10, 16, 28), r, border_radius=8)
+        pygame.draw.rect(self.win, (255, 215, 100) if self._pause_wave_focus else (120, 135, 155),
+                         r, 2, border_radius=8)
+        txt = self._pause_wave_txt if self._pause_wave_txt else str(self.wave + 1)
+        col = (240, 244, 248) if self._pause_wave_txt else (110, 120, 135)
+        tv = self.font_btn18.render(txt, True, col)
+        self.win.blit(tv, (r.x + 10, r.y + r.h // 2 - tv.get_height() // 2))
+        if self._pause_wave_focus and (pygame.time.get_ticks() // 500) % 2 == 0:
+            cx = r.x + 10 + tv.get_width() + 3
+            pygame.draw.line(self.win, (255, 215, 100), (cx, r.y + 8), (cx, r.bottom - 8), 2)
+        jb = self._pause_jump_btn
+        pygame.draw.rect(self.win, (75, 90, 110) if jb.collidepoint(mx, my) else (55, 65, 80),
+                         jb, border_radius=10)
+        jt = self.font_btn18.render(tr("menu.endless_go"), True, (240, 240, 240))
+        self.win.blit(jt, (jb.x + (jb.w - jt.get_width()) // 2,
+                           jb.y + (jb.h - jt.get_height()) // 2))
         # Pod-ekran pomocy
         if self._show_help:
             self.draw_help_overlay()

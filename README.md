@@ -16,7 +16,7 @@ Survive **10 waves** of increasingly dangerous enemies. Each wave arrives by shi
 - **Economy:** Earn gold for every kill. Golden (elite) enemies are tougher but worth 5× more
 - **Victory:** Survive all 10 waves, including the final boss
 - **Endless mode:** After victory, keep going — enemies scale +5% HP per wave, bigger gold bonuses per wave. Wave composition shifts toward the strongest enemy types the deeper you go (and the golden-elite chance rises from 8% to up to 18%), so late endless is far more dangerous
-- **Endless jump (main menu):** type a wave number in the bottom-left field and hit JUMP to start endless at that wave — or enter 10 for an Easter egg: a rematch against the final boss with 100× HP
+- **Endless jump:** type a wave number and hit JUMP — in the main menu (bottom-left field) to start a run at that wave, or mid-run in the pause menu (ESC) to teleport your current run: the field is cleared (enemies, projectiles, pending bosses), but your towers, money, lives and upgrades stay, the ship sails in again, and the jumped wave pays NO round-start gold (just that once — beating it makes the next wave pay normally). Enter 10 for an Easter egg: a rematch against the final boss with 100× HP
 
 ---
 
