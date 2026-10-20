@@ -3719,7 +3719,7 @@ class Game:
                 pygame.draw.line(self.win, (255, 200, 170) if d["sex"] == "m" else (255, 210, 180), (dx + face * 5, dy - 15), (hx, hy), 2)
 
     # Tombstone spots (z drag tool, 2026-10-14): Bonnie 22,393 / Clyde 71,393
-    _TOMBSTONE_POS = {"Bonnie": (22, 393), "Clyde": (98, 393)}  # Clyde blizej Bonnie: przesuniecie o polowe (14px zamiast 28px)
+    _TOMBSTONE_POS = {"Bonnie": (22, 393), "Clyde": (90, 393)}  # Clyde 8px blizej Bonnie (z 98 na 90)
 
     def _add_tombstone(self, d):
         """Guard dead -> R.I.P. stone at their placed spot. Kills read live from the guard."""
@@ -4205,10 +4205,12 @@ class Game:
                 mx = 850 + random.randint(-20, 20)
                 my = 650 + i * 8
                 pygame.draw.line(self.win, (220, 220, 240, 100), (mx - 15, my), (mx + 15, my), 2)
-        # Pecherzyki przy brzegu
+        # Pecherzyki przy brzegu - omijaja pomost (jak kraby i fale: pomost jest NAD woda)
         for i in range(8):
             bx = (i * 140 + t * 20) % self.width
             by = 630 + 5 * math.sin(t * 2 + i)
+            if bx + 3 + 15 > _px0 and bx - 3 - 15 < _px0 + _pw and by + 3 + 15 > _py0 and by - 3 - 15 < _py0 + _ph:
+                continue
             pygame.draw.circle(self.win, (200, 230, 255, 120), (int(bx), int(by)), 3)
         # Fale o skaly (splash)
         if random.random() < 0.1:
