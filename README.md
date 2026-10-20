@@ -95,7 +95,7 @@ Nine enemy types with full walk, hurt, and death animations:
 - **7 languages** — full UI localization (EN / PL / DE / ES / FR / PT-BR / RU) with a flag picker in the main menu; the choice persists between launches
 - **Resolution options** — 1124×720, 1280×720, 1600×900, 1920×1080, or native fullscreen
 - **Dynamic day/night cycle** with smooth transitions
-- **Weather system** — rain/storms with splash particles and ambient audio; random storm chance per wave is 20% in campaign and endless alike (40% with Storm Caller — never on boss waves)
+- **Weather system** — rain/storms with splash particles and ambient audio; random storm chance per wave depends on difficulty: 20% on Easy, 15% on Normal, 10% on Hard, in campaign and endless alike (Storm Caller doubles the chance — never on boss waves)
 - **Ambient life** — campfire with dancers; when Signal Fire is bought, the dancers walk to their guard posts along the road (2× mob speed on the road, half speed for the final stretch) and guard the facility with bows, firing visible arrows; one guard will charge a close enemy and trade their life for it
 - **Recon Balloon** — a single balloon flies from the start; after the upgrade is bought it drops bombs every 3s straight down onto the player-drawn bomb line (no homing, no enemy targeting)
 - **Spike Barricade** — spikes on the road deal 8 damage per second and can kill enemies on their own (damage is checked against the enemy sprite's hitbox, and kills pay out a flying coin like tower kills); each of the 3 spike clusters is clickable like a tower, upgradeable by 2 levels (8/14/22 DPS, prices scaled by difficulty) and sellable

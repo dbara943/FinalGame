@@ -122,10 +122,10 @@ DIFFICULTY_CONFIG = {
              "gold_mult": 1.25, "spawn_mult": 1.3, "ability_cd_mult": 0.85, "storm_chance": 0.2,
              "sell_mult": 0.8},
     "NORMAL": {"price_mult": 1.0, "enemy_hp_mult": 1.0, "enemy_speed_mult": 1.0,
-               "gold_mult": 1.0, "spawn_mult": 1.0, "ability_cd_mult": 1.0, "storm_chance": 0.2,
+               "gold_mult": 1.0, "spawn_mult": 1.0, "ability_cd_mult": 1.0, "storm_chance": 0.15,
                "sell_mult": 0.7},
     "HARD": {"price_mult": 1.25, "enemy_hp_mult": 1.3, "enemy_speed_mult": 1.15,
-             "gold_mult": 0.85, "spawn_mult": 0.7, "ability_cd_mult": 1.25, "storm_chance": 0.2,
+             "gold_mult": 0.85, "spawn_mult": 0.7, "ability_cd_mult": 1.25, "storm_chance": 0.10,
              "sell_mult": 0.6},
 }
 waves = [
@@ -708,11 +708,11 @@ class Game:
                 self._rainbow_timer = 600
         else:
             # Losowe burze w endless - te same szanse co w kampanii
-            # (20% bazowo, 40% ze Storm Caller). Tesla Coil NIE zwieksza
-            # szansy - daje tylko gwarantowana burze przy zakupie.
-            # Jak w kampanii: nie na falach z bossami.
+            # (EASY 20%, NORMAL 15%, HARD 10%; Storm Caller podwaja).
+            # Tesla Coil NIE zwieksza szansy - daje tylko gwarantowana
+            # burze przy zakupie. Jak w kampanii: nie na falach z bossami.
             if "storm" in self.building_upgrades:
-                _chance = 0.4
+                _chance = self._diff("storm_chance") * 2
             else:
                 _chance = self._diff("storm_chance")
             _dnum = self.wave + 1  # wyswietlany numer fali (self.wave juz zwiekszone)
@@ -880,11 +880,12 @@ class Game:
                 self._storm_extra = "storm" in self.building_upgrades
             else:
                 self.raining = False
-                # Szansa na burze: 20% bazowo, 40% ze Storm Caller
-                # (lapacz burz podwaja). Tesla Coil NIE zwieksza szansy -
+                # Szansa na burze wg trudnosci: EASY 20%, NORMAL 15%,
+                # HARD 10%. Storm Caller PODWAJA szanse poziomu
+                # (40/30/20%). Tesla Coil NIE zwieksza szansy -
                 # daje tylko gwarantowana burze przy zakupie.
                 if "storm" in self.building_upgrades:
-                    storm_chance = 0.4
+                    storm_chance = self._diff("storm_chance") * 2
                 else:
                     storm_chance = self._diff("storm_chance")
                 if wave_num % 4 != 0 and wave_num != 10 and random.random() < storm_chance:
