@@ -644,8 +644,8 @@ class Game:
                     _back = _k * 26
                     _en.x -= _d[0] * _back
                     _en.y -= _d[1] * _back
-                    _en.x += -_d[1] * random.randint(-7, 7)
-                    _en.y += _d[0] * random.randint(-7, 7)
+                    _en.x += -_d[1] * random.randint(-4, 4)
+                    _en.y += _d[0] * random.randint(-4, 4)
 
     def _spawn_one_from_pool(self):
         """Jeden wrog z puli biezacej fali (losowy typ) - dawne cialo gen_enemies."""
@@ -3490,7 +3490,7 @@ class Game:
             (tr("pause.quit"), "quit"),
         ]
         pw = 340
-        ph = 70 + (len(_items) - 1) * 54 + 44 + 16 + 78  # tytul + przyciski 44px co 54px + wiersz skoku do fali + margines
+        ph = 70 + (len(_items) - 1) * 54 + 44 + 16 + (78 if self.endless else 0)  # tytul + przyciski + ew. wiersz skoku (tylko endless) + margines
         px, py = (self.width - pw) // 2, (self.height - ph) // 2
         pygame.draw.rect(self.win, (25, 30, 38), (px, py, pw, ph), border_radius=16)
         pygame.draw.rect(self.win, (70, 80, 95), (px, py, pw, ph), 2, border_radius=16)
@@ -3532,31 +3532,37 @@ class Game:
                                     rect.y + (rect.h - txt.get_height()) // 2))
             self._menu_buttons.append((rect, action))
             by += 54
-        # Wiersz skoku do fali endless (jak w menu glownym): etykieta, pole
-        # z numerem fali i przycisk SKOCZ. Skok czysci plansze i zachowuje
-        # setup; skoczona fala nie placi bonusu startowego.
-        jy = by + 6
-        lbl = self.font_btn18.render(tr("menu.endless_title"), True, (255, 215, 100))
-        self.win.blit(lbl, (px + 40, jy))
-        self._pause_jump_input = pygame.Rect(px + 40, jy + 26, 120, 38)
-        self._pause_jump_btn = pygame.Rect(px + 168, jy + 26, pw - 208, 38)
-        r = self._pause_jump_input
-        pygame.draw.rect(self.win, (10, 16, 28), r, border_radius=8)
-        pygame.draw.rect(self.win, (255, 215, 100) if self._pause_wave_focus else (120, 135, 155),
-                         r, 2, border_radius=8)
-        txt = self._pause_wave_txt if self._pause_wave_txt else str(self.wave + 1)
-        col = (240, 244, 248) if self._pause_wave_txt else (110, 120, 135)
-        tv = self.font_btn18.render(txt, True, col)
-        self.win.blit(tv, (r.x + 10, r.y + r.h // 2 - tv.get_height() // 2))
-        if self._pause_wave_focus and (pygame.time.get_ticks() // 500) % 2 == 0:
-            cx = r.x + 10 + tv.get_width() + 3
-            pygame.draw.line(self.win, (255, 215, 100), (cx, r.y + 8), (cx, r.bottom - 8), 2)
-        jb = self._pause_jump_btn
-        pygame.draw.rect(self.win, (75, 90, 110) if jb.collidepoint(mx, my) else (55, 65, 80),
-                         jb, border_radius=10)
-        jt = self.font_btn18.render(tr("menu.endless_go"), True, (240, 240, 240))
-        self.win.blit(jt, (jb.x + (jb.w - jt.get_width()) // 2,
-                           jb.y + (jb.h - jt.get_height()) // 2))
+        # Wiersz skoku do fali endless - TYLKO w trybie endless
+        # (odblokowuje sie po dojsciu do fali 11; nowa gra = ukryty)
+        if self.endless:
+            # Wiersz skoku do fali endless (jak w menu glownym): etykieta, pole
+            # z numerem fali i przycisk SKOCZ. Skok czysci plansze i zachowuje
+            # setup; skoczona fala nie placi bonusu startowego.
+            jy = by + 6
+            lbl = self.font_btn18.render(tr("menu.endless_title"), True, (255, 215, 100))
+            self.win.blit(lbl, (px + 40, jy))
+            self._pause_jump_input = pygame.Rect(px + 40, jy + 26, 120, 38)
+            self._pause_jump_btn = pygame.Rect(px + 168, jy + 26, pw - 208, 38)
+            r = self._pause_jump_input
+            pygame.draw.rect(self.win, (10, 16, 28), r, border_radius=8)
+            pygame.draw.rect(self.win, (255, 215, 100) if self._pause_wave_focus else (120, 135, 155),
+                             r, 2, border_radius=8)
+            txt = self._pause_wave_txt if self._pause_wave_txt else str(self.wave + 1)
+            col = (240, 244, 248) if self._pause_wave_txt else (110, 120, 135)
+            tv = self.font_btn18.render(txt, True, col)
+            self.win.blit(tv, (r.x + 10, r.y + r.h // 2 - tv.get_height() // 2))
+            if self._pause_wave_focus and (pygame.time.get_ticks() // 500) % 2 == 0:
+                cx = r.x + 10 + tv.get_width() + 3
+                pygame.draw.line(self.win, (255, 215, 100), (cx, r.y + 8), (cx, r.bottom - 8), 2)
+            jb = self._pause_jump_btn
+            pygame.draw.rect(self.win, (75, 90, 110) if jb.collidepoint(mx, my) else (55, 65, 80),
+                             jb, border_radius=10)
+            jt = self.font_btn18.render(tr("menu.endless_go"), True, (240, 240, 240))
+            self.win.blit(jt, (jb.x + (jb.w - jt.get_width()) // 2,
+                               jb.y + (jb.h - jt.get_height()) // 2))
+        else:
+            self._pause_jump_input = None
+            self._pause_jump_btn = None
         # Pod-ekran pomocy
         if self._show_help:
             self.draw_help_overlay()
@@ -5679,9 +5685,6 @@ if __name__ == "__main__":
             break
         g = Game(lives=settings["lives"], money=settings["money"], sound=settings["sound"],
                  difficulty=settings["difficulty"])
-        # Teleport endless z menu glownego (pole z numerem fali)
-        if settings.get("start_wave"):
-            g.setup_endless_jump(settings["start_wave"])
         # run() zwraca "menu" gdy gracz chce wrocic do menu glownego
         if g.run() != "menu":
             break

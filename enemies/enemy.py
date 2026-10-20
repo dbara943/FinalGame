@@ -313,8 +313,15 @@ class Enemy:
        self.y += dirn[1] * step_len
        self.dis += step_len
 
-       # Dotarl do punktu docelowego?
-       if dist_to_target <= self.velocity / 3.0 + 1:
+       # Dotarl do punktu docelowego? Blisko punktu ALBO minal jego
+       # plaszczyzne (projekcja na kierunek segmentu >= dlugosc segmentu).
+       # Sam warunek odleglosci nie wystarczal: wrog z offsetem bocznym
+       # (np. rozproszony spawn grupowy) idzie rownolegle do segmentu,
+       # nigdy nie wchodzi w promien ~2px od punktu i w efekcie szedl
+       # prosto przed siebie az za mape.
+       _seg_len = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+       _proj = (self.x - x1) * dirn[0] + (self.y - y1) * dirn[1]
+       if dist_to_target <= self.velocity / 3.0 + 1 or _proj >= _seg_len:
            if self.path_pos + 1 >= len(self.path):
                # Koniec sciezki - atak na baze (animacja), nie natychmiastowe znikniecie
                if not self.attacking and not self.reached_end:
