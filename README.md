@@ -39,7 +39,7 @@ Upgrades add damage per level by tier (Wood +2, Metal +3, Gold +4, Fire +6, Blaz
 - **Sell back** towers you no longer need
 - **Range preview** with green/red validity indicator while placing. The range circle always shows the tower's TRUE effective range (level, rain −10%, Metal link +25%) — towers engage exactly at the circle's edge, never beyond it
 - **Prices in gold** — shop, tower menus and upgrade cards all show a gold coin icon next to the amount (no $ signs)
-- **Full run summary** — victory, defeat and forfeit screens all show the complete stat set: wave reached, kills, damage, gold earned/spent, towers built/lost, abilities used, and kills by enemy type
+- **Full run summary** — victory, defeat and forfeit screens all show the complete stat set: highest wave beaten (only waves actually completed count — jumping to wave 60 and failing still shows your real best of that run), kills, damage, gold earned/spent, towers built/lost, abilities used, and kills by enemy type
 
 ---
 

@@ -276,6 +276,7 @@ class Game:
         self.damage_numbers = []  # Latajace liczby obrazen [(x, y, tekst, timer)]
         # Statystyki koncowe
         self.stats_kills = 0
+        self.stats_highest_wave_beaten = 0  # najwyzsza UKONCZONA fala w tej grze (statystyka koncowa)
         self.stats_gold = 0
         self.stats_damage = 0
         self.stats_kills_by_type = {}
@@ -894,6 +895,13 @@ class Game:
     def advance_wave(self):
         """Przechodzi do nastepnej fali: zloto, bonusy, powiadomienie. Wywolywane
         gdy plansza jest wyczyszczona i statek ma wrocic."""
+        # Statystyka koncowa: najwyzsza UKONCZONA fala w tej grze. Liczymy
+        # tylko przy czystej planszy (SKIP z zywymi wrogami to nie ukonczenie);
+        # dzieki temu skok np. na fale 60 bez jej pokonania nie zawyza wyniku,
+        # a ekran koncowy pokazuje realny rekord gracza z tego podejscia.
+        if len(self.enemies) == 0:
+            self.stats_highest_wave_beaten = max(
+                getattr(self, "stats_highest_wave_beaten", 0), self.wave + 1)
         # Przerwane bombardowanie/przechwycenie (np. SKIP w trakcie poscigu
         # kawalerii): reset stanu, zeby zaden stary timeout nie wyrwal statku
         # z doku w trakcie desantu nowej fali. Bez tego statek wyplywal poza
@@ -2148,6 +2156,7 @@ class Game:
         self._spawn_cd = 0
         self._wave_start_lives = self._start_lives
         self.stats_kills = 0
+        self.stats_highest_wave_beaten = 0
         self.stats_gold = 0
         self.stats_damage = 0
         self.stats_kills_by_type = {}
@@ -2744,7 +2753,9 @@ class Game:
     def _end_stats_list(self):
         """Rozszerzone statystyki koncowe: ogolne + zabicia wg typu wroga."""
         lines = [
-            f"Wave reached: {self.wave + 1} / {len(waves)}",
+            (f"Highest wave beaten: {getattr(self, 'stats_highest_wave_beaten', 0)} (endless)"
+             if self.endless else
+             f"Highest wave beaten: {getattr(self, 'stats_highest_wave_beaten', 0)} / {len(waves)}"),
             f"Monsters slain: {self.stats_kills}",
             f"Damage dealt: {int(round(self.stats_damage))}",
             f"Gold earned: {self.stats_gold}   |   Gold spent: {self.stats_gold_spent}",
@@ -2902,9 +2913,9 @@ class Game:
             left_x = self.width // 2 - 330
             right_x = self.width // 2 + 30
             if self.endless:
-                wave_line = tr("end.wave_endless", a=self.wave + 1)
+                wave_line = tr("end.wave_endless", a=getattr(self, "stats_highest_wave_beaten", 0))
             else:
-                wave_line = tr("end.wave_reached", a=self.wave + 1, b=len(waves))
+                wave_line = tr("end.wave_reached", a=getattr(self, "stats_highest_wave_beaten", 0), b=len(waves))
             general = [
                 wave_line,
                 tr("end.monsters", n=self.stats_kills),
