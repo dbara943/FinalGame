@@ -181,6 +181,12 @@ class Enemy:
         """Logika wroga: animacje, ruch, timery. Wywolywane z Game.update_game_logic()."""
         if self.flash_timer > 0:
             self.flash_timer -= 1
+        # Siatka bezpieczenstwa: HP <= 0 zawsze znaczy smierc, nawet gdy
+        # obrazenia pominely hit() (bezposrednie odjecie HP) - inaczej taki
+        # wrog chodzi w nieskonczonosc i nigdy nie placi zlota za zabojstwo.
+        if self.health <= 0 and not self.dying and not self.dead:
+            self.dying = True
+            self.die_count = 0
         # Atak na baze - animacja ataku zamiast natychmiastowego znikniecia
         if self.attacking:
             if self.attack_imgs:

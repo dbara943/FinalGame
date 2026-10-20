@@ -103,10 +103,20 @@ class Tower:
                     pygame.draw.line(win, (255, 100, 100, 200), (x1, y1), (x2, y2), 2)
             # Menu rysowane osobno na samym wierzchu przez game.py (nieprzykryte przez inne wieze)
 
+    def effective_range(self):
+        """PRAWDZIWY zasieg strzalu: baza (z poziomem) x deszcz (0.9)
+        x Link Metal (1.25). Tego samego uzywa attack() i kolo zasiegu -
+        kolo ZAWSZE pokazuje to, czym wieza realnie strzela."""
+        r = self.range * getattr(self, '_rain_mod', 1.0)
+        if getattr(self, '_link', None) == 'metal':
+            r *= 1.25
+        return r
+
     def draw_radius(self, win):
         if self.selected or getattr(self, 'moving', False):
-            # Nowoczesny okrag: subtelne wypelnienie + jasna obwiednia
-            r = self.range
+            # Nowoczesny okrag: subtelne wypelnienie + jasna obwiednia.
+            # Promien = zasieg EFEKTYWNY (pogoda/link), nie surowy.
+            r = int(self.effective_range())
             surface = pygame.Surface((r*2, r*2), pygame.SRCALPHA, 32)
             # Wypelnienie - bardzo delikatne
             pygame.draw.circle(surface, (100, 200, 255, 35), (r, r), r, 0)

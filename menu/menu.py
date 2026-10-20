@@ -7,6 +7,7 @@ import i18n
 from i18n import t as _t
 
 money_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "coin.png")), (20, 20))
+_coin_icon = pygame.transform.scale(money_img, (15, 15))  # mala moneta przy cenach (zamiast $)
 
 class Button():
     def __init__(self, menu, img, name, dx=0, dy=0):
@@ -158,12 +159,12 @@ class Menu():
                                          up_cost, disc_cost, holo, not affordable)
             else:
                 affordable = money is not None and money >= up_cost
-                self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, _t("tm.upgrade"), f"${up_cost}",
+                self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, _t("tm.upgrade"), f"{up_cost}",
                                     holo, not affordable)
         else:
             self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, _t("tm.max_level"), "", (100, 110, 120), True)
         sell_val = tw.sell_value(sell_rate)
-        self._draw_holo_btn(win, px + 122, btn_y, 106, btn_h, _t("tm.sell"), f"+${sell_val}", (255, 100, 100), False)
+        self._draw_holo_btn(win, px + 122, btn_y, 106, btn_h, _t("tm.sell"), f"+{sell_val}", (255, 100, 100), False)
         # Linia linku sasiada (unikatowy bonus per typ) - zlota, pod przyciskami
         _link = getattr(tw, '_link', None) if tname != "SpikeCluster" else None
         if _link:
@@ -200,7 +201,13 @@ class Menu():
         if sub:
             scol = sub_color if sub_color else tcol
             s = sfont.render(str(sub), True, scol)
-            win.blit(s, (x + w//2 - s.get_width()//2, y + 28))
+            # Cena w zlocie: ikona monety + kwota jako wycentrowana grupa
+            _price_like = str(sub)[0].isdigit() or str(sub)[0] == "+"
+            _gw = s.get_width() + (19 if _price_like else 0)
+            _gx = x + w // 2 - _gw // 2
+            if _price_like:
+                win.blit(_coin_icon, (_gx, y + 27))
+            win.blit(s, (_gx + (19 if _price_like else 0), y + 28))
 
     def _draw_holo_btn_sale(self, win, x, y, w, h, title, orig_price, sale_price, color, disabled):
         """Przycisk z przekreslona cena (Costco style)."""
@@ -218,15 +225,20 @@ class Menu():
         tcol = (155, 165, 175) if disabled else (r, g, b)
         t = tfont.render(title, True, tcol)
         win.blit(t, (x + w//2 - t.get_width()//2, y + 6))
-        # Przekreslona oryginalna
-        o = sfont.render(f"${orig_price}", True, (150, 150, 150))
-        ox = x + w//2 - o.get_width()//2
+        # Przekreslona oryginalna (z ikona monety)
+        o = sfont.render(f"{orig_price}", True, (150, 150, 150))
+        _gw = o.get_width() + 17
+        ox = x + w//2 - _gw//2
         oy = y + 24
-        win.blit(o, (ox, oy))
-        pygame.draw.line(win, (200, 80, 80), (ox, oy + 6), (ox + o.get_width(), oy + 6), 2)
-        # Nowa cena
-        s = sfont.render(f"${sale_price}", True, (255, 215, 0))
-        win.blit(s, (x + w//2 - s.get_width()//2, y + 36))
+        win.blit(_coin_icon, (ox, oy - 2))
+        win.blit(o, (ox + 17, oy))
+        pygame.draw.line(win, (200, 80, 80), (ox, oy + 6), (ox + _gw, oy + 6), 2)
+        # Nowa cena (z ikona monety)
+        s = sfont.render(f"{sale_price}", True, (255, 215, 0))
+        _gw2 = s.get_width() + 17
+        _sx = x + w//2 - _gw2//2
+        win.blit(_coin_icon, (_sx, y + 34))
+        win.blit(s, (_sx + 17, y + 36))
 
             
     def get_clicked(self, X, Y):
@@ -333,19 +345,21 @@ class VerticalMenu(Menu):
             if discount < 1.0:
                 orig = item.cost
                 new_price = int(orig * discount)
-                # Przekreslona oryginalna (szara)
-                pt_orig = pfont.render(f"$ {orig}", True, (120, 120, 120))
-                surf.blit(pt_orig, (tx, by + 44 - py))
+                # Ikona monety + przekreslona oryginalna (szara)
+                surf.blit(_coin_icon, (tx, by + 45 - py))
+                pt_orig = pfont.render(f"{orig}", True, (120, 120, 120))
+                surf.blit(pt_orig, (tx + 19, by + 44 - py))
                 # Linia przekreslenia
-                lx1, ly = tx, by + 44 - py + pt_orig.get_height() // 2
-                lx2 = tx + pt_orig.get_width()
+                lx1, ly = tx + 19, by + 44 - py + pt_orig.get_height() // 2
+                lx2 = tx + 19 + pt_orig.get_width()
                 pygame.draw.line(surf, (200, 80, 80), (lx1, ly), (lx2, ly), 2)
                 # Nowa cena (zolota, obok)
-                pt_new = pfont.render(f"$ {new_price}", True, (255, 215, 0))
-                surf.blit(pt_new, (tx + pt_orig.get_width() + 8, by + 44 - py))
+                pt_new = pfont.render(f"{new_price}", True, (255, 215, 0))
+                surf.blit(pt_new, (tx + 19 + pt_orig.get_width() + 8, by + 44 - py))
             else:
-                pt = pfont.render(f"$ {item.cost}", True, (255, 215, 0))
-                surf.blit(pt, (tx, by + 44 - py))
+                surf.blit(_coin_icon, (tx, by + 45 - py))
+                pt = pfont.render(f"{item.cost}", True, (255, 215, 0))
+                surf.blit(pt, (tx + 19, by + 44 - py))
             # Aktualizuj pozycje klikalna (wspolrzedne ekranu)
             item.x, item.y = bx, by
             item.width, item.height = panel_w - 30, 68

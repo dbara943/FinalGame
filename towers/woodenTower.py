@@ -153,22 +153,17 @@ class WoodenTower(Tower):
         enemy_closest.clear()
         shot_fired = False
 
-        # 7: deszcz zmniejsza zasieg (liczone raz, nie w petli)
-        # Link Metal: +25% zasiegu
-        eff_range = self.range * self._rain_mod
-        if getattr(self, '_link', None) == 'metal':
-            eff_range *= 1.25
+        # Zasieg EFEKTYWNY (deszcz/Link Metal) - ta sama wartosc, ktora
+        # rysuje kolo zasiegu (Tower.effective_range).
+        eff_range = self.effective_range()
         eff_range_sq = eff_range * eff_range
         # Kandydaci: z siatki przestrzennej (tylko pobliskie komorki) lub wszyscy
-        # Margines na hitboxy: sprite (np. boss 160px) moze wystawac poza
-        # pozycje stop, wiec bierzemy komorki z zapasem.
-        _HB_MARGIN = 120
         if grid is not None:
             candidates = []
-            cx0 = int((self.x - eff_range - _HB_MARGIN) // grid_cell)
-            cx1 = int((self.x + eff_range + _HB_MARGIN) // grid_cell)
-            cy0 = int((self.y - eff_range - _HB_MARGIN) // grid_cell)
-            cy1 = int((self.y + eff_range + _HB_MARGIN) // grid_cell)
+            cx0 = int((self.x - eff_range) // grid_cell)
+            cx1 = int((self.x + eff_range) // grid_cell)
+            cy0 = int((self.y - eff_range) // grid_cell)
+            cy1 = int((self.y + eff_range) // grid_cell)
             for cx in range(cx0, cx1 + 1):
                 for cy in range(cy0, cy1 + 1):
                     candidates.extend(grid.get((cx, cy), []))
@@ -177,10 +172,14 @@ class WoodenTower(Tower):
         for enemy in candidates:
             if enemy.dying or enemy.dead or enemy.reached_end:
                 continue
-            # Hitbox: okrag zasiegu vs prostokat sprite'a (nie punkt stop).
-            # Wiekszy sprite = wiekszy hitbox = wieza strzela tez gdy
-            # zasieg dotyka np. samej glowy wroga.
-            if enemy.hitbox_in_radius(self.x, self.y, eff_range):
+            # Zasieg liczony do punktu stop wroga (pozycja x,y) - DOKLADNIE
+            # tak, jak pokazuje kolo. Wczesniej test na hitbox sprite'a
+            # pozwalal strzelac wyraznie POZA kolo (duzy sprite wystawial
+            # glowe w zasieg, gdy stopy byly jeszcze daleko) - gra byla
+            # przez to za latwa. Pocisk nadal trafia w hitbox w locie.
+            _dx = enemy.x - self.x
+            _dy = enemy.y - self.y
+            if _dx * _dx + _dy * _dy <= eff_range_sq:
                 self.inRange = True
                 enemy_closest.append(enemy)
         # Wybor celu wg priorytetu - min/max (O(n)) zamiast sort (O(n log n))

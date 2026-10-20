@@ -53,10 +53,11 @@ class AllyShip:
                 self.state = AllyShip.AWAY
                 self.mode = None
 
-    def draw(self, win):
+    def draw(self, win, t=None):
         if self.state == AllyShip.AWAY:
             return
-        t = time.time() - self._t0
+        if t is None:
+            t = time.time() - self._t0
         bob = math.sin(t * 2.0) * 6
         rot = math.sin(t * 1.5) * 1.5
         # Sprite bazowy patrzy w LEWO - przy ruchu w prawo odwracamy

@@ -111,11 +111,13 @@ class Ship:
             if self.x < -w or self.x > self.screen_w + w:
                 self.state = Ship.AWAY
 
-    def draw(self, win):
+    def draw(self, win, t=None):
         if self.state == Ship.AWAY:
             return
-        # Zywsze kolysanie na falach + rotacja
-        t = time.time() - self._t0
+        # Zywsze kolysanie na falach + rotacja. t: zegar animacji gry
+        # (stoi na pauzie); None = dawny zegar scienny.
+        if t is None:
+            t = time.time() - self._t0
         bob = math.sin(t * 2.0) * 6
         rot = math.sin(t * 1.5) * 1.5  # rotacja w stopniach
         # Obrocony sprite

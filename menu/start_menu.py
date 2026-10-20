@@ -67,6 +67,16 @@ class StartMenu:
             "help": pygame.Rect(x, y0 + 5 * (bh + gap), bw, bh),
             "quit": pygame.Rect(x, y0 + 6 * (bh + gap), bw, bh),
         }
+        # Teleport endless: pole na numer fali + przycisk SKOCZ (lewy dolny rog).
+        # Gracz wpisuje fale endless, od ktorej chce zaczac; 10 = easter egg
+        # (rewanz z bossem finalnym 100x HP).
+        self.endless_txt = ""
+        self.endless_focus = False
+        _ex, _ey = 16, self.rh - 156
+        self._endless_label_pos = (_ex, _ey)
+        self._endless_input = pygame.Rect(_ex, _ey + 26, 118, 40)
+        self._endless_go = pygame.Rect(_ex + 126, _ey + 26, 118, 40)
+        self._endless_hint_pos = (_ex, _ey + 74)
         # Wybor jezyka: rzad flag w prawym gornym rogu (male ikonki panstw)
         self._flag_imgs = {}
         for code, _name, flag in i18n.LANGUAGES:
@@ -192,6 +202,7 @@ class StartMenu:
         # Rzad flag wyboru jezyka (prawy gorny rog) - nie gdy otwarty jest panel
         if not (self.show_help or self.show_achievements or self.show_resolution):
             self._draw_flags(mouse)
+            self._draw_endless_jump(mouse)
 
         # Opis wybranej trudnosci (stopka - co zmienia EASY / NORMAL / HARD)
         diff_desc = t("diff." + diff_name.lower() + ".desc")
@@ -206,6 +217,44 @@ class StartMenu:
         if self.show_resolution:
             self.draw_resolution()
         pygame.display.update()
+
+    def _draw_endless_jump(self, mouse):
+        """Widget teleportu endless: etykieta, pole z numerem fali, przycisk."""
+        # Polprzezroczyste tlo - tekst czytelny na kazdym tle mapy
+        pill = pygame.Surface((338, 118), pygame.SRCALPHA)
+        pygame.draw.rect(pill, (5, 10, 25, 130), pill.get_rect(), border_radius=10)
+        self.win.blit(pill, (self._endless_label_pos[0] - 8, self._endless_label_pos[1] - 8))
+        lbl = self.btn_font_small.render(t("menu.endless_title"), True, (255, 215, 100))
+        self.win.blit(lbl, self._endless_label_pos)
+        r = self._endless_input
+        pygame.draw.rect(self.win, (10, 16, 28), r, border_radius=8)
+        pygame.draw.rect(self.win, (255, 215, 100) if self.endless_focus else (120, 135, 155),
+                         r, 2, border_radius=8)
+        txt = self.endless_txt if self.endless_txt else "11"
+        col = (240, 244, 248) if self.endless_txt else (110, 120, 135)
+        tv = self.btn_font.render(txt, True, col)
+        self.win.blit(tv, (r.x + 12, r.y + r.h // 2 - tv.get_height() // 2))
+        if self.endless_focus and (pygame.time.get_ticks() // 500) % 2 == 0:
+            cx = r.x + 12 + tv.get_width() + 3
+            pygame.draw.line(self.win, (255, 215, 100), (cx, r.y + 9), (cx, r.bottom - 9), 2)
+        self.draw_button(self._endless_go, t("menu.endless_go"),
+                         self._endless_go.collidepoint(mouse))
+        hint = self.small_font.render(t("menu.endless_hint"), True, (150, 160, 175))
+        self.win.blit(hint, self._endless_hint_pos)
+
+    def _endless_start(self):
+        """Buduje ustawienia startu endless od wpisanej fali (min. 10)."""
+        try:
+            n = int(self.endless_txt)
+        except ValueError:
+            n = 11
+        n = max(10, min(999, n))
+        if self.click_sound and self.sound:
+            self.click_sound.play()
+        pygame.mixer.music.stop()
+        name, lives, money = DIFFICULTIES[self.diff_idx]
+        return {"difficulty": name, "lives": lives, "money": money,
+                "sound": self.sound, "res_idx": self.res_idx, "start_wave": n}
 
     def _draw_flags(self, mouse):
         """Rzad flag w prawym gornym rogu: wybrany jezyk ma zlota ramke,
@@ -488,6 +537,16 @@ class StartMenu:
                         self._ach_scroll = max(0, min(self._ach_max_scroll,
                                                       self._ach_scroll - event.y * 40))
                     continue
+                # Pole fali endless: wpisywanie cyfr (gdy pole ma fokus)
+                if (event.type == pygame.KEYDOWN and self.endless_focus
+                        and not (self.show_help or self.show_achievements or self.show_resolution)):
+                    if event.key == pygame.K_BACKSPACE:
+                        self.endless_txt = self.endless_txt[:-1]
+                    elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                        return self._endless_start()
+                    elif event.unicode and event.unicode.isdigit() and len(self.endless_txt) < 3:
+                        self.endless_txt += event.unicode
+                    continue
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     # Dzwiek klikniecia TYLKO gdy klik faktycznie w cos trafil
                     # (przycisk, zamkniecie panelu, opcja) - nie przy kliku
@@ -524,9 +583,16 @@ class StartMenu:
                                 clicked_something = True
                                 _flag_hit = True
                                 break
-                        if _flag_hit:
-                            pass
+                        if self._endless_input.collidepoint(pos):
+                            self.endless_focus = True
+                            clicked_something = True
+                        elif self._endless_go.collidepoint(pos):
+                            clicked_something = True
+                            return self._endless_start()
+                        elif _flag_hit:
+                            self.endless_focus = False
                         elif self.buttons["start"].collidepoint(pos):
+                            self.endless_focus = False
                             clicked_something = True
                             if clicked_something and self.click_sound and self.sound:
                                 self.click_sound.play()

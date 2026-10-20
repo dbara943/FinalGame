@@ -15,7 +15,8 @@ Survive **10 waves** of increasingly dangerous enemies. Each wave arrives by shi
 - **Lives:** Enemies that reach the facility cost you a life and shatter its glass walls
 - **Economy:** Earn gold for every kill. Golden (elite) enemies are tougher but worth 5× more
 - **Victory:** Survive all 10 waves, including the final boss
-- **Endless mode:** After victory, keep going — enemies scale +5% HP per wave, bigger gold bonuses per wave
+- **Endless mode:** After victory, keep going — enemies scale +5% HP per wave, bigger gold bonuses per wave. Wave composition shifts toward the strongest enemy types the deeper you go (and the golden-elite chance rises from 8% to up to 18%), so late endless is far more dangerous
+- **Endless jump (main menu):** type a wave number in the bottom-left field and hit JUMP to start endless at that wave — or enter 10 for an Easter egg: a rematch against the final boss with 100× HP
 
 ---
 
@@ -36,14 +37,16 @@ Upgrades add damage per level by tier (Wood +2, Metal +3, Gold +4, Fire +6, Blaz
 - **Free placement** — no grid snapping; place towers anywhere on valid grass zones
 - **Tower links** — two towers of the same type within 100px link up (gold line between them), and each type gains a unique bonus instead of a flat damage boost: Wood +30% fire rate, Metal +25% range and much longer slows, Gold +50% gold from its kills, Fire +70% splash radius, Blaze chains 50% damage to a second nearby enemy. The active bonus is shown in the tower's menu
 - **Sell back** towers you no longer need
-- **Range preview** with green/red validity indicator while placing
+- **Range preview** with green/red validity indicator while placing. The range circle always shows the tower's TRUE effective range (level, rain −10%, Metal link +25%) — towers engage exactly at the circle's edge, never beyond it
+- **Prices in gold** — shop, tower menus and upgrade cards all show a gold coin icon next to the amount (no $ signs)
+- **Full run summary** — victory, defeat and forfeit screens all show the complete stat set: wave reached, kills, damage, gold earned/spent, towers built/lost, abilities used, and kills by enemy type
 
 ---
 
 ## Clickable Buildings
 
 **Glass Research Facility** (click it!) — 10 one-time upgrades per run, sorted by price:
-War Treasury $1,200, Bounty Board $1,500, Lucky Charm $2,000, Reinforced Docks $2,500, Storm Caller $3,000, Reinforced Walls $3,500, Ammunition Depot $4,000, Repair Drones $5,000 (+1 life right away, then +1 every 2 waves), Tesla Coil $6,500, and the secret **Call the Cavalry** $10,000 (endless only). Buying Repair Drones turns its slot into the **Drone Launch Facility** $8,000 (same slot, same icon — no locked/blacked-out entry).
+War Treasury $1,200, Bounty Board $1,500, Lucky Charm $2,000, Reinforced Docks $2,500, Storm Caller $3,000, Reinforced Walls $3,500, Ammunition Depot $4,000, Repair Drones $5,000 (+1 max life right away, then heals +1 life every 2 waves, up to max), Tesla Coil $6,500, and the secret **Call the Cavalry** $10,000 (endless only). Buying Repair Drones turns its slot into the **Drone Launch Facility** $8,000 (same slot, same icon — no locked/blacked-out entry).
 
 **War Tent** (click it!) — 10 one-time upgrades per run, sorted by price:
 Field Medic $1,500 (barrage destroy chance 50% → 25%), Scout Reports $2,000, Supply Lines $2,500 (towers 15% cheaper), War Drums $3,000, Signal Fire $3,500 (campfire grows 2×, all Fire/Blaze towers shoot 12% faster, dancers guard with bows), Guerrilla Training $4,000, Honor Banner $4,000 (+10% damage, no flag visual), Spike Barricade $4,500, Recon Balloon $5,500, Sabotage $6,000.
@@ -97,7 +100,7 @@ Nine enemy types with full walk, hurt, and death animations:
 - **Dynamic day/night cycle** with smooth transitions
 - **Weather system** — rain/storms with splash particles and ambient audio; random storm chance per wave depends on difficulty: 20% on Easy, 15% on Normal, 10% on Hard, in campaign and endless alike (Storm Caller doubles the chance — never on boss waves)
 - **Ambient life** — campfire with dancers; when Signal Fire is bought, the dancers walk to their guard posts along the road (2× mob speed on the road, half speed for the final stretch) and guard the facility with bows, firing visible arrows; one guard will charge a close enemy and trade their life for it
-- **Recon Balloon** — a single balloon flies from the start; after the upgrade is bought it drops bombs every 3s straight down onto the player-drawn bomb line (no homing, no enemy targeting)
+- **Recon Balloon** — the balloon appears only once the upgrade is bought (it flies in from the left edge) and drops bombs every 3s straight down onto the player-drawn bomb line (no homing, no enemy targeting)
 - **Spike Barricade** — spikes on the road deal 8 damage per second and can kill enemies on their own (damage is checked against the enemy sprite's hitbox, and kills pay out a flying coin like tower kills); each of the 3 spike clusters is clickable like a tower, upgradeable by 2 levels (8/14/22 DPS, prices scaled by difficulty) and sellable
 - **Gold on coin landing** — kill gold is added only when the flying gold coin lands in the counter, not the moment the enemy dies
 - **Tesla Coil** — visible coil on the facility roof; zaps start at the electrode ball and never target enemies still on the pier. In clear weather it fires every 1.8s: 75 damage, range 400, single target. During a storm there is no timed fire — lightning strikes the coil (bolt from the sky, then the charge travels down the coil, roughly every 2.5s at random), and only then does it discharge: 100 damage, range 700, up to 3 targets (main + 2 chained). Buying the coil guarantees a storm next round (2 rounds if Storm Caller was bought earlier)
@@ -114,7 +117,7 @@ Nine enemy types with full walk, hurt, and death animations:
 - **Guards' tombstones** — Bonnie and Clyde's tombstones stand apart, with the name and kill count fitting inside each stone
 - **Music / Sound Effects** — separate toggles (pause menu, M key = music only): Music covers the normal track and the boss (intense) track; everything else is SFX. The intense track plays only while a boss is alive
 - **Speed** — 2×/3× speeds up everything, including enemy disembark from the ship (tick-based spawning)
-- **Group disembark** — each spawn tick can land a whole group at once: 64% single, 20% two, 10% three, 5% four, 1% five enemies (types drawn randomly from the wave pool)
+- **Group disembark** — each spawn tick can land a whole group at once: 64% single, 20% two, 10% three, 5% four, 1% five enemies (types drawn randomly from the wave pool). Group members start spread out along the deck (~26px apart) instead of stacked on one spot
 - **Damage dealt** — end-screen stats show rounded whole numbers
 - **Performance optimized** — spatial targeting grid, 60 FPS rendering, 100 Hz logic
 
@@ -132,7 +135,7 @@ Nine enemy types with full walk, hurt, and death animations:
 | **S** | Sell selected tower |
 | **M** | Music on/off |
 | **F11** | Toggle fullscreen |
-| **SPACE** | Pause/unpause |
+| **SPACE** | Pause/unpause (pausing freezes ALL animation too — clouds, water, ships, drones, the balloon) |
 | **Shift+click** | Quick-sell selected tower |
 | **Ctrl+Z** | Undo last tower placement / upgrade |
 
