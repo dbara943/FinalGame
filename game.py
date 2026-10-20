@@ -626,10 +626,10 @@ class Game:
                 else:
                     self.ship.sail_out()
         else:
-            # Spawn grupowy: rzut na liczbe wrogow w jednym desancie -
-            # 64% x1, 20% x2, 10% x3, 5% x4, 1% x5 (typy losowe z puli fali)
-            _r = random.random()
-            _n = 5 if _r < 0.01 else 4 if _r < 0.06 else 3 if _r < 0.16 else 2 if _r < 0.36 else 1
+            # Spawn grupowy WYLACZONY na prosbe Daniela (2026-10-20, testy
+            # balansu - gra zrobila sie za trudna): zawsze pojedynczy desant.
+            # Rozklad grup do przywrocenia: 64% x1, 20% x2, 10% x3, 5% x4, 1% x5.
+            _n = 1
             for _k in range(_n):
                 if sum(self.current_wave) == 0:
                     break
@@ -674,12 +674,14 @@ class Game:
             # Trudnosc: HP i predkosc zwyklych wrogow (EASY slabsze/wolniejsze, HARD mocniejsze/szybsze)
             _hp_mult = self._diff("enemy_hp_mult")
             if _hp_mult != 1.0:
-                en.max_health = int(en.max_health * _hp_mult)
-                en.health = int(en.health * _hp_mult)
+                # Minimum 1 HP: Forkman ma 1 HP bazowo, a int(1 * 0.8) = 0
+                # na EASY dawal wroga z 0 HP (ginie od razu przy spawnie)
+                en.max_health = max(1, int(en.max_health * _hp_mult))
+                en.health = max(1, int(en.health * _hp_mult))
             en.velocity *= self._diff("enemy_speed_mult")
             if "sabotage" in self.tent_upgrades:
                 # Tylko aktualne HP (widoczne na pasku), max zostaje
-                en.health = int(en.health * 0.85)
+                en.health = max(1, int(en.health * 0.85))
             if "docks" in self.building_upgrades:
                 en._docks_slow = True
             en._spawn_tick = self._logic_tick  # Scout Reports: ambush (ticki logiki, nie czas rzeczywisty)
@@ -714,7 +716,7 @@ class Game:
         fala NIE placi bonusu startowego (tylko ten jeden raz); po jej
         ukonczeniu nastepna fala placi juz normalnie.
         n >= 11: sklad/HP jak przy naturalnym dojsciu do tej fali.
-        n == 10: EASTER EGG - rewanz z bossem finalnym z 100x HP;
+        n == 10: EASTER EGG - rewanz z bossem finalnym z 10x HP;
         po jego fali gra przechodzi w endless od fali 11."""
         # Anuluj stawianie wiezy ze zwrotem (jak ESC)
         if getattr(self, "moving_object", None) is not None:
@@ -763,7 +765,7 @@ class Game:
             self.current_wave = waves[9][:]
             self._wave_start_lives = self.lives
             self.pending_bosses.append(Boss(final=True,
-                hp=int(950 * self._diff("enemy_hp_mult") * 100)))
+                hp=int(950 * self._diff("enemy_hp_mult") * 10)))
             self.wave_banner_text = tr("banner.final_boss")
             self.wave_banner_timer = 150
         else:
