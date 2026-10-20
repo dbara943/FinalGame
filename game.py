@@ -658,9 +658,11 @@ class Game:
             # U8: SWIFT - +30% predkosci
             if self.wave_modifier == "swift":
                 en.velocity *= 1.3
-            # 6: 8% szansy na elitarnego (nie boss)
-            # Endless: szansa na elitarnego rosnie z fala (8% -> maks. 18%)
-            _elite_ch = 0.08 + (min(0.10, self.endless_wave * 0.01) if self.endless else 0.0)
+            # 6: 8% szansy na elitarnego (nie boss) - tyle samo w kampanii
+            # i endless (Daniel 2026-10-20: endless ma dawac SILNIEJSZE typy
+            # wrogow czesciej, a NIE wiecej zlotych elit - elita z ~2000 HP
+            # na fali 12 jest nie do przejscia)
+            _elite_ch = 0.08
             if not isinstance(en, Boss) and random.random() < _elite_ch:
                 en.make_elite()
             # Endless: 5x HP bazowo + 5% co fale (compound), minimum +1 HP na fale
