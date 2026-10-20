@@ -3,6 +3,9 @@ import math
 import os
 pygame.font.init()
 
+import i18n
+from i18n import t as _t
+
 money_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "money.png")), (20, 20))
 
 class Button():
@@ -101,8 +104,9 @@ class Menu():
         pygame.draw.rect(win, (8, 14, 22), (px + 8, py - 10, tag.get_width() + 8, 14))
         win.blit(tag, (px + 12, py - 8))
         name_font = pygame.font.SysFont("consolas, monospace", 15, bold=True)
-        # Nazwa wyswietlana (Wood Tower / Gold Tower), nie klucz logiczny
-        name_text = getattr(tw, 'display_name', None) or (tw.name if hasattr(tw, 'name') else tname)
+        # Nazwa wyswietlana w biezacym jezyku (Wood Tower / Gold Tower...)
+        name_text = i18n.tower_name(tname, getattr(tw, 'display_name', None)
+                                    or (tw.name if hasattr(tw, 'name') else tname))
         label = name_font.render(f"> {name_text.upper()}", True, bright)
         win.blit(label, (px + 14, py + 14))
         lvl, maxlvl = tw.level, tw.max_level
@@ -119,21 +123,21 @@ class Menu():
         # niby dzialaly, ale menu tego nie pokazywalo.
         if tname == "SpikeCluster":
             # Kolce: damage TO juz DPS (obrazenia na sekunde), bez strzalow
-            slabel = stat_font.render(f"DPS {tw.damage:.0f}/s  RNG {tw.range}", True, bright)
+            slabel = stat_font.render(_t("tm.spike_stats", dmg=f"{tw.damage:.0f}", rng=tw.range), True, bright)
             win.blit(slabel, (px + 14, py + 52))
         else:
             eff_dmg = math.ceil(int(tw.damage * getattr(tw, '_synergy', 1.0)) * getattr(tw, '_dmg_mult', 1.0))
             shots_per_s = 100.0 * getattr(tw, '_fire_rate_mult', 1.0) / 60.0
             dps = eff_dmg * shots_per_s
             eff_rng = int(tw.range * getattr(tw, '_rain_mod', 1.0))
-            slabel = stat_font.render(f"DMG {eff_dmg}  RNG {eff_rng}", True, bright)
+            slabel = stat_font.render(_t("tm.stats1", dmg=eff_dmg, rng=eff_rng), True, bright)
             win.blit(slabel, (px + 14, py + 52))
-            dlabel = stat_font.render(f"DPS {dps:.1f}", True, bright)
+            dlabel = stat_font.render(_t("tm.stats2", dps=f"{dps:.1f}"), True, bright)
             win.blit(dlabel, (px + 14, py + 68))
-            klabel = stat_font.render(f"KILLS {tw.kills}", True, bright)
+            klabel = stat_font.render(_t("tm.kills", n=tw.kills), True, bright)
             win.blit(klabel, (px + 122, py + 68))
         if tname == "SpikeCluster":
-            klabel = stat_font.render(f"KILLS {tw.kills}", True, bright)
+            klabel = stat_font.render(_t("tm.kills", n=tw.kills), True, bright)
             win.blit(klabel, (px + 14, py + 68))
         btn_y, btn_h = py + 92, 52
         is_max = tw.level >= tw.max_level
@@ -144,16 +148,16 @@ class Menu():
             if discount < 1.0:
                 disc_cost = int(up_cost * discount)
                 affordable = money is not None and money >= disc_cost
-                self._draw_holo_btn_sale(win, px + 12, btn_y, 106, btn_h, "UPGRADE",
+                self._draw_holo_btn_sale(win, px + 12, btn_y, 106, btn_h, _t("tm.upgrade"),
                                          up_cost, disc_cost, holo, not affordable)
             else:
                 affordable = money is not None and money >= up_cost
-                self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "UPGRADE", f"${up_cost}",
+                self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, _t("tm.upgrade"), f"${up_cost}",
                                     holo, not affordable)
         else:
-            self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, "MAX LEVEL", "", (100, 110, 120), True)
+            self._draw_holo_btn(win, px + 12, btn_y, 106, btn_h, _t("tm.max_level"), "", (100, 110, 120), True)
         sell_val = tw.sell_value(sell_rate)
-        self._draw_holo_btn(win, px + 122, btn_y, 106, btn_h, "SELL", f"+${sell_val}", (255, 100, 100), False)
+        self._draw_holo_btn(win, px + 122, btn_y, 106, btn_h, _t("tm.sell"), f"+${sell_val}", (255, 100, 100), False)
         if len(self.buttons) >= 2:
             if not is_max:
                 self.buttons[0].x, self.buttons[0].y = px + 12, btn_y
@@ -282,9 +286,9 @@ class VerticalMenu(Menu):
         pygame.draw.rect(bg, (80, 120, 180, 100), bg.get_rect(), 2, border_radius=16)
         surf.blit(bg, (0, 0))
 
-        # Naglowek SKLEP
+        # Naglowek sklepu
         hfont = pygame.font.SysFont("segoe ui, calibri, arial", 18, bold=True)
-        ht = hfont.render("SHOP", True, (200, 220, 240))
+        ht = hfont.render(_t("shop.title"), True, (200, 220, 240))
         surf.blit(ht, (panel_w//2 - ht.get_width()//2, 10))
         
         for idx, item in enumerate(self.buttons):
@@ -306,11 +310,12 @@ class VerticalMenu(Menu):
             nfont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
             dfont = pygame.font.SysFont("segoe ui, calibri, arial", 12)
             pfont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
-            names = ["Wood Tower", "Metal Tower", "Gold Tower", "Fire Tower", "Blaze Tower"]
+            names = [_t("tower.wood"), _t("tower.metal"), _t("tower.gold"),
+                     _t("tower.fire"), _t("tower.blaze")]
             tx = bx + 60 - px  # wspolna lewa krawedz tekstu
             nm = nfont.render(names[idx] if idx < len(names) else item.name, True, (230, 235, 240))
             surf.blit(nm, (tx, by + 6 - py))
-            dm = dfont.render(f"DMG {item.damage}", True, (170, 180, 190))
+            dm = dfont.render(_t("shop.dmg", dmg=item.damage), True, (170, 180, 190))
             surf.blit(dm, (tx, by + 26 - py))
             # Cena: z discountem pokazuje przekreslona oryginalna + nowa (Costco style)
             if discount < 1.0:

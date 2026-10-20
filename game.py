@@ -1,6 +1,8 @@
 import pygame
 import os
 import sys
+import i18n
+from i18n import t as tr
 # PyInstaller: gdy uruchomione jako .exe, pliki sa w sys._MEIPASS
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     os.chdir(sys._MEIPASS)
@@ -15,7 +17,7 @@ try:
     _load_win = pygame.display.set_mode((_lw, _lh), pygame.FULLSCREEN)
     _load_win.fill((20, 25, 35))
     _lf = pygame.font.SysFont("arial", 36)
-    _lt = _lf.render("Loading Island Defenders...", True, (255, 255, 255))
+    _lt = _lf.render(i18n.t("loading"), True, (255, 255, 255))
     _load_win.blit(_lt, (_lw//2 - _lt.get_width()//2, _lh//2 - 20))
     pygame.display.flip()
 except Exception:
@@ -518,12 +520,12 @@ class Game:
         self._lives_icon = pygame.transform.scale(lives_img, (28, 28))
         self._money_icon = pygame.transform.scale(money_img, (28, 28))
         # Prerender statycznych napisow (wydajnosc)
-        self._txt_paused = self.font_p36.render("PAUSED", True, (255, 255, 255))
-        self._txt_paused_sub = self.font_s16.render("you can build and upgrade towers", True, (200, 200, 200))
-        self._txt_ready = self.font_f11.render("READY - click", True, (255, 255, 200))
-        self._txt_no_tower = self.font_f11.render("no tower", True, (120, 120, 120))
-        self._txt_next = self.font_small16.render("Next:", True, (255, 255, 255))
-        self._txt_boss = self.font_small16.render("BOSS!", True, (255, 50, 50))
+        self._txt_paused = self.font_p36.render(tr("hud.paused"), True, (255, 255, 255))
+        self._txt_paused_sub = self.font_s16.render(tr("hud.paused_sub"), True, (200, 200, 200))
+        self._txt_ready = self.font_f11.render(tr("hud.ready"), True, (255, 255, 200))
+        self._txt_no_tower = self.font_f11.render(tr("hud.no_tower"), True, (120, 120, 120))
+        self._txt_next = self.font_small16.render(tr("hud.next"), True, (255, 255, 255))
+        self._txt_boss = self.font_small16.render(tr("hud.boss_next"), True, (255, 50, 50))
         # Licznik klatek i cache czasu animacji ambient (wydajnosc)
         self._frame = 0
         self._ambient_t = 0.0
@@ -584,7 +586,7 @@ class Game:
                 _b._spawn_tick = self._logic_tick
                 self.enemies.append(_b)
             # A10: intro bossa - dramatyczne wejscie (raz na cala paczke)
-            self.wave_banner_text = "BOSS"
+            self.wave_banner_text = tr("banner.boss")
             self.wave_banner_timer = 150
             self.screen_shake = 10
             self.boss_intro_dark = 180  # przyciemnienie ekranu na 3s
@@ -656,7 +658,7 @@ class Game:
                         # Baraz z miejsca pirata (867, 603), nie z portu
                         self.ally_ship.sail_in("strike", fire_x=867)
                         self.ally_ship.y = 603
-                        self.wave_banner_text = "ALLY SHIP INBOUND!"
+                        self.wave_banner_text = tr("banner.ally")
                         self.wave_banner_timer = 150
 
     def _setup_endless_wave(self):
@@ -674,7 +676,7 @@ class Game:
         gold = self.wave * 100
         self.money += gold
         self._ach_stats["gold_earned"] = self._ach_stats.get("gold_earned", 0) + gold
-        self.gold_notifications.append([f"+{gold} gold (wave {self.wave})", 150])
+        self.gold_notifications.append([tr("notif.gold_wave", gold=gold, wave=self.wave), 150])
         # Deszcz w endless: brak losowych burz, ale gwarantowana burza
         # z Tesla Coil dziala (1 runda, 2 ze Storm Caller). Deszcz
         # przeniesiony z kampanii gasnie po 1 fali endless (wczesniej
@@ -710,7 +712,7 @@ class Game:
                 self.raindrops = [(random.randint(0, self.width), random.randint(0, self.height),
                                    random.randint(8, 14)) for _ in range(100)]
                 sound_rain.play(loops=-1)
-        self.gold_notifications.append([f"+{gold} gold (wave {self.wave})", 150])
+        self.gold_notifications.append([tr("notif.gold_wave", gold=gold, wave=self.wave), 150])
         # Co 10 fal: ekstra bossowie (fala 20 -> 2, fala 30 -> 3, fala 40 -> 4...).
         # Na falach co 10 zastepuje zwyklego bossa z co-4-falowego cyklu
         # (fala 30 ma 3 bossow, nie 3+1).
@@ -787,8 +789,8 @@ class Game:
             lives_lost = self._wave_start_lives - self.lives
             # MVP: wieza z najwieksza liczba zabojstw
             mvp = max(self.towers, key=lambda t: t.kills, default=None)
-            mvp_text = f"{getattr(mvp, 'display_name', mvp.name)} ({mvp.kills})" if mvp else "-"
-            report = f"Wave {self.wave + 1}: {kills} kills, -{lives_lost} lives, +{gold}$ | MVP: {mvp_text}"
+            mvp_text = f"{i18n.tower_name(type(mvp).__name__, getattr(mvp, 'display_name', mvp.name))} ({mvp.kills})" if mvp else "-"
+            report = tr("report.wave", wave=self.wave + 1, kills=kills, lives=lives_lost, gold=gold, mvp=mvp_text)
             self.wave_report = [report, 240]
         self._wave_kills_start = self.stats_kills
         self._wave_gold_start = self.stats_gold
@@ -800,7 +802,7 @@ class Game:
                 self._drone_wave_count = 0
                 if self.lives < self._start_lives:
                     self.lives += 1
-                    self.gold_notifications.append(["+1 life (drones)", 150])
+                    self.gold_notifications.append([tr("notif.life_drones"), 150])
         if self.endless:
             # Tryb endless: generuj fale proceduralnie z rosnacym HP
             self._setup_endless_wave()
@@ -816,9 +818,9 @@ class Game:
             self.money += total
             self._ach_stats["gold_earned"] = self._ach_stats.get("gold_earned", 0) + total
             # Widoczne powiadomienie o zlocie
-            parts = [f"+{base_gold} for wave"]
+            parts = [tr("notif.wave_base", gold=base_gold)]
             if bonus > 0:
-                parts.append(f"+{bonus} clean wave")
+                parts.append(tr("notif.wave_clean", bonus=bonus))
             self.gold_notifications.append([" | ".join(parts), 180])
             self.wave += 1
             # Achievements: max_wave = wyswietlany numer fali (wave+1)
@@ -828,7 +830,7 @@ class Game:
                 self._ach_stats["full_lives_wave8"] = self._ach_stats.get("full_lives_wave8", 0) + 1
             self.current_wave = waves[self.wave][:]
             self._wave_start_lives = self.lives
-            self.wave_banner_text = f"WAVE {self.wave + 1}"  # V3
+            self.wave_banner_text = tr("banner.wave", n=self.wave + 1)  # V3
             self.wave_banner_timer = 120  # 2 sekundy
             # U8: modyfikator co 3 fale (nie na bossach)
             self.wave_modifier = None
@@ -837,12 +839,12 @@ class Game:
                 mod = random.choice(["swift", "rich", "swarm"])
                 self.wave_modifier = mod
                 if mod == "swift":
-                    self.wave_banner_text += " [SWIFT!]"
+                    self.wave_banner_text += tr("banner.swift")
                 elif mod == "rich":
-                    self.wave_banner_text += " [RICH!]"
+                    self.wave_banner_text += tr("banner.rich")
                 elif mod == "swarm":
                     self.current_wave = [int(c * 1.5) for c in self.current_wave]
-                    self.wave_banner_text += " [SWARM!]"
+                    self.wave_banner_text += tr("banner.swarm")
             # 7: deszcz na losowych falach (nie na bossach)
             # Storm Caller: podwaja szanse na burze (20% -> 40%) i burze
             # trwaja dluzej (2 fale zamiast 1).
@@ -859,7 +861,7 @@ class Game:
                 # Caller _storm_extra przedluza ja na 2 rundy.
                 if not was_raining:
                     self.raining = True
-                    self.wave_banner_text += " [RAIN]"
+                    self.wave_banner_text += tr("banner.rain")
                     self.raindrops = [(random.randint(0, self.width), random.randint(0, self.height),
                                        random.randint(8, 14)) for _ in range(100)]
                     sound_rain.play(loops=-1)  # 38: szum deszczu
@@ -876,7 +878,7 @@ class Game:
                     storm_chance = self._diff("storm_chance")
                 if wave_num % 4 != 0 and wave_num != 10 and random.random() < storm_chance:
                     self.raining = True
-                    self.wave_banner_text += " [RAIN]"
+                    self.wave_banner_text += tr("banner.rain")
                     self.raindrops = [(random.randint(0, self.width), random.randint(0, self.height),
                                        random.randint(8, 14)) for _ in range(100)]
                     sound_rain.play(loops=-1)  # 38: szum deszczu
@@ -889,11 +891,11 @@ class Game:
             # Boss spawnuje sie dopiero gdy statek zadokuje (pending_bosses).
             if (self.wave + 1) % 4 == 0 and self.wave + 1 < 10:
                 self.pending_bosses.append(Boss(hp=self._boss_hp(self.wave + 1)))
-                self.wave_banner_text = f"WAVE {self.wave + 1} - BOSS!"
+                self.wave_banner_text = tr("banner.wave_boss", n=self.wave + 1)
             elif self.wave + 1 == 10:
                 # Boss finalny: 950 bazowo (-50, jak reszta bossow), skalowany trudnoscia
                 self.pending_bosses.append(Boss(final=True, hp=int(950 * self._diff("enemy_hp_mult"))))
-                self.wave_banner_text = "FINALNA FALA - BOSS!"
+                self.wave_banner_text = tr("banner.final_boss")
         self.waiting_for_clear = False
     def _close_all_menus(self, refund_placement=True):
         """Close every open menu / cancel in-progress actions so the cinematic is visible."""
@@ -950,7 +952,7 @@ class Game:
             self.bombard_targets = random.sample(self.towers, min(num_targets, len(self.towers)))
         else:
             self.bombard_targets = []
-        self.wave_banner_text = "CANNON BARRAGE!"
+        self.wave_banner_text = tr("banner.barrage")
         self.wave_banner_timer = 180
         # Statek plynie na pozycje wybrana przez gracza (867, 603)
         self.ship.sail_to_bombard(867, 603)
@@ -964,7 +966,7 @@ class Game:
         self.bombard_phase = 10  # 10: czekamy az pirat doplynie
         self.bombard_timer = 0
         self._interception_timeout = 0
-        self.wave_banner_text = "CALL THE CAVALRY!"
+        self.wave_banner_text = tr("banner.cavalry")
         self.wave_banner_timer = 200
         # Pirat plynie na pozycje barazu (jak zwykle)
         self.ship.sail_to_bombard(867, 603)
@@ -1161,7 +1163,7 @@ class Game:
         if icon:
             self.win.blit(icon, (px + 10, py + 16))
         # Tekst
-        t1 = self.font_btn18.render("ACHIEVEMENT UNLOCKED!", True, (255, 215, 100))
+        t1 = self.font_btn18.render(tr("ach.unlocked"), True, (255, 215, 100))
         t2 = self.font_small30.render(name, True, (255, 255, 255))
         self.win.blit(t1, (px + 68, py + 10))
         self.win.blit(t2, (px + 68, py + 35))
@@ -1340,7 +1342,7 @@ class Game:
                 # Pirat okaleczony - UCIEKA w prawo, sojusznik GONI!
                 self.pirate_crippled = True
                 self._ach_stats["pirate_crippled"] = 1
-                self.wave_banner_text = "PIRATE SHIP CRIPPLED!"
+                self.wave_banner_text = tr("banner.crippled")
                 self.wave_banner_timer = 200
                 # Pirat ucieka w prawo (szybciej niz zwykle)
                 self.ship.state = Ship.OUT
@@ -1415,9 +1417,9 @@ class Game:
                     self.stats_towers_lost += 1
                     if self.selected_tower == tw:
                         self.selected_tower = None
-                    self.gold_notifications.append(["Tower destroyed!", 150])
+                    self.gold_notifications.append([tr("notif.tower_destroyed"), 150])
                 else:
-                    self.gold_notifications.append(["Tower survived!", 120])
+                    self.gold_notifications.append([tr("notif.tower_survived"), 120])
                 # Jesli to byl strzal z cinematic, przejdz do nastepnego celu
                 if cb.get("bombard") and self.bombard_active and self.bombard_phase == 2:
                     self.bombard_index += 1
@@ -1727,12 +1729,12 @@ class Game:
                         # Nie mozna pominac gdy boss zyje
                         boss_alive = any(isinstance(en, Boss) for en in self.enemies)
                         if boss_alive:
-                            self.gold_notifications.append(["Cannot skip - boss is alive!", 150])
+                            self.gold_notifications.append([tr("notif.cannot_skip"), 150])
                         else:
                             bonus = len(self.enemies) * 5
                             self.money += bonus
                             self._ach_stats["gold_earned"] = self._ach_stats.get("gold_earned", 0) + bonus
-                            self.gold_notifications.append([f"+{bonus}$ rush bonus!", 150])
+                            self.gold_notifications.append([tr("notif.rush_bonus", bonus=bonus), 150])
                             # Pozostali wrogowie ZYJA - ida dalej, nowa fala dolacza
                             self.advance_wave()
                             if self.last_wave_done:
@@ -2238,7 +2240,7 @@ class Game:
             # Boss finalny: ryk przy enrage
             if isinstance(en, Boss) and en.get_roar_request():
                 sound_roar.play()
-                self.wave_banner_text = "BOSS ENRAGED!"
+                self.wave_banner_text = tr("banner.enraged")
                 self.wave_banner_timer = 90
             # Boss finalny przywoluje miniony
             if isinstance(en, Boss) and en.get_summon_request():
@@ -2249,7 +2251,7 @@ class Game:
                     m.update()  # inicjalizuj img zeby byly widoczne
                     m.x, m.y = en.x - 30, en.y + 20
                     self.enemies.append(m)
-                self.gold_notifications.append(["Boss przywoluje posilki!", 120])
+                self.gold_notifications.append([tr("notif.boss_reinforcements"), 120])
         to_del = []
         for en in self.enemies:
             if en.reached_end:
@@ -2326,10 +2328,10 @@ class Game:
                 self.kill_streak = [t for t in getattr(self, 'kill_streak', []) if now - t < 3000]
                 self.kill_streak.append(now)
                 n = len(self.kill_streak)
-                if n == 2: self.announce("DOUBLE KILL!")
-                elif n == 3: self.announce("TRIPLE KILL!")
-                elif n == 5: self.announce("RAMPAGE!")
-                elif n == 8: self.announce("UNSTOPPABLE!")
+                if n == 2: self.announce(tr("ann.double"))
+                elif n == 3: self.announce(tr("ann.triple"))
+                elif n == 5: self.announce(tr("ann.rampage"))
+                elif n == 8: self.announce(tr("ann.unstoppable"))
             self.enemies.remove(d)
 
         # Siatka przestrzenna dla namierzania (wydajnosc)
@@ -2601,15 +2603,15 @@ class Game:
         big_font = self.font_big70
         small_font = self.font_small30
         if forfeited:
-            title = "RUN FORFEITED"
+            title = tr("end.forfeited")
             color = (255, 180, 80)
             title_bg = None
         elif won:
-            title = "ISLAND SECURED!"
+            title = tr("end.secured")
             color = (101, 45, 20)  # ciemny braz na pergaminie
             title_bg = None
         else:
-            title = "ISLAND LOST"
+            title = tr("end.lost")
             color = (150, 60, 60)  # przygaszona czerwien na ciemnym tle
             title_bg = None
         # Przyciski - szersze + wiekszy odstep (wczesniej 170x52, gap 20: ciasno + ENDLESS MODE wylewal sie)
@@ -2657,9 +2659,9 @@ class Game:
         stats_font = self.font_stats24
         # Proste statystyki dla victory/forfeit (porazka ma wlasny uklad w _draw_static)
         stats = [
-            f"Kills: {self.stats_kills}",
-            f"Gold earned: ${self.stats_gold}",
-            f"Damage dealt: {int(round(self.stats_damage))}",
+            tr("end.kills", n=self.stats_kills),
+            tr("end.gold_earned", n=self.stats_gold),
+            tr("end.damage", n=int(round(self.stats_damage))),
         ]
         def _draw_static():
             # Tlo
@@ -2682,30 +2684,30 @@ class Game:
                 left_x = self.width // 2 - 330
                 right_x = self.width // 2 + 30
                 general = [
-                    f"Wave reached: {self.wave + 1} / {len(waves)}",
-                    f"Monsters slain: {self.stats_kills}",
-                    f"Damage dealt: {int(round(self.stats_damage))}",
-                    f"Gold earned: ${self.stats_gold}",
-                    f"Gold spent: ${self.stats_gold_spent}",
-                    f"Towers built: {self.stats_towers_built} / lost: {self.stats_towers_lost}",
-                    f"Abilities used: {self.stats_abilities_used}",
+                    tr("end.wave_reached", a=self.wave + 1, b=len(waves)),
+                    tr("end.monsters", n=self.stats_kills),
+                    tr("end.damage", n=int(round(self.stats_damage))),
+                    tr("end.gold_earned", n=self.stats_gold),
+                    tr("end.gold_spent", n=self.stats_gold_spent),
+                    tr("end.towers", a=self.stats_towers_built, b=self.stats_towers_lost),
+                    tr("end.abilities", n=self.stats_abilities_used),
                 ]
                 for i, s in enumerate(general):
                     label = stats_font.render(s, True, stat_color)
                     self.win.blit(label, (left_x, col_y + i * 28))
                 by_type = sorted(self.stats_kills_by_type.items(), key=lambda kv: -kv[1])[:7]
                 if by_type:
-                    hdr = stats_font.render("Kills by type:", True, (130, 140, 155))
+                    hdr = stats_font.render(tr("end.kills_by_type"), True, (130, 140, 155))
                     self.win.blit(hdr, (right_x, col_y))
                     for i, (etype, count) in enumerate(by_type):
                         nice = "".join(" " + c if c.isupper() and j else c
                                        for j, c in enumerate(etype)).strip()
                         label = stats_font.render(f"{nice}: {count}", True, stat_color)
                         self.win.blit(label, (right_x, col_y + (i + 1) * 28))
-                motto = small_font.render("The island still needs you.", True, (100, 110, 125))
+                motto = small_font.render(tr("end.motto"), True, (100, 110, 125))
                 self.win.blit(motto, (self.width // 2 - motto.get_width() // 2, col_y + 8 * 28))
             else:
-                sub = small_font.render("Wave reached: " + str(self.wave + 1) + " / " + str(len(waves)), 1, sub_color)
+                sub = small_font.render(tr("end.wave_reached", a=self.wave + 1, b=len(waves)), 1, sub_color)
                 self.win.blit(sub, (self.width // 2 - sub.get_width() // 2, self.height // 2 - 30))
                 for i, s in enumerate(stats):
                     label = stats_font.render(s, True, stat_color)
@@ -2713,12 +2715,12 @@ class Game:
         _draw_static()
         # Przyciski - szklane (glassmorphism), z hover w petli
         buttons = [
-            (restart_rect, "RESTART", (80, 220, 130)),
-            (menu_rect, "MAIN MENU", (90, 160, 255)),
-            (quit_rect, "QUIT", (255, 100, 100)),
+            (restart_rect, tr("end.restart"), (80, 220, 130)),
+            (menu_rect, tr("end.main_menu"), (90, 160, 255)),
+            (quit_rect, tr("end.quit"), (255, 100, 100)),
         ]
         if continue_rect:
-            buttons.insert(1, (continue_rect, "ENDLESS MODE", (255, 180, 50)))
+            buttons.insert(1, (continue_rect, tr("end.endless"), (255, 180, 50)))
         def _draw_buttons(hover_pos=None):
             for rect, label_text, glow_color in buttons:
                 hov = hover_pos is not None and rect.collidepoint(hover_pos)
@@ -2826,7 +2828,7 @@ class Game:
                     break
         if self._hover_enemy is not None:
             en = self._hover_enemy
-            hlabel = self.font_e14.render(f"HP: {int(en.health)}/{en.max_health}", True, (255, 180, 180))
+            hlabel = self.font_e14.render(tr("hud.hp", hp=int(en.health), max=en.max_health), True, (255, 180, 180))
             self.win.blit(hlabel, (en.x - hlabel.get_width()//2, en.y - 95))
         # Q9: podswietl wrogow w zasiegu wybranej wiezy - usuniete na prosbe gracza
         # 7: deszcz
@@ -2938,9 +2940,9 @@ class Game:
                     self.win.blit(fg, (bx + 3, by + 3))
                 # Nazwa bossa (bez emoji - brak glyfu w czcionce)
                 boss_font = self.font_boss16
-                skull = "BOSS" if not getattr(en, 'final', False) else "FINAL BOSS"
+                skull = tr("boss.name") if not getattr(en, 'final', False) else tr("boss.final")
                 if getattr(en, 'enraged', False):
-                    skull += " (ENRAGED!)"
+                    skull += tr("boss.enraged")
                     scol = (255, 100, 100)
                 else:
                     scol = (255, 220, 220)
@@ -2970,8 +2972,8 @@ class Game:
             self.win.blit(btn_bg, (bx, by))
             btn_font = self.font_btn18
             # Wytlumaczenie: co robi przycisk + ile zlota za skip
-            line1 = btn_font.render("SKIP TO NEXT WAVE", True, (200, 255, 210))
-            line2 = btn_font.render(f"FOR +{bonus}$ BONUS", True, (255, 215, 100))
+            line1 = btn_font.render(tr("hud.skip"), True, (200, 255, 210))
+            line2 = btn_font.render(tr("hud.skip_bonus", bonus=bonus), True, (255, 215, 100))
             self.win.blit(line1, (bx + btn_w//2 - line1.get_width()//2, by + 6))
             self.win.blit(line2, (bx + btn_w//2 - line2.get_width()//2, by + 28))
         else:
@@ -3015,7 +3017,7 @@ class Game:
                     avg = sum(t.damage for t in self.towers) / max(1, len(self.towers))
                     diff = tw.damage - avg
                     cfont = self.font_c13
-                    ctxt = f"DPS {tw.damage} ({'+' if diff >= 0 else ''}{diff:.0f} vs avg)"
+                    ctxt = tr("hud.dps_avg", dmg=tw.damage, diff=f"{'+' if diff >= 0 else ''}{diff:.0f}")
                     ccol = (100, 255, 100) if diff >= 0 else (255, 150, 150)
                     clabel = cfont.render(ctxt, True, ccol)
                     self.win.blit(clabel, (pos[0] + 15, pos[1] - 25))
@@ -3139,7 +3141,7 @@ class Game:
         next_is_boss = (self.wave + 2) % 4 == 0 or self.wave + 2 == 10
         if next_is_boss and self.waiting_for_clear and not hasattr(self, '_boss_warned'):
             self._boss_warned = True
-            self.wave_banner_text = "WARNING: BOSS INCOMING!"
+            self.wave_banner_text = tr("banner.warning")
             self.wave_banner_timer = 150
             sound_horn.play()  # Niespodzianka 5: rog ostrzegawczy
         if not self.waiting_for_clear:
@@ -3250,22 +3252,22 @@ class Game:
         # Panel: wysokosc DOKLADNIE na miare przyciskow (wczesniej stale 520,
         # a 9 przyciskow potrzebuje 562 - Quit wystawal 26px poza panel).
         _items = [
-            ("Resume", "resume"),
-            ("Restart Game", "restart"),
-            ("Forfeit Run", "forfeit"),
-            ("How to Play", "help"),
-            ("Music", "music", not self.music_muted),
-            ("Sound Effects", "sfx", not self.sfx_muted),
-            (f"Fullscreen: {'ON' if self._fullscreen else 'OFF'}", "fullscreen"),
-            (f"Speed: {self.speed}x", "speed"),
-            ("Quit to Desktop", "quit"),
+            (tr("pause.resume"), "resume"),
+            (tr("pause.restart"), "restart"),
+            (tr("pause.forfeit"), "forfeit"),
+            (tr("pause.help"), "help"),
+            (tr("pause.music"), "music", not self.music_muted),
+            (tr("pause.sfx"), "sfx", not self.sfx_muted),
+            (tr("pause.fullscreen", state=tr("common.on") if self._fullscreen else tr("common.off")), "fullscreen"),
+            (tr("pause.speed", n=self.speed), "speed"),
+            (tr("pause.quit"), "quit"),
         ]
         pw = 340
         ph = 70 + (len(_items) - 1) * 54 + 44 + 16  # tytul + przyciski 44px co 54px + dolny margines
         px, py = (self.width - pw) // 2, (self.height - ph) // 2
         pygame.draw.rect(self.win, (25, 30, 38), (px, py, pw, ph), border_radius=16)
         pygame.draw.rect(self.win, (70, 80, 95), (px, py, pw, ph), 2, border_radius=16)
-        title = self.font_p36.render("PAUSED", True, (255, 255, 255))
+        title = self.font_p36.render(tr("hud.paused"), True, (255, 255, 255))
         self.win.blit(title, (px + (pw - title.get_width()) // 2, py + 22))
         # Przyciski
         self._menu_buttons = []
@@ -3312,20 +3314,20 @@ class Game:
         hx, hy = (self.width - hw) // 2, (self.height - hh) // 2
         pygame.draw.rect(self.win, (20, 25, 32), (hx, hy, hw, hh), border_radius=16)
         pygame.draw.rect(self.win, (70, 80, 95), (hx, hy, hw, hh), 2, border_radius=16)
-        title = self.font_p36.render("HOW TO PLAY", True, (255, 215, 100))
+        title = self.font_p36.render(tr("menu.help"), True, (255, 215, 100))
         self.win.blit(title, (hx + (hw - title.get_width()) // 2, hy + 20))
         lines = [
-            "Build towers on grass to stop enemies.",
-            "Enemies follow the dirt path to your base.",
-            "Earn gold for kills, spend it in the SHOP.",
+            tr("help.l1"),
+            tr("help.l2"),
+            tr("help.l3"),
             "",
-            "SPACE - pause | 1-5 - select tower | Q - ability",
-            "M - music on/off | F11 - fullscreen | ESC - menu",
-            "Click a tower to upgrade or sell it.",
-            "Golden enemies give 5x gold - prioritize them!",
-            "Survive all waves to win.",
+            tr("help.l4"),
+            tr("help.l5"),
+            tr("help.l6"),
+            tr("help.l7"),
+            tr("help.l8"),
             "",
-            "ESC - back",
+            tr("help.esc"),
         ]
         y = hy + 70
         for ln in lines:
@@ -3742,7 +3744,7 @@ class Game:
             pygame.draw.rect(self.win, (195, 195, 200), rect, border_radius=16)
             pygame.draw.rect(self.win, (120, 120, 130), rect, 2, border_radius=16)
             lines = ["R.I.P.", tb["name"]]
-            kills_parts = ("Kills:", str(tb['d'].get('kills', 0)))
+            kills_parts = (tr("tomb.kills"), str(tb['d'].get('kills', 0)))
             font = self._tomb_fonts[5]
             for s in (12, 11, 10, 9, 8, 7, 6, 5):
                 f = self._tomb_fonts[s]
@@ -3926,7 +3928,7 @@ class Game:
                     self._ach_stats["dancers_sacrificed"] = self._ach_stats.get("dancers_sacrificed", 0) + 1
                     self._add_tombstone(d)
                     self.particles.burst(d["x"], d["y"] - 20, (255, 100, 100), count=20, speed=4, life=40, size=4)
-                    self.gold_notifications.append(["A guard gave their life!", 180])
+                    self.gold_notifications.append([tr("notif.guard_life"), 180])
                 continue
             if mode == "returning":
                 hx, hy = d.get("home_x", d["x"]), d.get("home_y", d["y"])
@@ -4013,7 +4015,7 @@ class Game:
         self._add_tombstone(pick)
         self._ach_stats["dancers_sacrificed"] = self._ach_stats.get("dancers_sacrificed", 0) + 1
         self.particles.burst(pick["x"], pick["y"] - 20, (255, 100, 100), count=20, speed=4, life=40, size=4)
-        self.gold_notifications.append(["A guard gave their life!", 180])
+        self.gold_notifications.append([tr("notif.guard_life"), 180])
         return True
 
     def draw_campfire_dancers(self, cx, cy, t):
@@ -4100,7 +4102,7 @@ class Game:
         }
         with open('savegame.dat', 'wb') as f:
             pickle.dump(data, f)
-        self.gold_notifications.append(["Game saved (F5)", 120])
+        self.gold_notifications.append([tr("notif.saved"), 120])
 
     def load_game(self):
         """Q11: Wczytaj gre z pliku."""
@@ -4126,7 +4128,7 @@ class Game:
             self._recalc_synergy()
         self.enemies = []
         self.current_wave = waves[self.wave][:]
-        self.gold_notifications.append(["Game loaded (F9)", 120])
+        self.gold_notifications.append([tr("notif.loaded"), 120])
 
     def draw_sky_effects(self):
         """Wizualne: niebo (slonce, ksiezyc, gwiazdy, zorza, spadajace gwiazdy)."""
@@ -4318,7 +4320,7 @@ class Game:
             # Jak Walls: podnosi tez max (start_lives), wiec bonus zawsze dziala.
             self._start_lives += 1
             self.lives += 1
-            self.gold_notifications.append(["+1 life (drones)", 150])
+            self.gold_notifications.append([tr("notif.life_drones"), 150])
         if uid == "walls":
             self._start_lives += 5
             self.lives += 5
@@ -4351,14 +4353,14 @@ class Game:
 
     def draw_building_menu(self):
         """Menu upgradow budynku."""
-        self._draw_upgrade_menu("BUILDING UPGRADES", BUILDING_UPGRADES,
+        self._draw_upgrade_menu(tr("upg.building_title"), BUILDING_UPGRADES,
                                 self.building_upgrades, self._building_icons,
                                 "_building_menu_open", "_building_menu_buttons",
                                 "_building_menu_close_rect")
 
     def draw_tent_menu(self):
         """Menu upgradow namiotu."""
-        self._draw_upgrade_menu("TENT UPGRADES", TENT_UPGRADES,
+        self._draw_upgrade_menu(tr("upg.tent_title"), TENT_UPGRADES,
                                 self.tent_upgrades, self._tent_icons,
                                 "_tent_menu_open", "_tent_menu_buttons",
                                 "_tent_menu_close_rect")
@@ -4431,7 +4433,7 @@ class Game:
             # w praktyce sie nie pojawia)
             _req_id = upg.get("requires")
             locked = bool(_req_id) and _req_id not in owned_set
-            _req_name = next((u["name"] for u in upg_list if u["id"] == _req_id), _req_id) if _req_id else ""
+            _req_name = next((tr(f"upg.{u['id']}.name", u["name"]) for u in upg_list if u["id"] == _req_id), _req_id) if _req_id else ""
             hover = rect.collidepoint(mx, my) and not owned and not locked
             bg_col = (35, 45, 60) if not hover else (50, 65, 90)
             if owned:
@@ -4451,15 +4453,15 @@ class Game:
                 q_bg.blit(q, (28 - q.get_width() // 2, 28 - q.get_height() // 2))
                 self.win.blit(q_bg, (sx + 10, sy + (row_h - 56) // 2))
                 name = "???"
-                desc = "Intel locked."
+                desc = tr("upg.mystery_desc")
                 price_txt = "???"
             else:
                 icon = icons.get(upg["id"])
                 if icon:
                     self.win.blit(icon, (sx + 10, sy + (row_h - 56) // 2))
-                name = upg["name"]
-                desc = f"Requires {_req_name}." if locked else upg["desc"]
-                price_txt = "LOCKED" if locked else f"${self._price(upg['cost']):,}"
+                name = tr(f"upg.{upg['id']}.name", upg["name"])
+                desc = tr("upg.requires", name=_req_name) if locked else tr(f"upg.{upg['id']}.desc", upg["desc"])
+                price_txt = tr("upg.locked") if locked else f"${self._price(upg['cost']):,}"
             # Opis: wrap po szerokosci w pikselach (nie po liczbie znakow) - nic nie ucina
             desc_col = (110, 115, 125) if mystery else (170, 180, 190)
             desc_font = self._building_desc_font
@@ -4497,11 +4499,11 @@ class Game:
                 self.win.blit(d_lbl, (sx + 76, block_top + name_h + 4 + li * desc_step))
             # Cena / status (prawy GORNY rog, w wierszu tytulu - nie koliduje z opisem)
             if owned:
-                st = self.font_btn18.render("OWNED", True, (100, 220, 130))
+                st = self.font_btn18.render(tr("upg.owned"), True, (100, 220, 130))
             elif mystery:
                 st = self.font_btn18.render("???", True, (120, 130, 150))
             elif locked:
-                st = self.font_btn18.render("LOCKED", True, (130, 130, 140))
+                st = self.font_btn18.render(tr("upg.locked"), True, (130, 130, 140))
             else:
                 afford = self.money >= self._price(upg["cost"])
                 st = self.font_btn18.render(price_txt,
@@ -4890,7 +4892,7 @@ class Game:
                 self.damage_numbers.append([en.x, en.y - 40, str(self._DRONE_KAMIKAZE_DMG), 60])
         self._combat_drone = None
         self._facility_rearm = self._DRONE_REARM
-        self.gold_notifications.append(["Drone down - rearming (3:00)...", 200])
+        self.gold_notifications.append([tr("notif.drone_down"), 200])
 
     def draw_facility(self):
         """Flat rectangular dock on the building roof (165, 198).
@@ -4908,10 +4910,10 @@ class Game:
         pygame.draw.rect(self.win, (255, 170, 60), (fx - w // 2 + 4, fy + h // 2 - 5, w - 8, 3), border_radius=1)
         d = self._combat_drone
         if d is not None:
-            label, secs = "KAMIKAZE", max(0, d["life"] // 100)
+            label, secs = tr("dock.kamikaze"), max(0, d["life"] // 100)
             lab_col, time_col = (255, 120, 120), (255, 220, 200)
         else:
-            label, secs = "NEXT DRONE", max(0, self._facility_rearm // 100)
+            label, secs = tr("dock.next"), max(0, self._facility_rearm // 100)
             lab_col, time_col = (255, 210, 120), (255, 240, 190)
         time_txt = f"{secs // 60}:{secs % 60:02d}"
         lab_font = self._tomb_fonts[6]
@@ -5119,14 +5121,14 @@ class Game:
 
             # Teksty - wieksze i czytelniejsze
             cx = draw_x + draw_w // 2
-            t1 = f_name.render(aname, True, (255, 255, 255))
+            t1 = f_name.render(tr(i18n.ABILITY_KEYS[tname]) if tname in i18n.ABILITY_KEYS else aname, True, (255, 255, 255))
             # Cien pod tekstem dla czytelnosci
-            shadow = f_name.render(aname, True, (0, 0, 0))
+            shadow = f_name.render(tr(i18n.ABILITY_KEYS[tname]) if tname in i18n.ABILITY_KEYS else aname, True, (0, 0, 0))
             self.win.blit(shadow, (cx - t1.get_width()//2 + 1, draw_y + 9))
             self.win.blit(t1, (cx - t1.get_width()//2, draw_y + 8))
             if ready_count > 0:
-                badge = f_status.render(f"{ready_count}x READY", True, (255, 255, 180))
-                bshadow = f_status.render(f"{ready_count}x READY", True, (0, 0, 0))
+                badge = f_status.render(tr("ability.ready", n=ready_count), True, (255, 255, 180))
+                bshadow = f_status.render(tr("ability.ready", n=ready_count), True, (0, 0, 0))
                 self.win.blit(bshadow, (cx - badge.get_width()//2 + 1, draw_y + 33))
                 self.win.blit(badge, (cx - badge.get_width()//2, draw_y + 32))
             elif cooling:
@@ -5134,9 +5136,9 @@ class Game:
                 t2 = f_status.render(f"{secs}s", True, (200, 200, 200))
                 self.win.blit(t2, (cx - t2.get_width()//2, draw_y + 32))
             else:
-                t2 = f_type.render("no tower", True, (140, 140, 140))
+                t2 = f_type.render(tr("hud.no_tower"), True, (140, 140, 140))
                 self.win.blit(t2, (cx - t2.get_width()//2, draw_y + 32))
-            t3 = f_type.render(tname, True, (210, 210, 210))
+            t3 = f_type.render(tr(i18n.TOWER_SHORT_KEYS[tname]) if tname in i18n.TOWER_SHORT_KEYS else tname, True, (210, 210, 210))
             self.win.blit(t3, (cx - t3.get_width()//2, draw_y + 54))
 
     def draw_placement_grid(self, win, mx, my):
@@ -5240,7 +5242,7 @@ class Game:
         pill_h = self._pill_h
         y = 10
         items = [
-            (10, 0, None, "Wave #" + str(self.wave + 1)),
+            (10, 0, None, tr("hud.wave", n=self.wave + 1)),
             (200, 1, self._lives_icon, str(int(self.display_lives))),
             (340, 2, self._money_icon, str(int(self.display_money))),
         ]
@@ -5303,7 +5305,7 @@ class Game:
                 try:
                     boss_temp = Boss()
                     boss_icon = pygame.transform.scale(boss_temp.imgs[0], (32, 32))
-                    blabel = font_cnt.render("BOSS", True, (255, 100, 100))
+                    blabel = font_cnt.render(tr("hud.boss"), True, (255, 100, 100))
                     items.append((boss_icon, blabel))
                 except:
                     pass
@@ -5325,7 +5327,7 @@ class Game:
             self.win.blit(s, (preview_x, preview_y))
             # Naglowek "Enemies" - wycentrowany
             font_head = pygame.font.SysFont("arial", 14, bold=True)
-            label = font_head.render("Enemies", True, (200, 220, 255))
+            label = font_head.render(tr("hud.enemies"), True, (200, 220, 255))
             self.win.blit(label, (preview_x + panel_w//2 - label.get_width()//2, preview_y + 5))
             # Ikony - liczba OBOK sprite'a, wycentrowana w pionie
             x_off = preview_x + 10

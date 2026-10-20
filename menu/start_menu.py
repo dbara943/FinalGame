@@ -2,6 +2,9 @@ import pygame
 import os
 import json
 
+import i18n
+from i18n import t
+
 DIFFICULTIES = [
     ("EASY", 30, 300),
     ("NORMAL", 20, 200),
@@ -64,6 +67,19 @@ class StartMenu:
             "help": pygame.Rect(x, y0 + 5 * (bh + gap), bw, bh),
             "quit": pygame.Rect(x, y0 + 6 * (bh + gap), bw, bh),
         }
+        # Wybor jezyka: rzad flag w prawym gornym rogu (male ikonki panstw)
+        self._flag_imgs = {}
+        for code, _name, flag in i18n.LANGUAGES:
+            try:
+                img = pygame.image.load(os.path.join("images", "flags", flag + ".png"))
+                self._flag_imgs[code] = pygame.transform.smoothscale(img, (44, 30))
+            except Exception:
+                self._flag_imgs[code] = None
+        fw, fh, fgap, fmargin = 44, 30, 8, 14
+        total_fw = len(i18n.LANGUAGES) * fw + (len(i18n.LANGUAGES) - 1) * fgap
+        fx0 = self.rw - fmargin - total_fw
+        self._flag_rects = [(code, pygame.Rect(fx0 + i * (fw + fgap), fmargin, fw, fh))
+                            for i, (code, _n, _f) in enumerate(i18n.LANGUAGES)]
 
     def _load_resolution(self):
         """Wczytuje zapisana rozdzielczosc."""
@@ -154,27 +170,31 @@ class StartMenu:
 
         # Animowany tytul - fala jak w filmach
         self.draw_title_wave()
-        sub = self.small_font.render("Defend Vancouver Island from the monster-pirates!",
+        sub = self.small_font.render(t("menu.subtitle"),
                                       True, (220, 230, 240))
         self.win.blit(sub, (self.rw // 2 - sub.get_width() // 2, self.rh // 2 - 160))
 
         diff_name = DIFFICULTIES[self.diff_idx][0]
         res = self.resolutions[self.res_idx]
-        res_name = f"{res[0]}x{res[1]}" if isinstance(res[0], int) else "NATIVE"
+        res_name = f"{res[0]}x{res[1]}" if isinstance(res[0], int) else t("menu.native")
         labels = {
-            "start": "START GAME",
-            "diff": "DIFFICULTY: " + diff_name,
-            "sound": "SOUND: " + ("ON" if self.sound else "OFF"),
-            "achievements": "ACHIEVEMENTS",
-            "resolution": "RESOLUTION: " + res_name,
-            "help": "HOW TO PLAY",
-            "quit": "QUIT",
+            "start": t("menu.start"),
+            "diff": t("menu.difficulty", name=t("diff." + diff_name.lower())),
+            "sound": t("menu.sound", state=t("common.on") if self.sound else t("common.off")),
+            "achievements": t("menu.achievements"),
+            "resolution": t("menu.resolution", name=res_name),
+            "help": t("menu.help"),
+            "quit": t("menu.quit"),
         }
         for key, rect in self.buttons.items():
             self.draw_button(rect, labels[key], rect.collidepoint(mouse))
 
+        # Rzad flag wyboru jezyka (prawy gorny rog) - nie gdy otwarty jest panel
+        if not (self.show_help or self.show_achievements or self.show_resolution):
+            self._draw_flags(mouse)
+
         # Opis wybranej trudnosci (stopka - co zmienia EASY / NORMAL / HARD)
-        diff_desc = DIFFICULTY_DESC.get(diff_name, "")
+        diff_desc = t("diff." + diff_name.lower() + ".desc")
         if diff_desc:
             dtxt = self.small_font.render(diff_desc, True, (170, 180, 190))
             self.win.blit(dtxt, (self.rw // 2 - dtxt.get_width() // 2, self.rh - 30))
@@ -186,6 +206,34 @@ class StartMenu:
         if self.show_resolution:
             self.draw_resolution()
         pygame.display.update()
+
+    def _draw_flags(self, mouse):
+        """Rzad flag w prawym gornym rogu: wybrany jezyk ma zlota ramke,
+        pod najechana flaga pokazuje sie nazwa jezyka (autonim)."""
+        if not self._flag_rects:
+            return
+        x0 = self._flag_rects[0][1].x
+        x1 = self._flag_rects[-1][1].right
+        y0 = self._flag_rects[0][1].y
+        pill = pygame.Surface((x1 - x0 + 16, 30 + 12), pygame.SRCALPHA)
+        pygame.draw.rect(pill, (5, 10, 25, 130), pill.get_rect(), border_radius=10)
+        self.win.blit(pill, (x0 - 8, y0 - 6))
+        hovered_name = None
+        for code, rect in self._flag_rects:
+            img = self._flag_imgs.get(code)
+            if img:
+                self.win.blit(img, rect.topleft)
+            if code == i18n.current():
+                pygame.draw.rect(self.win, (255, 215, 100), rect, 3, border_radius=3)
+            elif rect.collidepoint(mouse):
+                pygame.draw.rect(self.win, (255, 255, 255), rect, 2, border_radius=3)
+                hovered_name = i18n.LANG_NAMES[code]
+            else:
+                pygame.draw.rect(self.win, (140, 150, 165), rect, 1, border_radius=3)
+        if hovered_name:
+            lbl = self.small_font.render(hovered_name, True, (255, 215, 100))
+            lx = min(max(4, x1 - lbl.get_width()), self.rw - lbl.get_width() - 4)
+            self.win.blit(lbl, (lx, y0 + 38))
 
     def draw_achievements(self):
         """Panel achievementow (50) - karty w stylu CS2, PIRACKI klimat."""
@@ -203,11 +251,11 @@ class StartMenu:
         for i in range(0, self.rw, 30):
             pygame.draw.circle(self.win, (101, 80, 50), (i, 8), 4)
         # Tytul: jak na mapie skarbow
-        title = self.btn_font.render("PIRATE ACHIEVEMENTS", True, (255, 215, 100))
+        title = self.btn_font.render(t("ach.title"), True, (255, 215, 100))
         self.win.blit(title, (self.rw // 2 - title.get_width() // 2, 25))
         unlocked = len(self._ach_mgr.unlocked)
         total_ach = len(self._ach_mgr.get_all())
-        sub = self.small_font.render(f"{unlocked} / {total_ach} treasures found", True, (180, 150, 110))
+        sub = self.small_font.render(t("ach.found", unlocked=unlocked, total=total_ach), True, (180, 150, 110))
         self.win.blit(sub, (self.rw // 2 - sub.get_width() // 2, 65))
         # Monety po bokach tytulu
         pygame.draw.circle(self.win, (255, 215, 100), (self.rw//2 - 220, 50), 12)
@@ -298,7 +346,7 @@ class StartMenu:
             bar_y = list_y0 + int(self._ach_scroll * (list_h - bar_h) / max(1, total_h - list_h))
             pygame.draw.rect(self.win, (101, 80, 50), (self.rw - 18, bar_y, 8, bar_h), border_radius=4)
         # Dolny hint
-        hint = self.small_font.render("Scroll with mouse wheel", True, (140, 120, 90))
+        hint = self.small_font.render(t("ach.scroll"), True, (140, 120, 90))
         self.win.blit(hint, (self.rw // 2 - hint.get_width() // 2, self.rh - 55))
         # Przycisk zamkniecia (X)
         close_rect = pygame.Rect(self.rw - 60, 20, 40, 40)
@@ -318,12 +366,12 @@ class StartMenu:
         px, py = (self.rw - pw) // 2, (self.rh - ph) // 2
         pygame.draw.rect(self.win, (25, 30, 40), (px, py, pw, ph), border_radius=15)
         pygame.draw.rect(self.win, (100, 200, 255), (px, py, pw, ph), 2, border_radius=15)
-        title = self.btn_font.render("RESOLUTION", True, (100, 200, 255))
+        title = self.btn_font.render(t("res.title"), True, (100, 200, 255))
         self.win.blit(title, (px + (pw - title.get_width()) // 2, py + 20))
         # Opcje
         self._res_buttons = []
         for i, res in enumerate(self.resolutions):
-            name = f"{res[0]}x{res[1]}" if isinstance(res[0], int) else "NATIVE FULLSCREEN"
+            name = f"{res[0]}x{res[1]}" if isinstance(res[0], int) else t("res.native_full")
             bw, bh = 320, 44
             bx, by = px + (pw - bw) // 2, py + 80 + i * 56
             rect = pygame.Rect(bx, by, bw, bh)
@@ -332,7 +380,7 @@ class StartMenu:
             pygame.draw.rect(self.win, col, rect, 3 if i == self.res_idx else 1, border_radius=8)
             lbl = self.btn_font_small.render(name, True, (255, 255, 255))
             self.win.blit(lbl, (bx + (bw - lbl.get_width()) // 2, by + 12))
-        hint = self.small_font.render("Applies on next game start", True, (150, 150, 150))
+        hint = self.small_font.render(t("res.applies"), True, (150, 150, 150))
         self.win.blit(hint, (px + (pw - hint.get_width()) // 2, py + ph - 35))
 
     def draw_help(self):
@@ -340,28 +388,28 @@ class StartMenu:
         # a tresc potrzebuje 567 - ostatnia linia wystawala poza panel).
         _steps = {"title": 40, "header": 30, "dim": 30, "text": 26, "spacer": 12}
         _lines = [
-            ("HOW TO PLAY", "title"),
+            ("sm.help.title", "title"),
             ("", "spacer"),
-            ("Build towers from the right panel, then click", "text"),
-            ("on the map to place them.", "text"),
-            ("Monster-pirates follow the dirt road.", "text"),
-            ("Don't let them reach your base!", "text"),
+            ("sm.help.l1", "text"),
+            ("sm.help.l2", "text"),
+            ("sm.help.l3", "text"),
+            ("sm.help.l4", "text"),
             ("", "spacer"),
-            ("CONTROLS", "header"),
-            ("1-5  Buy tower      |  U  Upgrade tower", "text"),
-            ("S  Sell tower      |  Q  Tower ability", "text"),
-            ("T  Target priority |  R  Show all ranges", "text"),
-            ("Space  Pause       |  F  Toggle 1x/3x speed", "text"),
-            ("M  Music on/off   |  C  Filter towers by type", "text"),
-            ("Shift+Click  Queue build / Quick sell", "text"),
-            ("Ctrl+Z  Undo last build or upgrade", "text"),
-            ("F5 / F9  Save / Load game", "text"),
+            ("sm.help.controls", "header"),
+            ("sm.help.c1", "text"),
+            ("sm.help.c2", "text"),
+            ("sm.help.c3", "text"),
+            ("sm.help.c4", "text"),
+            ("sm.help.c5", "text"),
+            ("sm.help.c6", "text"),
+            ("sm.help.c7", "text"),
+            ("sm.help.c8", "text"),
             ("", "spacer"),
-            ("TIPS", "header"),
-            ("Same-type towers next to each other: +15% damage.", "text"),
-            ("Gold elites give 5x gold. Watch for rain: +15% gold!", "text"),
+            ("sm.help.tips", "header"),
+            ("sm.help.t1", "text"),
+            ("sm.help.t2", "text"),
             ("", "spacer"),
-            ("Click anywhere to go back.", "dim"),
+            ("sm.help.back", "dim"),
         ]
         _total = 25 + sum(_steps[s] for _, s in _lines) + 20
         panel = pygame.Rect(self.rw // 2 - 360, self.rh // 2 - _total // 2, 720, _total)
@@ -381,8 +429,8 @@ class StartMenu:
                 f, c, step = self.small_font, (140, 150, 160), 30
             else:
                 f, c, step = self.small_font, (225, 232, 240), 26
-            t = f.render(line, True, c)
-            self.win.blit(t, (panel.centerx - t.get_width() // 2, y))
+            t_surf = f.render(t(line), True, c)
+            self.win.blit(t_surf, (panel.centerx - t_surf.get_width() // 2, y))
             y += step
 
     def run(self):
@@ -436,7 +484,17 @@ class StartMenu:
                         clicked_something = True
                     else:
                         pos = event.pos
-                        if self.buttons["start"].collidepoint(pos):
+                        # Flagi jezyka (prawy gorny rog): przelaczaja od razu
+                        _flag_hit = False
+                        for _code, _frect in self._flag_rects:
+                            if _frect.collidepoint(pos):
+                                i18n.set_language(_code)
+                                clicked_something = True
+                                _flag_hit = True
+                                break
+                        if _flag_hit:
+                            pass
+                        elif self.buttons["start"].collidepoint(pos):
                             clicked_something = True
                             if clicked_something and self.click_sound and self.sound:
                                 self.click_sound.play()

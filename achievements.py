@@ -3,6 +3,8 @@ import os
 import json
 import pygame
 
+from i18n import t as _t
+
 # Definicje: (id, nazwa, opis, ikona_kategorii, warunek)
 # Warunek: funkcja(stats) -> bool, gdzie stats to dict ze statystykami gry
 ACHIEVEMENTS = [
@@ -176,7 +178,8 @@ class AchievementManager:
                 try:
                     if cond(stats):
                         self.unlocked.add(aid)
-                        self._pending_popup.append((name, desc, icon))
+                        self._pending_popup.append((_t(f"ach.{aid}.name", name),
+                                                    _t(f"ach.{aid}.desc", desc), icon))
                         self._save()
                 except:
                     pass
@@ -188,6 +191,7 @@ class AchievementManager:
         return None
 
     def get_all(self):
-        """Lista (id, name, desc, icon, unlocked)."""
-        return [(aid, name, desc, icon, aid in self.unlocked)
+        """Lista (id, name, desc, icon, unlocked) - nazwy/opisy w biezacym jezyku."""
+        return [(aid, _t(f"ach.{aid}.name", name), _t(f"ach.{aid}.desc", desc),
+                 icon, aid in self.unlocked)
                 for aid, name, desc, icon, _ in ACHIEVEMENTS]
