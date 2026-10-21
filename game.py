@@ -5502,14 +5502,16 @@ class Game:
             _req_name = next((tr(f"upg.{u['id']}.name", u["name"]) for u in upg_list if u["id"] == _req_id), _req_id) if _req_id else ""
             hover = rect.collidepoint(mx, my) and not maxed and not locked
             bg_col = (35, 45, 60) if not hover else (50, 65, 90)
-            if owned and not maxed:
-                bg_col = (40, 58, 42)  # L1: przygaszona zielien - jest jeszcze L2
+            # L1 (poziom 1 kupiony, L2 wciaz do kupienia): karta wyglada jak
+            # ZWYKLA karta do kupienia - bez zielonego tla i ramki "juz
+            # kupione" (Daniel: zielen dawala bledne odczucie, ze upgrade
+            # jest juz w calosci zakupiony). Zieleń zostaje tylko na MAX.
             if maxed:
                 bg_col = (30, 60, 40)
             if locked:
                 bg_col = (28, 30, 38)
             pygame.draw.rect(self.win, bg_col, rect, border_radius=10)
-            pygame.draw.rect(self.win, (100, 120, 150) if not owned else (80, 200, 120),
+            pygame.draw.rect(self.win, (80, 200, 120) if maxed else (100, 120, 150),
                              rect, 2, border_radius=10)
             # Ikonka
             if mystery:
