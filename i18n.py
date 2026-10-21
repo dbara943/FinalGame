@@ -106,6 +106,7 @@ TOWER_NAME_KEYS = {
     "GoldenTower": "tower.gold",
     "FireTower": "tower.fire",
     "BlazeTower": "tower.blaze",
+    "IceTower": "tower.ice",
     "SpikeCluster": "tower.spikes",
 }
 TOWER_SHORT_KEYS = {
@@ -115,6 +116,7 @@ TOWER_SHORT_KEYS = {
     "Gold": "tower.gold_short",
     "Fire": "tower.fire_short",
     "Blaze": "tower.blaze_short",
+    "Ice": "tower.ice_short",
 }
 ABILITY_KEYS = {
     "Wood": "ability.wood",
@@ -122,6 +124,7 @@ ABILITY_KEYS = {
     "Gold": "ability.gold",
     "Fire": "ability.fire",
     "Blaze": "ability.blaze",
+    "Ice": "ability.ice",
 }
 
 

@@ -157,12 +157,12 @@ def test_win_on_last_wave():
     print("Win on last wave:")
     g = fresh_game()
     # Simulate last wave done: advance past final wave
-    g.wave = 9  # 0-indexed wave 10
+    g.wave = 19  # 0-indexed wave 20 (kampania ma 20 fal od batcha 25)
     g.last_wave_done = False
     g.waiting_for_clear = True
     g.ship.state = Ship.AWAY
     g.enemies.clear()
-    g.advance_wave()  # should set last_wave_done for wave 10
+    g.advance_wave()  # should set last_wave_done for wave 20
     check("last_wave_done after final advance", g.last_wave_done,
           f"wave={g.wave} last_wave_done={g.last_wave_done}")
 

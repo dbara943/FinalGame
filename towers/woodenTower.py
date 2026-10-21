@@ -262,8 +262,12 @@ class MetalTower(WoodenTower):
     upgrade_dmg = 3
     # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
     upgrade_costs = [400, 800]
-    ability_name = "Frost Nova"
-    ability_desc = "Slows all enemies in range"
+    ability_name = "Barrage"
+    ability_desc = "Piercing volley at the nearest enemies"
+    # NOWA ROLA (paczka 25): Metal NIE spowalnia juz wrogow (to robi Ice
+    # Tower). Metal PRZEBIJA: pocisk przechodzi na kolejnego wroga za
+    # trafionym (obsluga w game.py przy trafieniu). Link: +1 cel.
+    pierce = 2
     def __init__(self, x, y):
         super().__init__(x, y)
         self.tower_imgs = tower_imgs2[:]
@@ -272,24 +276,28 @@ class MetalTower(WoodenTower):
         self.range = 125
         self.inRange = False
         self.facing_left = False
-        self.timer = time.time()      
+        self.timer = time.time()
         self.damage = self.base_damage
-        self.slow_on_hit = True  # Spowalnia trafionych wrogow
         self._setup_menu()
         self.name = "metalTower"
 
     def activate_ability(self, enemies, projectiles):
-        """Frost Nova: lodowy pocisk w losowego wroga na mapie - spowalnia wszystkich w zasiegu wybuchu."""
+        """Barrage: salwa w do 6 najblizszych wrogow (kazdy pocisk 2x dmg,
+        przebijajacy jak zwykle strzaly Metala)."""
         if self.ability_cooldown > 0:
             return False
-        self.ability_cooldown = int(self.ability_max_cooldown * getattr(self, '_ability_cd_mult', 1.0))
-        targets = self._random_enemies(enemies, 1)
+        living = [e for e in enemies
+                  if not e.dying and not e.dead and not e.reached_end
+                  and (e.x - self.x) ** 2 + (e.y - self.y) ** 2 <= 220 ** 2]
+        living.sort(key=lambda e: (e.x - self.x) ** 2 + (e.y - self.y) ** 2)
+        targets = living[:6]
         if not targets:
             return False
-        img = Projectile.make_special_img((120, 200, 255), 40)
-        projectiles.append(Projectile(
-            self.x, self.y - 30, img, targets[0], 5,
-            speed=14, source_tower=self, special="frost_nova"))
+        self.ability_cooldown = int(self.ability_max_cooldown * getattr(self, '_ability_cd_mult', 1.0))
+        for t in targets:
+            projectiles.append(Projectile(
+                self.x, self.y - 30, self.archer_imgs[0], t,
+                self.damage * 2, speed=13, source_tower=self))
         return True
 """
 GOLDEN TOWER 
@@ -468,4 +476,64 @@ class BlazeTower(WoodenTower):
         projectiles.append(Projectile(
             self.x, self.y - 30, img, targets[0], 30,
             speed=10, source_tower=self, special="armageddon"))
+        return True
+"""
+ICE TOWER (6. typ wiezy, paczka 25): przejela role spowalniania po
+Metal Tower. Kazde trafienie mocno spowalnia (slow_duration 150 tickow),
+umiejetnosc to Frost Nova (przejeta od Metala 1:1). Link: spowolnienie
+trwa x1.8. Grafiki: images/turrets/towers/6.png + projectiles/6.png.
+"""
+try:
+    shoot_snd["IceTower"] = pygame.mixer.Sound("sounds/shoot_ice.wav")
+except Exception:
+    pass
+
+menu_bg = pygame.transform.scale(pygame.image.load(os.path.join("images", "menu.png")), (150, 75))
+upgrade_btn = pygame.transform.scale(pygame.image.load(os.path.join("images", "upgrade.png")), (50, 50))
+tower_imgs6 = []
+archer_imgs6 = []
+
+# load ice tower
+tower_imgs6.append(pygame.transform.scale(
+    pygame.image.load(os.path.join("images/turrets/towers", str(6) + ".png" )), (64, 64)))
+
+# load projectile shooter
+archer_imgs6.append(pygame.transform.scale(
+    pygame.image.load(os.path.join("images/turrets/projectiles", str(6) + ".png" )), (25, 25)))
+
+class IceTower(WoodenTower):
+    buy_price = 650
+    display_name = "Ice Tower"
+    base_damage = 2
+    upgrade_dmg = 2
+    upgrade_costs = [500, 1000]
+    ability_name = "Frost Nova"
+    ability_desc = "Slows all enemies in range"
+    def __init__(self, x, y):
+        super().__init__(x, y)
+        self.tower_imgs = tower_imgs6[:]
+        self.archer_imgs = archer_imgs6[:]
+        self.archer_count = 0
+        self.range = 125
+        self.inRange = False
+        self.facing_left = False
+        self.timer = time.time()
+        self.damage = self.base_damage
+        self.slow_on_hit = True   # kazde trafienie spowalnia
+        self.slow_duration = 150  # 1,5 s (link: x1.8)
+        self._setup_menu()
+        self.name = "iceTower"
+
+    def activate_ability(self, enemies, projectiles):
+        """Frost Nova: lodowy pocisk w losowego wroga na mapie - spowalnia wszystkich w zasiegu wybuchu."""
+        if self.ability_cooldown > 0:
+            return False
+        targets = self._random_enemies(enemies, 1)
+        if not targets:
+            return False
+        self.ability_cooldown = int(self.ability_max_cooldown * getattr(self, '_ability_cd_mult', 1.0))
+        img = Projectile.make_special_img((120, 200, 255), 40)
+        projectiles.append(Projectile(
+            self.x, self.y - 30, img, targets[0], 5,
+            speed=14, source_tower=self, special="frost_nova"))
         return True

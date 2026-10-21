@@ -33,7 +33,7 @@ from enemies.ogre import Ogre
 from enemies.evilVillager import EvilVillager
 from enemies.boss import Boss
 from enemies.enemy import _PIER_RECT  # pomost: kraby i fale go omijaja (jest NAD woda)
-from towers.woodenTower import (WoodenTower, MetalTower, GoldenTower, FireTower, BlazeTower,
+from towers.woodenTower import (WoodenTower, MetalTower, GoldenTower, FireTower, BlazeTower, IceTower,
                                 _gold_tint,
                                 sound_1 as tower_sound_1, sound_2 as tower_sound_2,
                                 sound_3 as tower_sound_3, sound_4 as tower_sound_4,
@@ -57,11 +57,11 @@ t4_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t4.png
 t5_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "t5.png")), (30, 30))
 wave_bg = pygame.transform.scale(pygame.image.load(os.path.join("images","wave.png")), (225, 75))
 
-towers_names = ["woodenTower", "metalTower", "goldenTower", "fireTower", "blazeTower"]
-# Mapowanie: nazwa klasy wiezy -> nazwa przycisku w sklepie (t1..t5).
+towers_names = ["woodenTower", "metalTower", "goldenTower", "fireTower", "blazeTower", "iceTower"]
+# Mapowanie: nazwa klasy wiezy -> nazwa przycisku w sklepie (t1..t6).
 # get_item_cost() szuka po nazwie przycisku, wiec bez tego zwracal -1.
 tower_shop_names = {"woodenTower": "t1", "metalTower": "t2", "goldenTower": "t3",
-                    "fireTower": "t4", "blazeTower": "t5"}
+                    "fireTower": "t4", "blazeTower": "t5", "iceTower": "t6"}
 # Upgrady klikalnego budynku (jednorazowe na run)
 BUILDING_UPGRADES = [
     {"id": "treasury", "name": "War Treasury", "cost": 1200,
@@ -112,6 +112,33 @@ TENT_UPGRADES = [
     {"id": "sabotage", "name": "Sabotage", "cost": 6000,
      "desc": "Saboteurs poison enemy supplies. All enemies spawn with -15% HP."},
 ]
+# Drugi poziom upgradow (paczka 25): kazdy upgrade budynku/namiotu ma L2.
+# Koszt + opis L2 (opis jako fallback EN; tlumaczenia: upg.<id>.desc2).
+# Kontenery upgradow to teraz dict {id: poziom}; efekty czytaja poziom
+# przez Game._upg_level(). Ikony L2: pliki *_2.webp (zlota ramka + "II").
+UPGRADE_L2 = {
+    "treasury": {"cost": 1900, "desc": "Level 2: +50% gold from all kills in total."},
+    "bounty": {"cost": 2400, "desc": "Level 2: bosses and elites give +100% gold in total."},
+    "lucky": {"cost": 3200, "desc": "Level 2: 20% chance to deal 2x critical damage."},
+    "docks": {"cost": 4000, "desc": "Level 2: enemies move 30% slower on the pier."},
+    "storm": {"cost": 4800, "desc": "Level 2: storms give +40% gold (instead of +25%)."},
+    "walls": {"cost": 5600, "desc": "Level 2: +10 max lives in total."},
+    "ammo": {"cost": 6400, "desc": "Level 2: all towers shoot 30% faster in total."},
+    "drones": {"cost": 8000, "desc": "Level 2: heals +1 life every wave; the repair drone works faster."},
+    "tesla": {"cost": 10400, "desc": "Level 2: stronger zaps (130, storms 160) and longer range."},
+    "facility": {"cost": 12800, "desc": "Level 2: drone rearms in 2 min; minigun +50%, kamikaze 600 dmg."},
+    "cavalry": {"cost": 16000, "desc": "Level 2: the ally's mortars deal +50% damage."},
+    "medic": {"cost": 2400, "desc": "Level 2: bombardment destroys towers only 12.5% of the time."},
+    "scout": {"cost": 3200, "desc": "Level 2: ambush +50% damage in the first 6s after spawning."},
+    "supply": {"cost": 4000, "desc": "Level 2: towers cost 25% less in total."},
+    "drums": {"cost": 4800, "desc": "Level 2: tower abilities recharge 50% faster in total."},
+    "signal": {"cost": 5600, "desc": "Level 2: all Fire and Blaze towers shoot 24% faster in total."},
+    "guerrilla": {"cost": 6400, "desc": "Level 2: +60% damage against slowed enemies in total."},
+    "banner": {"cost": 6400, "desc": "Level 2: all towers deal +20% damage in total."},
+    "spikes": {"cost": 7200, "desc": "Level 2: spikes deal +50% damage."},
+    "balloon": {"cost": 8800, "desc": "Level 2: bombs every 2s, 220 damage."},
+    "sabotage": {"cost": 9600, "desc": "Level 2: all enemies spawn with -25% HP in total."},
+}
 # Balans trudnosci: EASY ma byc naprawde latwy, NORMAL bazowy, HARD naprawde trudny.
 # price_mult: ceny WSZYSTKIEGO (sklep, ulepszenia wiez, upgrady budynku/namiotu).
 # enemy_hp_mult / enemy_speed_mult: zwykli wrogowie (bossowie maja wlasne HP w _boss_hp).
@@ -139,7 +166,17 @@ waves = [
     [0,0,10,15,15,10,5,0],
     [0,0,0,10,15,15,10,5],
     [0,5,10,10,15,15,20,10],
-    [0,0,0,0,0,0,0,0],  # Fala 10: sam boss
+    [5,5,15,15,10,10,5,0],
+    [10,10,15,10,10,5,0,0],
+    [5,10,15,10,10,10,5,0],
+    [5,5,15,15,10,10,5,0],
+    [0,5,15,15,15,10,5,5],
+    [0,5,10,15,15,15,10,5],
+    [0,0,10,15,15,15,10,10],
+    [0,0,10,10,20,15,15,10],
+    [0,0,5,10,20,20,15,15],
+    [0,0,5,10,20,20,25,15],
+    [0,0,0,0,0,0,0,0],  # Fala 20: sam boss finalny
 ]
 pygame.mixer.init()
 music = pygame.mixer.music.load(os.path.join("sounds", "music.wav"))
@@ -289,7 +326,7 @@ class Game:
         self.stats_abilities_used = 0
         self.stats_gold_spent = 0
         # Upgrady budynku (klikany szklany budynek)
-        self.building_upgrades = set()  # id kupionych upgradow
+        self.building_upgrades = {}  # {id: poziom 1-2} kupionych upgradow
         self._building_menu_open = False
         self._building_menu_buttons = []  # (rect, upgrade_id)
         self._building_rect = pygame.Rect(110, 158, 353, 231)  # bbox of drawn highlight polygon
@@ -303,9 +340,19 @@ class Game:
                 self._building_icons[uid] = None
         # Facility uses the same icon as Repair Drones (same icon, second tier)
         self._building_icons["facility"] = self._building_icons.get("drones")
+        # Ikony poziomu 2 (zlota ramka + odznaka II)
+        self._building_icons2 = {}
+        for uid in ("walls", "drones", "tesla", "treasury", "bounty",
+                    "ammo", "lucky", "storm", "docks", "cavalry"):
+            try:
+                img = pygame.image.load(os.path.join("images", "upgrades", uid + "_2.webp"))
+                self._building_icons2[uid] = pygame.transform.smoothscale(img, (56, 56))
+            except:
+                self._building_icons2[uid] = self._building_icons.get(uid)
+        self._building_icons2["facility"] = self._building_icons2.get("drones")
         self._building_desc_font = pygame.font.SysFont("arial", 16)
         # Upgrady namiotu (klikany namiot tipi)
-        self.tent_upgrades = set()  # id kupionych upgradow
+        self.tent_upgrades = {}  # {id: poziom 1-2} kupionych upgradow
         self._tent_menu_open = False
         self._tent_menu_buttons = []
         self._tent_rect = pygame.Rect(861, 244, 170, 144)  # bbox of drawn highlight polygon
@@ -324,6 +371,13 @@ class Game:
                 self._tent_icons[uid] = pygame.transform.smoothscale(img, (56, 56))
             except:
                 self._tent_icons[uid] = None
+        self._tent_icons2 = {}
+        for uid, fname in _tent_icon_files.items():
+            try:
+                img = pygame.image.load(os.path.join("images", "upgrades", "tent_" + fname + "_2.webp"))
+                self._tent_icons2[uid] = pygame.transform.smoothscale(img, (56, 56))
+            except:
+                self._tent_icons2[uid] = self._tent_icons.get(uid)
         # Wizualne efekty namiotu (init)
         self._balloon_x = -100
         self._balloon_bomb_cd = 0
@@ -426,6 +480,9 @@ class Game:
         self._endless_rain_left = 0  # pozostale fale deszczu w endless (gwarantowana burza)
         self._clear_snap = None  # snapshot wrogow dla failsafe'a czyszczenia planszy
         self.raining = False  # 7: deszcz
+        self._phenomenon = None  # pogoda fantasy: blood_moon/fog/aurora/meteors/gold_wind
+        self._meteor_cd = 0
+        self._meteor_fx = []
         try:
             sound_rain.stop()  # zadna zapetlona sciana deszczu z poprzedniej gry
         except Exception:
@@ -570,12 +627,25 @@ class Game:
         self._overlay_dawn = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         self._overlay_dawn.fill((255, 200, 150, 30))
         self.selected_tower = None
-        self.menu = VerticalMenu(self.width - 100, 250, side_img)
-        self.menu.add_btn(t1_img, "t1", 100, damage=1)
-        self.menu.add_btn(t2_img, "t2", 500, damage=3)
-        self.menu.add_btn(t3_img, "t3", 750, damage=5)
-        self.menu.add_btn(t4_img, "t4", 1000, damage=8)
-        self.menu.add_btn(t5_img, "t5", 2000, damage=10)
+        # Sklep startuje PO LEWEJ stronie ekranu (dalej przeciggalny).
+        self.menu = VerticalMenu(100, 250, side_img)
+        # Ikony sklepu: GRAFIKA WIEZY + jej pocisk w rogu (zamiast samych
+        # mini-ikonek pociskow). Kompozyt 46x46 budowany z prawdziwych assetow.
+        def _shop_icon(tower_file, proj_file):
+            _s = pygame.Surface((46, 46), pygame.SRCALPHA)
+            _t = pygame.transform.smoothscale(
+                pygame.image.load(os.path.join("images", "turrets", "towers", tower_file)), (46, 46))
+            _s.blit(_t, (0, 0))
+            _p = pygame.transform.smoothscale(
+                pygame.image.load(os.path.join("images", "turrets", "projectiles", proj_file)), (20, 20))
+            _s.blit(_p, (26, 26))
+            return _s
+        self.menu.add_btn(_shop_icon("1.png", "2.png"), "t1", 100, damage=1)
+        self.menu.add_btn(_shop_icon("2.png", "1.png"), "t2", 500, damage=3)
+        self.menu.add_btn(_shop_icon("3.png", "3.png"), "t3", 750, damage=5)
+        self.menu.add_btn(_shop_icon("4.png", "4.png"), "t4", 1000, damage=9)
+        self.menu.add_btn(_shop_icon("5.png", "5.png"), "t5", 2000, damage=12)
+        self.menu.add_btn(_shop_icon("6.png", "6.png"), "t6", 650, damage=2)
         # Trudnosc: ceny sklepu (wyswietlane + pobierane) - skalowane raz przy starcie.
         # EASY -20%, HARD +25%. Supply Lines liczy sie OD tych cen (shop_price).
         for _btn in self.menu.buttons:
@@ -612,7 +682,7 @@ class Game:
             for _b in self.pending_bosses:
                 # Sabotage: boss tez z -15% HP (widoczne na pasku)
                 if "sabotage" in self.tent_upgrades:
-                    _b.health = int(_b.health * 0.85)
+                    _b.health = int(_b.health * (0.75 if self._upg_level(self.tent_upgrades, "sabotage") >= 2 else 0.85))
                 _b._spawn_tick = self._logic_tick
                 self.enemies.append(_b)
             # A10: intro bossa - dramatyczne wejscie (raz na cala paczke)
@@ -700,11 +770,14 @@ class Game:
                 en.max_health = max(1, int(en.max_health * _hp_mult))
                 en.health = max(1, int(en.health * _hp_mult))
             en.velocity *= self._diff("enemy_speed_mult")
+            if getattr(self, "_phenomenon", None) == "blood_moon":
+                en.velocity *= 1.1  # Krwawy ksiezyc: wrogowie szybsi
             if "sabotage" in self.tent_upgrades:
                 # Tylko aktualne HP (widoczne na pasku), max zostaje
-                en.health = max(1, int(en.health * 0.85))
+                en.health = max(1, int(en.health * (0.75 if self._upg_level(self.tent_upgrades, "sabotage") >= 2 else 0.85)))
             if "docks" in self.building_upgrades:
                 en._docks_slow = True
+                en._docks_factor = 0.70 if self._upg_level(self.building_upgrades, "docks") >= 2 else 0.85
             en._spawn_tick = self._logic_tick  # Scout Reports: ambush (ticki logiki, nie czas rzeczywisty)
             self.enemies.append(en)
             # Call the Cavalry: licz rozladowanych, sojusznik wplywa w 1. polowie fali
@@ -736,12 +809,12 @@ class Game:
         i fala czeka na start - jak przed rozpoczeciem fali. Skoczona
         fala NIE placi bonusu startowego (tylko ten jeden raz); po jej
         ukonczeniu nastepna fala placi juz normalnie.
-        n >= 11: sklad/HP jak przy naturalnym dojsciu do tej fali.
-        n == 10: EASTER EGG - rewanz z bossem finalnym z 20x HP, ktory po
+        n >= 21: sklad/HP jak przy naturalnym dojsciu do tej fali.
+        n == 20: EASTER EGG - rewanz z bossem finalnym z 20x HP, ktory po
         dojsciu do budynku OBLEGA go (atak co 1 s = -1 zycie, az budynek
         padnie albo boss zginie); po jego fali gra przechodzi w endless
-        od fali 11.
-        n <= 9: zwykla fala kampanii (skok WSTECZ tez jest dozwolony);
+        od fali 21.
+        n <= 19: zwykla fala kampanii (skok WSTECZ tez jest dozwolony);
         tryb endless wylacza sie i gra wraca do kampanii."""
         # Anuluj stawianie wiezy ze zwrotem (jak ESC)
         if getattr(self, "moving_object", None) is not None:
@@ -783,7 +856,7 @@ class Game:
             self.ship = Ship(os.path.join("images", "ship.png"),
                              dock_x=278, dock_y=669, screen_w=self.width)
             self.ship.sail_in()
-        if n <= 9:
+        if n <= 19:
             # Zwykla fala kampanii (tez skok wstecz, np. na fale 1)
             self.endless = False
             self.endless_wave = 0
@@ -792,14 +865,14 @@ class Game:
             self._wave_start_lives = self.lives
             self.wave_banner_text = tr("banner.wave", n=n)
             self.wave_banner_timer = 120
-        elif n == 10:
+        elif n == 20:
             self.endless = True
             self.endless_wave = 0
-            self.wave = 9
-            self.current_wave = waves[9][:]
+            self.wave = 19
+            self.current_wave = waves[19][:]
             self._wave_start_lives = self.lives
             _egg = Boss(final=True,
-                hp=int(950 * self._diff("enemy_hp_mult") * 20))
+                hp=int(1500 * self._diff("enemy_hp_mult") * 20))
             # Easter egg: boss nie znika po jednym zyciu - oblega budynek
             # i co sekunde zdejmuje 1 zycie, dopoki nie zginie
             _egg._building_attacker = True
@@ -808,7 +881,7 @@ class Game:
             self.wave_banner_timer = 150
         else:
             self.endless = True
-            self.endless_wave = n - 11
+            self.endless_wave = n - 21
             self.wave = n - 2
             self._setup_endless_wave(grant_gold=False)
             self._wave_start_lives = self.lives
@@ -825,6 +898,21 @@ class Game:
         self._pause_wave_focus = False
         self.show_menu = False
         self.paused = False
+
+    _PHENOMENA = ("blood_moon", "fog", "aurora", "meteors", "gold_wind")
+
+    def _roll_phenomenon(self, wave_num, banner=True):
+        """Pogoda fantasy: 18% szans na fale (nie na falach z bossem).
+        Zwraca True, gdy wylosowano - wtedy fala jest bez deszczu."""
+        self._phenomenon = None
+        if wave_num % 4 == 0:
+            return False
+        if random.random() < 0.18:
+            self._phenomenon = random.choice(self._PHENOMENA)
+            if banner:
+                self.wave_banner_text += tr("banner." + self._phenomenon)
+            return True
+        return False
 
     def _setup_endless_wave(self, grant_gold=True):
         """Generuje kolejna fale endless (proceduralnie, rosnace HP).
@@ -854,6 +942,7 @@ class Game:
             self.money += gold
             self._ach_stats["gold_earned"] = self._ach_stats.get("gold_earned", 0) + gold
             self.gold_notifications.append([tr("notif.gold_wave", gold=gold, wave=self.wave), 150])
+        self._phenomenon = None  # zjawisko losuje tylko koncowa galaz else
         # Deszcz w endless: brak losowych burz, ale gwarantowana burza
         # z Tesla Coil dziala (1 runda, 2 ze Storm Caller). Deszcz
         # przeniesiony z kampanii gasnie po 1 fali endless (wczesniej
@@ -882,7 +971,9 @@ class Game:
             else:
                 _chance = self._diff("storm_chance")
             _dnum = self.wave + 1  # wyswietlany numer fali (self.wave juz zwiekszone)
-            if _dnum % 10 != 0 and self.endless_wave % 4 != 0 and random.random() < _chance:
+            # Pogoda fantasy tez w endless (bez bannera - endless go nie pokazuje)
+            _phenom = self._roll_phenomenon(self.endless_wave, banner=False)
+            if not _phenom and _dnum % 10 != 0 and self.endless_wave % 4 != 0 and random.random() < _chance:
                 self.raining = True
                 # Storm Caller: burza trwaja 2 fale (jak w kampanii)
                 self._endless_rain_left = 2 if "storm" in self.building_upgrades else 1
@@ -911,7 +1002,7 @@ class Game:
             self._ally_unloaded = 0
 
     def _endless_hp(self, base, endless_wave):
-        """HP w endless: 5x bazowo od fali 11, potem +5% co fale (compound).
+        """HP w endless: 5x bazowo od fali 21, potem +5% co fale (compound).
         Jesli 5% nie daje ani 1 HP, to +1."""
         hp = int(base * 5)
         for _ in range(1, endless_wave):
@@ -921,10 +1012,14 @@ class Game:
 
     def _boss_hp(self, wave_num):
         """HP bossa wg fali i trudnosci (po obnizce o 50: bossowie byli za silni).
-        Fala 4: EASY 150, NORMAL 200, HARD 250.
-        Fala 8: EASY 350, NORMAL 450, HARD 550."""
+        Fala 4: 150/200/250, fala 8: 350/450/550, fala 12: 550/700/850,
+        fala 16: 800/1000/1250 (EASY/NORMAL/HARD)."""
         if wave_num == 8:
             return {"EASY": 350, "NORMAL": 450, "HARD": 550}.get(self.difficulty, 450)
+        if wave_num == 12:
+            return {"EASY": 550, "NORMAL": 700, "HARD": 850}.get(self.difficulty, 700)
+        if wave_num == 16:
+            return {"EASY": 800, "NORMAL": 1000, "HARD": 1250}.get(self.difficulty, 1000)
         return {"EASY": 150, "NORMAL": 200, "HARD": 250}.get(self.difficulty, 200)
 
     def advance_wave(self):
@@ -981,7 +1076,7 @@ class Game:
         # Repair Drones: +1 zycie co 2 fale (do maxa)
         if "drones" in self.building_upgrades:
             self._drone_wave_count = getattr(self, "_drone_wave_count", 0) + 1
-            if self._drone_wave_count >= 2:
+            if self._drone_wave_count >= (1 if self._upg_level(self.building_upgrades, "drones") >= 2 else 2):
                 self._drone_wave_count = 0
                 if self.lives < self._start_lives:
                     self.lives += 1
@@ -1018,7 +1113,7 @@ class Game:
             # U8: modyfikator co 3 fale (nie na bossach)
             self.wave_modifier = None
             wave_num = self.wave + 1
-            if wave_num % 3 == 0 and wave_num % 4 != 0 and wave_num != 10:
+            if wave_num % 3 == 0 and wave_num % 4 != 0 and wave_num != 20:
                 mod = random.choice(["swift", "rich", "swarm"])
                 self.wave_modifier = mod
                 if mod == "swift":
@@ -1033,6 +1128,7 @@ class Game:
             # trwaja dluzej (2 fale zamiast 1).
             # Tesla Coil nie zmienia szansy - daje gwarantowana burze przy zakupie.
             was_raining = self.raining
+            self._phenomenon = None  # zjawisko fantasy losuje tylko galaz else
             _tesla_guaranteed = getattr(self, "_tesla_guaranteed_storm", 0) > 0
             if _tesla_guaranteed:
                 self._tesla_guaranteed_storm -= 1
@@ -1052,6 +1148,11 @@ class Game:
                 self._storm_extra = "storm" in self.building_upgrades
             else:
                 self.raining = False
+                # Pogoda fantasy najpierw: gdy wyskoczy zjawisko, fala jest
+                # bez deszczu (i bez szansy na burze).
+                _phenom = self._roll_phenomenon(wave_num)
+                if _phenom and was_raining:
+                    sound_rain.stop()
                 # Szansa na burze wg trudnosci: EASY 20%, NORMAL 15%,
                 # HARD 10%. Storm Caller PODWAJA szanse poziomu
                 # (40/30/20%). Tesla Coil NIE zwieksza szansy -
@@ -1060,25 +1161,25 @@ class Game:
                     storm_chance = self._diff("storm_chance") * 2
                 else:
                     storm_chance = self._diff("storm_chance")
-                if wave_num % 4 != 0 and wave_num != 10 and random.random() < storm_chance:
+                if not _phenom and wave_num % 4 != 0 and random.random() < storm_chance:
                     self.raining = True
                     self.wave_banner_text += tr("banner.rain")
                     self.raindrops = [(random.randint(0, self.width), random.randint(0, self.height),
                                        random.randint(8, 14)) for _ in range(100)]
                     sound_rain.play(loops=-1)  # 38: szum deszczu
                     self._storm_extra = "storm" in self.building_upgrades
-                elif was_raining:
+                elif was_raining and not _phenom:
                     sound_rain.stop()
                     # B4: tecza po deszczu
                     self._rainbow_timer = 600  # 10s
-            # Boss na falach 4 i 8; fala 10 (ostatnia) to sam boss FINALNY.
+            # Bossowie na falach 4, 8, 12 i 16; fala 20 (ostatnia) to sam boss FINALNY.
             # Boss spawnuje sie dopiero gdy statek zadokuje (pending_bosses).
-            if (self.wave + 1) % 4 == 0 and self.wave + 1 < 10:
+            if (self.wave + 1) % 4 == 0 and self.wave + 1 < 20:
                 self.pending_bosses.append(Boss(hp=self._boss_hp(self.wave + 1)))
                 self.wave_banner_text = tr("banner.wave_boss", n=self.wave + 1)
-            elif self.wave + 1 == 10:
-                # Boss finalny: 950 bazowo (-50, jak reszta bossow), skalowany trudnoscia
-                self.pending_bosses.append(Boss(final=True, hp=int(950 * self._diff("enemy_hp_mult"))))
+            elif self.wave + 1 == 20:
+                # Boss finalny (fala 20): 1500 bazowo, skalowany trudnoscia
+                self.pending_bosses.append(Boss(final=True, hp=int(1500 * self._diff("enemy_hp_mult"))))
                 self.wave_banner_text = tr("banner.final_boss")
         self.waiting_for_clear = False
     def _close_all_menus(self, refund_placement=True):
@@ -1190,7 +1291,7 @@ class Game:
         self.mortar_shots.append({
             "x0": sx, "y0": sy, "x1": tx, "y1": ty,
             "t": 0.0, "dur": 55,  # klatek lotu
-            "dmg": 500, "splash": 110,
+            "dmg": 750 if self._upg_level(self.building_upgrades, "cavalry") >= 2 else 500, "splash": 110,
             "trail": [],
         })
         self.ally_ship.cannon_flash = 20
@@ -1256,15 +1357,18 @@ class Game:
     def _tent_damage_mult(self, en):
         """Mnoznik obrazen z upgradow namiotu (Scout, Guerrilla)."""
         mult = 1.0
-        # Scout Reports: +25% w pierwsze 4s po spawnie (zasadzka) - w tickach logiki,
-        # wiec pauza i predkosc 2x/3x nie psuja okna (wczesniej time.time()).
-        if "scout" in self.tent_upgrades:
-            if self._logic_tick - getattr(en, "_spawn_tick", 0) < 400:
-                mult *= 1.25
-        # Guerrilla Training: +35% vs spowolnionych
-        if "guerrilla" in self.tent_upgrades:
+        # Scout Reports: +25% (L2: +50%) w pierwsze 4s (L2: 6s) po spawnie -
+        # w tickach logiki, wiec pauza i predkosc 2x/3x nie psuja okna.
+        _scout = self._upg_level(self.tent_upgrades, "scout")
+        if _scout:
+            _window = 600 if _scout >= 2 else 400
+            if self._logic_tick - getattr(en, "_spawn_tick", 0) < _window:
+                mult *= 1 + 0.25 * _scout
+        # Guerrilla Training: +35% vs spowolnionych (L2: +60%)
+        _grr = self._upg_level(self.tent_upgrades, "guerrilla")
+        if _grr:
             if getattr(en, "slow_timer", 0) > 0:
-                mult *= 1.35
+                mult *= 1.60 if _grr >= 2 else 1.35
         return mult
 
     def draw_tesla_coil(self):
@@ -1314,22 +1418,27 @@ class Game:
                         for x, y in base_pts]
 
     def _update_spikes(self):
-        """Kolce rania przechodzacych wrogow (dps wg poziomu klastra: 8/14/22).
-        Uzywa hit(), wiec moga zabijac (kills liczone do menu klastra,
-        zloto z monety ladowanej przy smierci wroga - jak przy wiezach).
-        Zasieg po HITBOXIE sprite'a (promien 55), nie po srodku wroga -
-        wczesniej szybcy/grubsi wrogowie przechodzili niemal bez obrazen."""
+        """Kolce rania TYLKO wrogow, ktorzy na nich stoja (elipsa zgodna
+        z rysunkiem klastra: 5 kolcow na ~56x22 px) - wczesniejszy test
+        hitboxem r=55 ranil wrogow, ktorzy jeszcze na kolce nie weszli.
+        Obrazenia przez hit(flash=False): ciagly DPS nie moze co tick
+        odswiezac bialego blysku trafienia (wrogowie na kolcach swiecili
+        sie na bialo bez przerwy). Zabojstwa i zloto jak przy wiezach."""
         if "spikes" not in self.tent_upgrades or not self._spikes:
             return
         for sp in self._spikes:
             for en in self.enemies:
                 if en.dying or en.dead or en.reached_end:
                     continue
-                if en.hitbox_in_radius(sp.x, sp.y, 55):
+                _dx = (en.x - sp.x) / 32.0
+                _dy = (en.y - sp.y) / 15.0
+                if _dx * _dx + _dy * _dy <= 1.0:
                     dmg = sp.damage / 100.0  # dps przy logice 100 Hz
+                    if "spikes" in self.tent_upgrades and self._upg_level(self.tent_upgrades, "spikes") >= 2:
+                        dmg *= 1.5  # Spike Barricade L2: glebsze kolce
                     was_dying = en.dying
                     try:
-                        en.hit(dmg)
+                        en.hit(dmg, flash=False)
                     except Exception:
                         en.health -= dmg
                         if en.health <= 0 and not en.dying:
@@ -1337,7 +1446,7 @@ class Game:
                     if not was_dying and en.dying:
                         sp.kills += 1
                     self.stats_damage += dmg
-                    if random.random() < 0.1:
+                    if random.random() < 0.02:
                         self.damage_numbers.append([en.x, en.y - 40, f"{sp.damage:.0f}", 30])
 
     def draw_achievement_popup(self):
@@ -1437,7 +1546,7 @@ class Game:
             self._balloon_bomb_cd -= 1
             if self._balloon_bomb_cd <= 0:
                 self._balloon_bombs.append({"x": bx, "y": by + 55, "vy": 1.2, "land_y": line_y})
-                self._balloon_bomb_cd = 300  # 3 s przy 100 Hz
+                self._balloon_bomb_cd = 200 if self._upg_level(self.tent_upgrades, "balloon") >= 2 else 300  # 2 s (L2) / 3 s przy 100 Hz
         # Bomby spadaja PIONOWO na linie (wprost ponizej miejsca zrzutu).
         for bomb in self._balloon_bombs[:]:
             bomb["vy"] += 0.054  # grawitacja (0.15/klatke 60 FPS przeliczone na ticki)
@@ -1453,14 +1562,15 @@ class Game:
                     if en.dying or en.dead or en.reached_end:
                         continue
                     if (en.x - ex) ** 2 + (en.y - ey) ** 2 < 90 ** 2:
+                        _bdmg = 220 if self._upg_level(self.tent_upgrades, "balloon") >= 2 else 150
                         try:
-                            en.hit(150)
+                            en.hit(_bdmg)
                         except Exception:
-                            en.health -= 150
+                            en.health -= _bdmg
                             if en.health <= 0 and not en.dying:
                                 en.dying = True
-                        self.stats_damage += 150
-                        self.damage_numbers.append([en.x, en.y - 40, "150", 60])
+                        self.stats_damage += _bdmg
+                        self.damage_numbers.append([en.x, en.y - 40, str(_bdmg), 60])
 
     def _update_bombardment(self):
         """Cinematic bombardowania - fazy."""
@@ -1612,7 +1722,7 @@ class Game:
                 self.particles.burst(cb["tx"], cb["ty"], (255, 150, 50), count=20, speed=5, life=30, size=4)
                 self.screen_shake = 8
                 # 50% szans na zniszczenie wiezy (Field Medic: 25%)
-                destroy_chance = 0.25 if "medic" in self.tent_upgrades else 0.5
+                destroy_chance = {0: 0.5, 1: 0.25, 2: 0.125}[self._upg_level(self.tent_upgrades, "medic")]
                 if random.random() < destroy_chance and tw in self.towers:
                     # Wieza rozpada sie na kawalki
                     for _ in range(15):
@@ -1818,10 +1928,10 @@ class Game:
                     # Spacja: pauza
                     if event.key == pygame.K_SPACE:
                         self.paused = not self.paused
-                    # 1-5: wybor wiezy ze sklepu
-                    if event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5):
+                    # 1-6: wybor wiezy ze sklepu
+                    if event.key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_4, pygame.K_5, pygame.K_6):
                         idx = event.key - pygame.K_1
-                        tower_names = ["t1", "t2", "t3", "t4", "t5"]
+                        tower_names = ["t1", "t2", "t3", "t4", "t5", "t6"]
                         if idx < len(tower_names):
                             cost = self.menu.get_item_cost(tower_names[idx])
                             if self.money >= cost:
@@ -1832,7 +1942,7 @@ class Game:
                     if event.key == pygame.K_u and self.selected_tower:
                         cost = self.selected_tower.menu.get_item_cost()
                         if cost != "MAX" and "supply" in self.tent_upgrades:
-                            cost = int(cost * 0.85)
+                            cost = int(cost * self._supply_discount())
                         if cost != "MAX" and self.money >= cost:
                             self.money -= cost
                             self._add_gold_spent(cost)
@@ -1877,7 +1987,7 @@ class Game:
                         self.load_game()
                     # Q15: C - filtr wiez (cykl po typach)
                     if event.key == pygame.K_c:
-                        types = [None, "Wood", "Metal", "Gold", "Fire", "Blaze"]
+                        types = [None, "Wood", "Metal", "Gold", "Fire", "Blaze", "Ice"]
                         idx = types.index(self.tower_filter) if self.tower_filter in types else 0
                         self.tower_filter = types[(idx + 1) % len(types)]
                     if event.key == pygame.K_s and self.selected_tower:
@@ -1950,9 +2060,9 @@ class Game:
                                     self.stats_abilities_used += 1
                                     self._ach_stats["abilities_used"] = self._ach_stats.get("abilities_used", 0) + 1
                                     # Unikalny dzwiek dla kazdej umiejetnosci
-                                    snd = {"Wood": sound_ab_rapid, "Metal": sound_ab_frost,
+                                    snd = {"Wood": sound_ab_rapid, "Metal": sound_minigun,
                                            "Gold": sound_ab_gold, "Fire": sound_ab_meteor,
-                                           "Blaze": sound_ab_arma}.get(tname)
+                                           "Blaze": sound_ab_arma, "Ice": sound_ab_frost}.get(tname)
                                     if snd:
                                         snd.play()
                                 continue
@@ -2046,7 +2156,7 @@ class Game:
                             if btn_clicked == "Upgrade":
                                 cost = self.selected_tower.menu.get_item_cost()
                                 if cost != "MAX" and "supply" in self.tent_upgrades:
-                                    cost = int(cost * 0.85)
+                                    cost = int(cost * self._supply_discount())
                                 if cost != "MAX" and self.money >= cost:
                                     self.money -= cost
                                     self._add_gold_spent(cost)
@@ -2087,12 +2197,17 @@ class Game:
                         if _pr is not None and _pr.collidepoint(pos):
                             continue
                     clicked_tower = None
+                    # Zaznacz DOKLADNIE JEDNA wieze: przy nachodzacych na
+                    # siebie grafikach klik pasuje do kilku wiez - wczesniej
+                    # wszystkie zostawaly zaznaczone (dwa okregi zasiegu).
+                    # Wygrywa wieza, ktorej srodek jest najblizej kliku.
+                    _matches = [tw for tw in self.towers if tw.click(pos[0], pos[1])]
+                    if _matches:
+                        clicked_tower = min(
+                            _matches,
+                            key=lambda tw: (tw.x - pos[0]) ** 2 + (tw.y - pos[1]) ** 2)
                     for tw in self.towers:
-                        if tw.click(pos[0], pos[1]):
-                            tw.selected = True
-                            clicked_tower = tw
-                        else:
-                            tw.selected = False
+                        tw.selected = tw is clicked_tower
                     # Klik w puste miejsce = odznacz (menu znika jak kiedys)
                     self.selected_tower = clicked_tower
                     # Kolce: klikalne jak wieze (po wiezach, przed budynkiem/namiotem)
@@ -2157,7 +2272,7 @@ class Game:
                 elif result == "menu":
                     return "menu"
                 elif result == "continue":
-                    # Tryb endless: od razu fala 11 (bez pustego rejsu statku z fali 10)
+                    # Tryb endless: od razu fala 21 (bez pustego rejsu statku z fali 20)
                     self._ach_stats["endless_entered"] = self._ach_stats.get("endless_entered", 0) + 1
                     self.endless = True
                     self.won = False
@@ -2184,6 +2299,9 @@ class Game:
         except Exception:
             pass
         self.raining = False
+        self._phenomenon = None
+        self._meteor_cd = 0
+        self._meteor_fx = []
         self.enemies = []
         self.towers = []
         self.projectiles = []
@@ -2222,7 +2340,7 @@ class Game:
         self.stats_abilities_used = 0
         self.stats_gold_spent = 0
         # Reset upgradow budynku
-        self.building_upgrades = set()
+        self.building_upgrades = {}
         self._building_menu_open = False
         self._drone_angle = 0.0
         self._tesla_cooldown = 0
@@ -2241,7 +2359,7 @@ class Game:
         self.mortar_shots = []
         self._storm_extra = False
         # Reset upgradow namiotu
-        self.tent_upgrades = set()
+        self.tent_upgrades = {}
         self._tent_menu_open = False
         self._balloon_x = -100
         self._balloon_bomb_cd = 0
@@ -2276,7 +2394,8 @@ class Game:
         wywolywane TYLKO z konca animacji uderzenia pioruna w cewke.
         Wrogowie wciaz na pomoście (_PIER_RECT) sa ZAWSZE pomijani."""
         bx, by = 308, 123  # electrode ball (z drag tool, 2026-10-14) - zasieg od kuli
-        zap_r = 700 if storm else 400  # zasieg w burze: o wiele wiekszy
+        _tl2 = self._upg_level(self.building_upgrades, "tesla") >= 2
+        zap_r = (760 if storm else 460) if _tl2 else (700 if storm else 400)
         _px0, _py0, _pw, _ph = _PIER_RECT
 
         def _on_pier(en):
@@ -2291,7 +2410,7 @@ class Game:
                 best, best_d2 = en, d2
         if not best:
             return
-        dmg = 100 if storm else 75
+        dmg = (160 if storm else 130) if _tl2 else (100 if storm else 75)
         targets = [best]
         if storm:
             # Lancuch: +2 najblizszych od glownego celu (razem max 3)
@@ -2379,6 +2498,35 @@ class Game:
         self._update_balloon()
         # Dron naprawczy: zadania przy uszkodzeniach budynku
         self._update_repair_drone()
+        # Deszcz meteorow (pogoda fantasy): co 1,4 s meteor spada na
+        # losowego wroga (45 dmg, male AoE 20 w promieniu 60)
+        if getattr(self, "_phenomenon", None) == "meteors":
+            self._meteor_cd -= 1
+            if self._meteor_cd <= 0:
+                self._meteor_cd = 140
+                _living = [e for e in self.enemies
+                           if not e.dying and not e.dead and not e.reached_end]
+                if _living:
+                    _t = random.choice(_living)
+                    self._meteor_fx.append([_t.x, -20, _t])
+        for _mf in self._meteor_fx[:]:
+            _tgt = _mf[2]
+            if _tgt is None or _tgt.dead or _tgt.dying or _tgt.reached_end:
+                self._meteor_fx.remove(_mf)
+                continue
+            _mf[1] += 14
+            if _mf[1] >= _tgt.y - 30:
+                self._meteor_fx.remove(_mf)
+                self.particles.burst(_tgt.x, _tgt.y - 20, (255, 170, 80),
+                                     count=14, speed=4, size=4)
+                for en in self.enemies:
+                    if en.dying or en.dead or en.reached_end:
+                        continue
+                    if (en.x - _tgt.x) ** 2 + (en.y - _tgt.y) ** 2 <= 60 ** 2:
+                        _md = 45 if en is _tgt else 20
+                        en.hit(_md)
+                        self.stats_damage += _md
+                self.damage_numbers.append([_tgt.x, _tgt.y - 50, "45", 40, (255, 190, 90)])
         # Achievements: max_gold_held = szczyt kasy (nie tylko przy zabojstwach)
         self._ach_stats["max_gold_held"] = max(self._ach_stats.get("max_gold_held", 0), self.money)
         # Achievements: sprawdzanie co 60 tickow + zapis postepu (kumulatywnie)
@@ -2495,13 +2643,15 @@ class Game:
         for tw in self.towers:
             if tw.ability_cooldown > 0:
                 tw.ability_cooldown -= 1
+                if getattr(self, "_phenomenon", None) == "aurora" and self._logic_tick % 4 == 0:
+                    tw.ability_cooldown = max(0, tw.ability_cooldown - 1)  # Zorza: odnowienie +25% szybciej
             # Cooldown ataku wiezy (tick-based, zeby speed dzialal)
             if tw.attack_cooldown > 0:
                 tw.attack_cooldown -= 1
         # Update wrogow (animacje, ruch, timery) - TU, nie w draw()!
         for en in self.enemies:
             en.update()
-            # Boss-oblegacz (easter egg fali 10): co 1 s uderza w budynek.
+            # Boss-oblegacz (easter egg fali 20): co 1 s uderza w budynek.
             # Kazde uderzenie = -1 zycie + efekty jak przy przepuszczeniu
             # wroga; jak zycia sie skoncza, budynek pada (porazka).
             if getattr(en, "_building_hit", False):
@@ -2567,21 +2717,27 @@ class Game:
                 # Gold placi +50% zlota
                 if getattr(getattr(d, 'last_hit_by', None), '_link', None) == 'gold':
                     _mult *= 1.5
-                # Bounty Board: bossowie i elity +50% zlota
+                # Bounty Board: bossowie i elity +50% zlota za poziom
                 if "bounty" in self.building_upgrades and (isinstance(d, Boss) or d.elite):
-                    _mult *= 1.5
+                    _mult *= 1 + 0.5 * self._upg_level(self.building_upgrades, "bounty")
                 # U8: RICH - +50% zlota
                 if self.wave_modifier == "rich":
                     _mult *= 1.5
-                # 7: deszcz +15% zlota (Storm Caller: +25%)
+                # 7: deszcz +15% zlota (Storm Caller: +25%, L2: +40%)
                 if self.raining:
-                    _mult *= 1.25 if "storm" in self.building_upgrades else 1.15
-                # War Treasury: +25% zlota
-                if "treasury" in self.building_upgrades:
+                    _slvl = self._upg_level(self.building_upgrades, "storm")
+                    _mult *= (1.40 if _slvl >= 2 else 1.25) if _slvl else 1.15
+                # Upiorna mgla: +25% zlota za zabojstwa
+                if getattr(self, "_phenomenon", None) == "fog":
                     _mult *= 1.25
+                # War Treasury: +25% zlota za poziom
+                if "treasury" in self.building_upgrades:
+                    _mult *= 1 + 0.25 * self._upg_level(self.building_upgrades, "treasury")
                 # Trudnosc: mnoznik zlota za zabojstwa (EASY +25%, HARD -15%)
                 _mult *= self._diff("gold_mult")
                 reward = max(1, math.ceil(d.money * _mult))
+                if getattr(self, "_phenomenon", None) == "gold_wind":
+                    reward += 3  # Zloty wiatr: +3 zlota za kazde zabojstwo
                 # self.money += reward - ODLOZONE: moneta doda zloto przy ladowaniu
                 # Trup zostaje na ziemi (ostatnia klatka animacji smierci)
                 if d.die_imgs:
@@ -2666,7 +2822,7 @@ class Game:
                 # Lucky Charm: 10% szansy na 2x obrazen krytycznych.
                 # Bez Lucky NIE ma krytow (wczesniej: stale 15% dla wszystkich
                 # + osobny rzut 10% w wiezy = podwojne krytyki do 4x).
-                is_crit = ("lucky" in self.building_upgrades) and random.random() < 0.10
+                is_crit = ("lucky" in self.building_upgrades) and random.random() < 0.10 * self._upg_level(self.building_upgrades, "lucky")
                 if is_crit:
                     self._ach_stats["crits"] = self._ach_stats.get("crits", 0) + 1
                 crit_mult = 2.0 if is_crit else 1.0
@@ -2728,6 +2884,8 @@ class Game:
                 else:
                     dmg = proj.damage * crit_mult * hit_enemy.get_damage_mult(proj.damage_type)
                     dmg *= self._tent_damage_mult(hit_enemy)
+                    if getattr(self, "_phenomenon", None) == "blood_moon":
+                        dmg *= 1.1  # Krwawy ksiezyc: wieze +10% dmg
                     if hit_enemy.hit(dmg):
                         tower_sound_3.play()
                     dmg_text = str(int(dmg)) + ("!" if is_crit else "")
@@ -2753,10 +2911,39 @@ class Game:
                         self.damage_numbers.append([_chain.x, _chain.y - 40, str(int(_cdmg)), 30, (255, 170, 80)])
                         self.stats_damage += int(_cdmg)
                         self.particles.burst(_chain.x, _chain.y - 30, (255, 150, 60), count=6, speed=3, size=3)
-                # Slow: MetalTower spowalnia trafionych.
-                # Link Metal: spowolnienie trzyma duzo dluzej (240 zamiast 90).
+                # Przebicie (Metal Tower): pocisk przechodzi na kolejnych
+                # wrogow do 130 px za trafionym, pelne obrazenia. Link
+                # Metal: +1 cel. (Blaze ma swoj lancuch 50% - wyzej.)
+                if proj.special is None and getattr(proj.source_tower, 'pierce', 1) > 1:
+                    _extra = proj.source_tower.pierce - 1
+                    if getattr(proj.source_tower, '_link', None) == 'metal':
+                        _extra += 1
+                    _anchor = hit_enemy
+                    _hit_ids = {id(hit_enemy)}
+                    for _ in range(_extra):
+                        _nxt, _nd2 = None, 130 ** 2
+                        for en in self.enemies:
+                            if en.dying or en.dead or en.reached_end or id(en) in _hit_ids:
+                                continue
+                            _d2 = (en.x - _anchor.x) ** 2 + (en.y - _anchor.y) ** 2
+                            if _d2 < _nd2:
+                                _nxt, _nd2 = en, _d2
+                        if _nxt is None:
+                            break
+                        _hit_ids.add(id(_nxt))
+                        _pdmg = proj.damage * _nxt.get_damage_mult(proj.damage_type)
+                        _pdmg *= self._tent_damage_mult(_nxt)
+                        _nxt.hit(_pdmg)
+                        _nxt.last_hit_by = proj.source_tower
+                        self.damage_numbers.append([_nxt.x, _nxt.y - 40, str(int(_pdmg)), 30, (200, 220, 235)])
+                        self.stats_damage += int(_pdmg)
+                        self.particles.burst(_nxt.x, _nxt.y - 30, (200, 220, 235), count=4, speed=2, size=2)
+                        _anchor = _nxt
+                # Slow: wieza ze slow_on_hit (Ice Tower) spowalnia trafionych.
+                # Czas z atrybutu wiezy (Ice: 150); link Ice: x1.8.
                 if proj.slow_on_hit:
-                    _slow_dur = 240 if getattr(proj.source_tower, '_link', None) == 'metal' else 90
+                    _base_slow = getattr(proj.source_tower, 'slow_duration', 90)
+                    _slow_dur = int(_base_slow * 1.8) if getattr(proj.source_tower, '_link', None) == 'ice' else _base_slow
                     hit_enemy.apply_slow(_slow_dur)
             if proj.done:
                 self.projectiles.remove(proj)
@@ -3310,6 +3497,11 @@ class Game:
         self.draw_facility()
         self.draw_combat_drone()
         self.draw_tesla_bolts()
+        # Meteory pogody fantasy: pomaranczowa smuga spadajaca na cel
+        for _mf in getattr(self, "_meteor_fx", []):
+            pygame.draw.line(self.win, (255, 150, 60),
+                             (int(_mf[0]) + 12, int(_mf[1]) - 52), (int(_mf[0]), int(_mf[1])), 4)
+            pygame.draw.circle(self.win, (255, 200, 110), (int(_mf[0]), int(_mf[1])), 5)
         self.draw_building_menu()
         self.draw_tent_menu()
         self.draw_achievement_popup()
@@ -3469,13 +3661,13 @@ class Game:
         if not self.waiting_for_clear:
             self._boss_warned = False
         
-        discount = 0.85 if "supply" in self.tent_upgrades else 1.0
+        discount = self._supply_discount()
         # Sklep: DMG na zywo (nie statyczny z init) - bazowe x Honor Banner.
         # Wczesniej sklep pokazywal stare 8/10 dla Fire/Blaze mimo rebalansu
         # (9/12) i nie uwzglednial Bannera.
         _dmgm = 1.1 if "banner" in self.tent_upgrades else 1.0
         for _btn, _cls in zip(self.menu.buttons,
-                              (WoodenTower, MetalTower, GoldenTower, FireTower, BlazeTower)):
+                              (WoodenTower, MetalTower, GoldenTower, FireTower, BlazeTower, IceTower)):
             _btn.damage = math.ceil(_cls.base_damage * _dmgm)
         self.menu.draw(self.win, self._mouse_pos(), discount=discount)
         self.draw_hud()
@@ -3483,7 +3675,7 @@ class Game:
         self._draw_bombard_zoom()
         # Menu wybranej wiezy NA SAMYM KONCU - nad wrogami, pociskami, HUDem, wszystkim
         if self.selected_tower is not None and self.selected_tower in self.towers:
-            discount = 0.85 if "supply" in self.tent_upgrades else 1.0
+            discount = self._supply_discount()
             self.selected_tower.menu.draw(self.win, self.money, discount=discount,
                                            sell_rate=self._diff("sell_mult"))
         # Menu wybranego klastra kolcow - tak samo na wierzchu
@@ -4076,16 +4268,9 @@ class Game:
 
         # 20: wrak statku - usuniety na prosbe gracza
 
-        # 22: dmiace ruiny
-        ux, uy = 950, 360
-        for i, (cxo, h) in enumerate([(-18, 46), (0, 60), (18, 38)]):
-            pygame.draw.rect(self.win, (140, 135, 125), (ux + cxo - 7, uy - h, 14, h), border_radius=3)
-            pygame.draw.rect(self.win, (110, 105, 95), (ux + cxo - 10, uy - h - 8, 20, 8), border_radius=2)
-        for i in range(2):
-            sx = ux + i * 14 - 7 + 6 * math.sin(t + i * 2)
-            sy = uy - 66 - ((t * 14 + i * 40) % 50)
-            alpha = int(70 * (1 - ((t * 14 + i * 40) % 50) / 50))
-            pygame.draw.circle(self.win, (150, 150, 150, alpha), (int(sx), int(sy)), 7)
+        # 22: "dmiace ruiny" - USUNIETE na prosbe gracza: trzy szare filary
+        # staly na (950, 360), czyli dokladnie na namiocie tipi, i wygladaly
+        # jak trzy rury z dymem wystajace z namiotu (zglaszane 4 razy).
 
         # 23: swiecace grzyby - usuniete na prosbe gracza
 
@@ -4586,15 +4771,64 @@ class Game:
         pygame.draw.line(self.win, (255, 210, 180), (wx, wy - 18), (panx, pany), 3)
         pygame.draw.circle(self.win, (80, 80, 80), (int(panx), int(pany)), 7)
 
+    def _draw_phenomenon(self):
+        """Wizualne nakladki pogody fantasy (aktywne zjawisko tej fali)."""
+        ph = getattr(self, "_phenomenon", None)
+        if not ph:
+            return
+        t = self._anim_s
+        if ph == "blood_moon":
+            # Krwawy ksiezyc: czerwona poswiata na caly ekran + wielki
+            # czerwony ksiezyc na niebie
+            ov = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            ov.fill((150, 25, 20, 55))
+            self.win.blit(ov, (0, 0))
+            pygame.draw.circle(self.win, (196, 62, 48), (850, 74), 34)
+            pygame.draw.circle(self.win, (168, 44, 38), (838, 66), 9)  # krater
+            pygame.draw.circle(self.win, (176, 50, 40), (862, 84), 6)  # krater
+        elif ph == "fog":
+            # Upiorna mgla: dryfujace, polprzezroczyste pasma na roznych
+            # wysokosciach (wolny ruch od czasu animacji - pauza je trzyma)
+            for i, (fy, sp, al) in enumerate(((300, 11, 46), (428, 8, 58), (556, 14, 42))):
+                band = pygame.Surface((self.width + 240, 96), pygame.SRCALPHA)
+                band.fill((208, 220, 232, al))
+                off = -int((t * sp + i * 97) % 240)
+                self.win.blit(band, (off, fy + int(6 * math.sin(t * 0.7 + i * 2.1))))
+        elif ph == "aurora":
+            # Zorza: falujace wstegi na niebie (zielen / fiolet / blekit)
+            for ci, (col, base_y, amp, phs) in enumerate((
+                    ((90, 255, 170), 66, 16, 0.0),
+                    ((150, 90, 255), 96, 22, 1.7),
+                    ((80, 200, 255), 126, 13, 3.4))):
+                pts = []
+                for x in range(0, self.width + 40, 40):
+                    y = base_y + amp * math.sin(x * 0.008 + t * 0.9 + phs)
+                    pts.append((x, y))
+                rib = pygame.Surface((self.width, 220), pygame.SRCALPHA)
+                pygame.draw.lines(rib, (*col, 65), False, pts, 15)
+                pygame.draw.lines(rib, (*col, 40), False,
+                                  [(x, y + 16) for (x, y) in pts], 22)
+                self.win.blit(rib, (0, 0))
+        elif ph == "gold_wind":
+            # Zloty wiatr: zlote drobiny pedzone w poprzek ekranu
+            for i in range(16):
+                gx = int((i * 211 + t * 130) % (self.width + 60)) - 30
+                gy = 110 + (i * 67) % 430 + int(10 * math.sin(t * 2 + i))
+                a = 120 + int(90 * math.sin(t * 3 + i * 1.3))
+                sp = pygame.Surface((8, 8), pygame.SRCALPHA)
+                pygame.draw.circle(sp, (255, 214, 90, max(30, min(230, a))), (4, 4), 3)
+                self.win.blit(sp, (gx, gy))
+
     def draw_day_night(self):
         """B1: Cykl dnia/nocy - przyciemnienie co 2 fale (nakladki prerenderowane)."""
         phase = (self.wave // 2) % 4  # 0=dzien, 1=zachod, 2=noc, 3=swit
         t = self._anim_s
         if phase == 0:
-            # Dzien - brak nakladki (oszczednosc)
+            # Dzien - brak nakladki, ale pogoda (tecza / blyskawice burzy)
+            # MUSI sie rysowac takze w dzien - wczesniej return pomijal
+            # blok blyskawic i burza w dzien nie miala piorunow (tylko Tesla).
             self.morning_fog = 0
-            return
-        if phase == 1:
+        elif phase == 1:
             self.win.blit(self._overlay_sunset, (0, 0))
         elif phase == 2:
             self.win.blit(self._overlay_night, (0, 0))
@@ -4607,6 +4841,9 @@ class Game:
                 fog = pygame.Surface((self.width, 200), pygame.SRCALPHA)
                 fog.fill((220, 230, 240, int(60 * (1 - self.morning_fog / 900))))
                 self.win.blit(fog, (0, 520))
+        # Pogoda fantasy: nakladki zjawisk (krwawy ksiezyc / mgla / zorza /
+        # zloty wiatr) - meteory rysuje draw() razem z piorunami Tesli
+        self._draw_phenomenon()
         # B4: tecza po deszczu (10s po koncu deszczu)
         if hasattr(self, '_rainbow_timer') and self._rainbow_timer > 0:
             self._rainbow_timer -= 1
@@ -4658,7 +4895,7 @@ class Game:
         self.towers = []
         tower_map = {"WoodenTower": WoodenTower, "MetalTower": MetalTower,
                      "GoldenTower": GoldenTower, "FireTower": FireTower,
-                     "BlazeTower": BlazeTower}
+                     "BlazeTower": BlazeTower, "IceTower": IceTower}
         for name, x, y, level in data['towers']:
             tw = tower_map[name](x, y)
             for _ in range(level - 1):
@@ -4800,10 +5037,12 @@ class Game:
         self._ach_stats["max_level_at_once"] = max(self._ach_stats.get("max_level_at_once", 0), _at_max)
 
     def _buy_upgrade(self, upg_list, owned_set, uid, kind):
-        """Generyczne kupno upgradu."""
+        """Generyczne kupno upgradu (poziom 1 albo 2)."""
         upg = next((u for u in upg_list if u["id"] == uid), None)
-        if not upg or uid in owned_set:
+        _cur = self._upg_level(owned_set, uid)
+        if not upg or _cur >= 2:
             return
+        _new_level = _cur + 1
         # Prerequisite (np. Drone Launch Facility wymaga Repair Drones)
         if upg.get("requires") and upg["requires"] not in owned_set:
             _req = next((u for u in upg_list if u["id"] == upg["requires"]), None)
@@ -4811,7 +5050,8 @@ class Game:
             self.gold_notifications.append([f"Requires {_req_name} first.", 200])
             return
         # Cavalry: tylko w endless (easter egg w normalnej grze)
-        cost = self._price(upg["cost"])
+        _base_cost = upg["cost"] if _cur == 0 else UPGRADE_L2.get(uid, {}).get("cost", upg["cost"])
+        cost = self._price(_base_cost)
         if upg.get("endless_only") and not self.endless:
             if self.money >= cost:
                 self.gold_notifications.append(
@@ -4825,7 +5065,11 @@ class Game:
             return
         self.money -= cost
         self._add_gold_spent(cost)
-        owned_set.add(uid)
+        if isinstance(owned_set, dict):
+            owned_set[uid] = _new_level
+        else:  # zgodnosc wsteczna (stary set ze wczytanego stanu)
+            owned_set.add(uid)
+            _new_level = 1
         # Achievements: liczniki upgradow (max per-run) + konkretne zakupy
         if kind == "building":
             self._ach_stats["building_upgrades"] = max(self._ach_stats.get("building_upgrades", 0), len(self.building_upgrades))
@@ -4841,22 +5085,28 @@ class Game:
                 self._ach_stats["drums_bought"] = 1
             elif uid == "medic":
                 self._ach_stats["medic_bought"] = 1
-        self.gold_notifications.append([f"{upg['name']} acquired!", 200])
-        # Natychmiastowe efekty budynku
-        if uid == "facility":
-            self._facility_rearm = 30  # first drone emerges almost immediately
+        self.gold_notifications.append(
+            [f"{upg['name']}{' II' if _new_level == 2 else ''} acquired!", 200])
+        # Natychmiastowe efekty budynku. Efekty JEDNORAZOWE (start zegara,
+        # gwarantowana burza, spawn balonu/strazy/kolcow) tylko przy L1 -
+        # kupno L2 ich nie resetuje. Walls/Drones: bonus zycia przy KAZDYM
+        # poziomie (to jest istota ich L2).
+        if uid == "facility" and _new_level == 1:
+            self._facility_rearm = self._DRONE_REARM  # pierwszy dron dokladnie po 3:00
         if uid == "docks":
             # Pomost: spowolnienie dotyczy tez wrogow juz na mapie (na pomoście)
+            _df = 0.70 if _new_level >= 2 else 0.85
             for en in self.enemies:
                 en._docks_slow = True
-        if uid == "tesla":
+                en._docks_factor = _df
+        if uid == "tesla" and _new_level == 1:
             # Tesla Coil: gwarantowana burza w nastepnej rundzie.
             # Ze Storm Caller (kupionym WCZESNIEJ) burza trwa 2 rundy -
             # ten sam mechanizm _storm_extra co zwykle burze.
             self._tesla_guaranteed_storm = 1
         if uid == "drones":
-            # Repair Drones: +1 zycie OD RAZU przy zakupie (potem +1 co 2 fale).
-            # Jak Walls: podnosi tez max (start_lives), wiec bonus zawsze dziala.
+            # Repair Drones: +1 zycie OD RAZU przy zakupie (potem +1 co 2 fale;
+            # L2: co fale). Jak Walls: podnosi tez max (start_lives).
             self._start_lives += 1
             self.lives += 1
             self.gold_notifications.append([tr("notif.life_drones"), 150])
@@ -4866,52 +5116,63 @@ class Game:
         elif uid in ("ammo", "lucky"):
             for tw in self.towers:
                 self._apply_tower_upgrade_flags(tw)
-        if uid == "balloon":
+        if uid == "balloon" and _new_level == 1:
             # Balon pojawia sie dopiero przy zakupie: startuje spoza lewej
             # krawedzi i wlatuje na mape (wczesniej latal od poczatku gry).
             self._balloon_x = -100
             self._balloon_bombs = []
             self._balloon_bomb_cd = 30
         # Natychmiastowe efekty namiotu
-        if uid == "signal":
+        if uid == "signal" and _new_level == 1:
             self._start_guard_deployment()
-        if uid == "spikes":
+        if uid == "spikes" and _new_level == 1:
             self._place_spikes()
         elif uid in ("drums", "banner", "signal", "balloon"):
             for tw in self.towers:
                 self._apply_tower_upgrade_flags(tw)
 
+    def _upg_level(self, container, uid):
+        """Poziom upgrade'a (0 = niekupiony). Kontenery upgradow to dict
+        {id: poziom}; zgodnosc wsteczna ze starymi zapisami (set = poz. 1)."""
+        if isinstance(container, dict):
+            return container.get(uid, 0)
+        return 1 if uid in container else 0
+
     def _apply_tower_upgrade_flags(self, tw):
-        """Ustawia flagi upgradow (budynek + namiot) na wiezy."""
+        """Ustawia flagi upgradow (budynek + namiot) na wiezy.
+        Efekty skalowane poziomem: Ammo +15%/poz., Signal +12%/poz.
+        (Fire/Blaze), Banner +10%/poz., Drums 0.7 / 0.5."""
         tw._fire_rate_mult = 1.0
         if "ammo" in self.building_upgrades:
-            tw._fire_rate_mult *= 1.15
-        # Signal Fire: +12% fire rate dla WSZYSTKICH wiez Fire/Blaze (globalnie,
-        # bez zasiegu ogniska). Tylko 2 typy wiez, wiec nie jest OP; stary
-        # aura 350px dla wszystkich typow usunieta (nikt nie wiedzial co daje).
+            tw._fire_rate_mult *= 1 + 0.15 * self._upg_level(self.building_upgrades, "ammo")
+        # Signal Fire: +12% fire rate za poziom dla WSZYSTKICH wiez Fire/Blaze
+        # (globalnie, bez zasiegu ogniska). Tylko 2 typy wiez, wiec nie jest OP.
         if "signal" in self.tent_upgrades and type(tw).__name__ in ("FireTower", "BlazeTower"):
-            tw._fire_rate_mult *= 1.12
+            tw._fire_rate_mult *= 1 + 0.12 * self._upg_level(self.tent_upgrades, "signal")
         tw._dmg_mult = 1.0
         if "banner" in self.tent_upgrades:
-            tw._dmg_mult *= 1.10  # Honor Banner: +10% dmg globalnie
-        tw._ability_cd_mult = (0.7 if "drums" in self.tent_upgrades else 1.0) * self._diff("ability_cd_mult")
+            tw._dmg_mult *= 1 + 0.10 * self._upg_level(self.tent_upgrades, "banner")
+        _drums = self._upg_level(self.tent_upgrades, "drums")
+        tw._ability_cd_mult = ({0: 1.0, 1: 0.7, 2: 0.5}[_drums]) * self._diff("ability_cd_mult")
 
     def draw_building_menu(self):
         """Menu upgradow budynku."""
         self._draw_upgrade_menu(tr("upg.building_title"), BUILDING_UPGRADES,
                                 self.building_upgrades, self._building_icons,
                                 "_building_menu_open", "_building_menu_buttons",
-                                "_building_menu_close_rect")
+                                "_building_menu_close_rect",
+                                icons2=self._building_icons2)
 
     def draw_tent_menu(self):
         """Menu upgradow namiotu."""
         self._draw_upgrade_menu(tr("upg.tent_title"), TENT_UPGRADES,
                                 self.tent_upgrades, self._tent_icons,
                                 "_tent_menu_open", "_tent_menu_buttons",
-                                "_tent_menu_close_rect")
+                                "_tent_menu_close_rect",
+                                icons2=self._tent_icons2)
 
     def _draw_upgrade_menu(self, title_text, upg_list, owned_set, icons,
-                           open_attr, buttons_attr, close_attr):
+                           open_attr, buttons_attr, close_attr, icons2=None):
         """Generyczne menu upgradow (2 kolumny)."""
         if not getattr(self, open_attr):
             return
@@ -4932,7 +5193,10 @@ class Game:
         for _u in sorted(upg_list, key=lambda x: x["cost"]):
             if _u.get("requires") and _u["requires"] in _by_id:
                 continue  # dziecko: pokazuje sie w slocie rodzica, nigdy osobno
-            if _u["id"] in _children and _u["id"] in owned_set:
+            if _u["id"] in _children and self._upg_level(owned_set, _u["id"]) >= 2:
+                # Rodzic na poziomie 2 (max) -> slot pokazuje dziecko (chain).
+                # Wczesniej dziecko zajmowalo slot juz po L1 rodzica, ale przy
+                # systemie poziomow rodzic musi moc dokupic wlasne L2.
                 ordered.append(_children[_u["id"]])
             else:
                 ordered.append(_u)
@@ -4970,7 +5234,12 @@ class Game:
             sx = px + 20 + col * (col_w + 20)
             sy = py + 70 + row * (row_h + gap_y)
             rect = pygame.Rect(sx, sy, col_w, row_h)
-            owned = upg["id"] in owned_set
+            # Poziomy: 0 = niekupiony, 1 = L1 (mozna dokupic L2), 2 = MAX
+            _lvl = self._upg_level(owned_set, upg["id"])
+            owned = _lvl >= 1
+            maxed = _lvl >= 2
+            _l2 = UPGRADE_L2.get(upg["id"], {})
+            _next_cost = upg["cost"] if _lvl == 0 else _l2.get("cost", upg["cost"])
             # Easter egg: cavalry ukryte w normalnej grze
             mystery = upg.get("endless_only") and not self.endless
             # Locked: wymaga innego upgradu (zapasowy mechanizm - chain pokazuje
@@ -4979,9 +5248,11 @@ class Game:
             _req_id = upg.get("requires")
             locked = bool(_req_id) and _req_id not in owned_set
             _req_name = next((tr(f"upg.{u['id']}.name", u["name"]) for u in upg_list if u["id"] == _req_id), _req_id) if _req_id else ""
-            hover = rect.collidepoint(mx, my) and not owned and not locked
+            hover = rect.collidepoint(mx, my) and not maxed and not locked
             bg_col = (35, 45, 60) if not hover else (50, 65, 90)
-            if owned:
+            if owned and not maxed:
+                bg_col = (40, 58, 42)  # L1: przygaszona zielien - jest jeszcze L2
+            if maxed:
                 bg_col = (30, 60, 40)
             if locked:
                 bg_col = (28, 30, 38)
@@ -5001,12 +5272,23 @@ class Game:
                 desc = tr("upg.mystery_desc")
                 price_txt = "???"
             else:
-                icon = icons.get(upg["id"])
+                # Ikona nastepnego poziomu: L1 -> zwykla, L2 -> zlota z "II"
+                if _lvl >= 1 and icons2 is not None:
+                    icon = icons2.get(upg["id"]) or icons.get(upg["id"])
+                else:
+                    icon = icons.get(upg["id"])
                 if icon:
                     self.win.blit(icon, (sx + 10, sy + (row_h - 56) // 2))
                 name = tr(f"upg.{upg['id']}.name", upg["name"])
-                desc = tr("upg.requires", name=_req_name) if locked else tr(f"upg.{upg['id']}.desc", upg["desc"])
-                price_txt = tr("upg.locked") if locked else f"{self._price(upg['cost']):,}"
+                if _lvl >= 1:
+                    name += " II"
+                if locked:
+                    desc = tr("upg.requires", name=_req_name)
+                elif _lvl >= 1:
+                    desc = tr(f"upg.{upg['id']}.desc2", _l2.get("desc", upg["desc"]))
+                else:
+                    desc = tr(f"upg.{upg['id']}.desc", upg["desc"])
+                price_txt = tr("upg.locked") if locked else f"{self._price(_next_cost):,}"
             # Opis: wrap po szerokosci w pikselach (nie po liczbie znakow) - nic nie ucina
             desc_col = (110, 115, 125) if mystery else (170, 180, 190)
             desc_font = self._building_desc_font
@@ -5077,22 +5359,22 @@ class Game:
                     d_lbl = desc_font.render(ln, True, desc_col)
                     self.win.blit(d_lbl, (sx + 76, block_top + name_h + 4 + li * desc_step))
             # Cena / status (prawy GORNY rog, w wierszu tytulu - nie koliduje z opisem)
-            if owned:
-                st = self.font_btn18.render(tr("upg.owned"), True, (100, 220, 130))
+            if maxed:
+                st = self.font_btn18.render(tr("upg.max"), True, (100, 220, 130))
             elif mystery:
                 st = self.font_btn18.render("???", True, (120, 130, 150))
             elif locked:
                 st = self.font_btn18.render(tr("upg.locked"), True, (130, 130, 140))
             else:
-                afford = self.money >= self._price(upg["cost"])
+                afford = self.money >= self._price(_next_cost)
                 st = self.font_btn18.render(price_txt,
                                             True, (255, 215, 100) if afford else (200, 100, 100))
             self.win.blit(st, (rect.right - st.get_width() - 12, block_top))
-            if not mystery and not locked:
+            if not mystery and not locked and not maxed:
                 # Ikona monety zamiast symbolu $ (cena w zlocie)
                 self.win.blit(self._coin_icon15,
                               (rect.right - st.get_width() - 12 - 19, block_top + 2))
-            if not owned and not locked:
+            if not maxed and not locked:
                 getattr(self, buttons_attr).append((rect, upg["id"]))
 
     def _scale_poly(self, pts, factor):
@@ -5192,7 +5474,7 @@ class Game:
                                              py + random.randint(-4, 8),
                                              (200, 230, 255), count=4, speed=1.2,
                                              life=16, size=3, gravity=0.05)
-                if d["work"] >= 300:  # 3 s pracy = punkt naprawiony
+                if d["work"] >= (180 if self._upg_level(self.building_upgrades, "drones") >= 2 else 300):  # 3 s pracy (L2: 1,8 s) = punkt naprawiony
                     self._drone_fixed.add(d["target"])
                     d["target"] = None
                     d["work"] = 0
@@ -5260,6 +5542,9 @@ class Game:
 
     def _spawn_combat_drone(self):
         """Drone emerges from the facility box."""
+        # Start drona = poczatek kolejnego 3-minutowego cyklu
+        _rearm = 10800 if self._upg_level(self.building_upgrades, "facility") >= 2 else self._DRONE_REARM
+        self._facility_rearm = _rearm
         fx, fy = self._FACILITY_POS
         self._combat_drone = {
             "x": float(fx), "y": float(fy), "state": "emerge", "emerge_t": 40,
@@ -5333,11 +5618,16 @@ class Game:
         if "facility" not in self.building_upgrades:
             return
         d = self._combat_drone
+        # Harmonogram kamikadze: zegar 3:00 chodzi ZAWSZE (tez podczas lotu
+        # drona), a reset jest przy STARCIE drona - dzieki temu drony leca
+        # dokladnie co 3 minuty od zakupu: 3:00, 6:00, 9:00... Wczesniej
+        # odliczanie szlo tylko bez aktywnego drona, wiec przerwy byly
+        # 3 min + czas lotu, a licznik nie zawsze pokazywal 3:00.
+        if self._facility_rearm > 0:
+            self._facility_rearm -= 1
         if d is None:
-            if self._facility_rearm > 0:
-                self._facility_rearm -= 1
-                if self._facility_rearm <= 0:
-                    self._spawn_combat_drone()
+            if self._facility_rearm <= 0:
+                self._spawn_combat_drone()
             return
         d["spin"] += 0.6
         if d["flash"] > 0:
@@ -5422,14 +5712,15 @@ class Game:
                         sound_minigun.play()
                     except Exception:
                         pass
+                    _gdmg = int(self._DRONE_MINIGUN * 1.5) if self._upg_level(self.building_upgrades, "facility") >= 2 else self._DRONE_MINIGUN
                     try:
-                        tgt.hit(self._DRONE_MINIGUN)
+                        tgt.hit(_gdmg)
                     except Exception:
-                        tgt.health -= self._DRONE_MINIGUN
+                        tgt.health -= _gdmg
                         if tgt.health <= 0 and not tgt.dying:
                             tgt.dying = True
-                    self.stats_damage += self._DRONE_MINIGUN
-                    self.damage_numbers.append([tgt.x, tgt.y - 40, str(self._DRONE_MINIGUN), 40])
+                    self.stats_damage += _gdmg
+                    self.damage_numbers.append([tgt.x, tgt.y - 40, str(_gdmg), 40])
             # Wyrzutnia rakiet: rzadki strzal obszarowy (co ~20 s)
             d["rocket_cd"] -= 1
             if d["rocket_cd"] <= 0:
@@ -5536,16 +5827,18 @@ class Game:
             if getattr(en, "dying", False) or getattr(en, "dead", False) or getattr(en, "reached_end", False):
                 continue
             if (en.x - x) ** 2 + (en.y - y) ** 2 <= self._DRONE_KAMIKAZE_R ** 2:
+                _kdmg = 600 if self._upg_level(self.building_upgrades, "facility") >= 2 else self._DRONE_KAMIKAZE_DMG
                 try:
-                    en.hit(self._DRONE_KAMIKAZE_DMG)
+                    en.hit(_kdmg)
                 except Exception:
-                    en.health -= self._DRONE_KAMIKAZE_DMG
+                    en.health -= _kdmg
                     if en.health <= 0 and not en.dying:
                         en.dying = True
-                self.stats_damage += self._DRONE_KAMIKAZE_DMG
-                self.damage_numbers.append([en.x, en.y - 40, str(self._DRONE_KAMIKAZE_DMG), 60])
+                self.stats_damage += _kdmg
+                self.damage_numbers.append([en.x, en.y - 40, str(_kdmg), 60])
         self._combat_drone = None
-        self._facility_rearm = self._DRONE_REARM
+        # Bez resetu zegara przy smierci: cykl 3:00 liczy sie od STARTU
+        # drona (reset w _spawn_combat_drone), nie od jego kamikadze.
         self.gold_notifications.append([tr("notif.drone_down"), 200])
 
     def draw_facility(self):
@@ -5813,12 +6106,16 @@ class Game:
             pygame.draw.circle(surf, (150, 220, 255, 60), (rg, rg), rg, 2)
             win.blit(surf, (mx - rg, my - rg))
 
+    def _supply_discount(self):
+        """Mnoznik ceny z Supply Lines: 1.0 / 0.85 (L1) / 0.75 (L2)."""
+        return {0: 1.0, 1: 0.85, 2: 0.75}[self._upg_level(self.tent_upgrades, "supply")]
+
     def shop_price(self, tower_name):
         """Cena wiezy w sklepie. Mapuje nazwe klasy (woodenTower) na przycisk (t1).
-        Supply Lines: -15%. Trudnosc: juz w cenie przycisku (skalowana przy starcie)."""
+        Supply Lines: -15% (L2: -25%). Trudnosc: juz w cenie przycisku (skalowana przy starcie)."""
         base = self.menu.get_item_cost(tower_shop_names.get(tower_name, tower_name))
         if "supply" in self.tent_upgrades:
-            base = int(base * 0.85)
+            base = int(base * self._supply_discount())
         return base
 
     def shop_price_for_button(self, btn_name):
@@ -5847,14 +6144,40 @@ class Game:
         return False
 
     def is_valid_placement(self, x, y):
-        """R4: Czy mozna postawic wieze w (x, y)."""
-        # Poza mapa / na menu bocznym
-        if x < 40 or x > self.width - 200 or y < 40 or y > self.height - 40:
+        """Czy mozna postawic wieze w (x, y). NOWY MODEL (Daniel): wieze
+        mozna stawiac na calej planszy, a nie tylko w recznie rysowanych
+        strefach (przez strefy dobre miejsca na trawie odrzucalo).
+        Blokady: marginesy/HUD, panel sklepu (tam gdzie aktualnie stoi),
+        budynek, namiot, woda i klif (z pikseli tla), droga (odleglosc
+        od sciezki < 38) i inne wieze (< 52 px)."""
+        if x < 30 or x > self.width - 30 or y < 48 or y > self.height - 24:
             return False
-        # Tylko na trawie
-        if not self._is_grass(x, y):
+        # Panel sklepu (przeciggalny - blokuje tylko swoj aktualny prostokat)
+        try:
+            if self.menu.get_rect().inflate(12, 12).collidepoint(x, y):
+                return False
+        except Exception:
+            pass
+        # Budynek (fasada, dach z Tesla/facility, podstawa)
+        if 115 < x < 485 and 170 < y < 400:
             return False
-        # Na drodze (aktualna sciezka wroga z enemies/enemy.py)
+        # Namiot
+        try:
+            if self._tent_rect.inflate(10, 10).collidepoint(x, y):
+                return False
+        except Exception:
+            pass
+        # Piksel tla: woda (niebieska) albo klif/skaly/pomost (cieply braz
+        # w dolnej czesci mapy) - nie stawiamy wiez na wodzie ani skale
+        try:
+            r, g, b = self.bg.get_at((int(x), int(y)))[:3]
+            if b > g + 12 and b >= r:
+                return False
+            if y > 430 and r > g + 45 and g > b + 10:
+                return False
+        except Exception:
+            pass
+        # Droga (aktualna sciezka wroga z enemies/enemy.py)
         path = [
                      (322, 658), (425, 630), (505, 591), (588, 581),
                      (696, 570), (792, 558), (890, 546), (953, 536),
@@ -5864,7 +6187,6 @@ class Game:
         for i in range(len(path) - 1):
             x1, y1 = path[i]
             x2, y2 = path[i + 1]
-            # Odleglosc punktu od odcinka
             dx, dy = x2 - x1, y2 - y1
             l2 = dx*dx + dy*dy
             if l2 == 0:
@@ -5873,11 +6195,11 @@ class Game:
                 t = max(0, min(1, ((x - x1)*dx + (y - y1)*dy) / l2))
                 px, py = x1 + t*dx, y1 + t*dy
                 dist = math.hypot(x - px, y - py)
-            if dist < 50:
+            if dist < 38:
                 return False
         # Na innej wiezy
         for tw in self.towers:
-            if math.hypot(x - tw.x, y - tw.y) < 60:
+            if math.hypot(x - tw.x, y - tw.y) < 52:
                 return False
         return True
 
@@ -5996,8 +6318,8 @@ class Game:
                 x_off += 36 + cnt_label.get_width() + 14
     def add_tower(self, name):
         x, y = self._mouse_pos()
-        name_list = ["t1", "t2", "t3", "t4", "t5"]
-        object_list = [WoodenTower(x,y), MetalTower(x,y), GoldenTower(x,y), FireTower(x,y), BlazeTower(x,y)]
+        name_list = ["t1", "t2", "t3", "t4", "t5", "t6"]
+        object_list = [WoodenTower(x,y), MetalTower(x,y), GoldenTower(x,y), FireTower(x,y), BlazeTower(x,y), IceTower(x,y)]
         
         try:
             obj = object_list[name_list.index(name)]

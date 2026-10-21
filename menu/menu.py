@@ -79,6 +79,7 @@ class Menu():
             "GoldenTower": (212, 175, 55),
             "FireTower": (220, 80, 40),
             "BlazeTower": (180, 60, 200),
+            "IceTower": (110, 200, 245),
             "SpikeCluster": (139, 90, 43),
         }
         holo = colors.get(tname, (0, 255, 204))
@@ -272,7 +273,7 @@ class VerticalMenu(Menu):
     def add_btn(self, img, name, cost, damage=0):
         self.items += 1
         btn_x = self.x - 20
-        btn_y = self.y -60 + (self.items-1)*75
+        btn_y = self.y - 60 + (self.items-1)*66
         self.buttons.append(VerticalButton(btn_x, btn_y, img, name, cost, damage))
 
     def get_item_cost(self, name):
@@ -283,8 +284,8 @@ class VerticalMenu(Menu):
 
     def get_rect(self):
         """Prostokat panelu sklepu (do przecigania i hover)."""
-        panel_w = 200
-        panel_h = len(self.buttons) * 78 + 50
+        panel_w = 184
+        panel_h = len(self.buttons) * 66 + 46
         return pygame.Rect(self.x - panel_w // 2, self.y - 140, panel_w, panel_h)
 
     def draw(self, win, mouse_pos=None, discount=1.0):
@@ -293,8 +294,8 @@ class VerticalMenu(Menu):
         # mouse_pos w wspolrzednych gry (po przeskalowaniu) - do hovera
         if mouse_pos is None:
             mouse_pos = pygame.mouse.get_pos()
-        panel_w = 200
-        panel_h = len(self.buttons) * 78 + 50
+        panel_w = 184
+        panel_h = len(self.buttons) * 66 + 46
         px = self.x - panel_w // 2
         py = self.y - 140
 
@@ -316,53 +317,52 @@ class VerticalMenu(Menu):
         surf.blit(ht, (panel_w//2 - ht.get_width()//2, 10))
         
         for idx, item in enumerate(self.buttons):
-            bx = px + 15
-            by = py + 42 + idx * 78
+            bx = px + 12
+            by = py + 38 + idx * 66
             # Tlo przycisku
-            btn_bg = pygame.Surface((panel_w - 30, 68), pygame.SRCALPHA)
+            btn_bg = pygame.Surface((panel_w - 24, 58), pygame.SRCALPHA)
             # Hover efekt
-            hovering = bx <= mx <= bx + panel_w - 30 and by <= my <= by + 68
+            hovering = bx <= mx <= bx + panel_w - 24 and by <= my <= by + 58
             if hovering:
                 pygame.draw.rect(btn_bg, (35, 50, 75, 255), btn_bg.get_rect(), border_radius=10)
             else:
                 pygame.draw.rect(btn_bg, (22, 32, 50, 255), btn_bg.get_rect(), border_radius=10)
             surf.blit(btn_bg, (bx - px, by - py))
-            # Ikona wiezy
-            icon = pygame.transform.scale(item.img, (44, 44))
-            surf.blit(icon, (bx + 8 - px, by + 12 - py))
+            # Ikona: grafika wiezy z pociskiem (kompozyt 46x46, bez skalowania)
+            surf.blit(item.img, (bx + 6 - px, by + 6 - py))
             # Schludny layout: nazwa / obrazenia / cena - wszystko wyrownane
             nfont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
             dfont = pygame.font.SysFont("segoe ui, calibri, arial", 12)
             pfont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
             names = [_t("tower.wood"), _t("tower.metal"), _t("tower.gold"),
-                     _t("tower.fire"), _t("tower.blaze")]
-            tx = bx + 60 - px  # wspolna lewa krawedz tekstu
+                     _t("tower.fire"), _t("tower.blaze"), _t("tower.ice")]
+            tx = bx + 58 - px  # wspolna lewa krawedz tekstu
             nm = nfont.render(names[idx] if idx < len(names) else item.name, True, (230, 235, 240))
-            surf.blit(nm, (tx, by + 6 - py))
+            surf.blit(nm, (tx, by + 4 - py))
             dm = dfont.render(_t("shop.dmg", dmg=item.damage), True, (170, 180, 190))
-            surf.blit(dm, (tx, by + 26 - py))
+            surf.blit(dm, (tx, by + 22 - py))
             # Cena: z discountem pokazuje przekreslona oryginalna + nowa (Costco style)
             if discount < 1.0:
                 orig = item.cost
                 new_price = int(orig * discount)
                 # Ikona monety + przekreslona oryginalna (szara)
-                surf.blit(_coin_icon, (tx, by + 45 - py))
+                surf.blit(_coin_icon, (tx, by + 39 - py))
                 pt_orig = pfont.render(f"{orig}", True, (120, 120, 120))
-                surf.blit(pt_orig, (tx + 19, by + 44 - py))
+                surf.blit(pt_orig, (tx + 19, by + 38 - py))
                 # Linia przekreslenia
-                lx1, ly = tx + 19, by + 44 - py + pt_orig.get_height() // 2
+                lx1, ly = tx + 19, by + 38 - py + pt_orig.get_height() // 2
                 lx2 = tx + 19 + pt_orig.get_width()
                 pygame.draw.line(surf, (200, 80, 80), (lx1, ly), (lx2, ly), 2)
                 # Nowa cena (zolota, obok)
                 pt_new = pfont.render(f"{new_price}", True, (255, 215, 0))
-                surf.blit(pt_new, (tx + 19 + pt_orig.get_width() + 8, by + 44 - py))
+                surf.blit(pt_new, (tx + 19 + pt_orig.get_width() + 8, by + 38 - py))
             else:
-                surf.blit(_coin_icon, (tx, by + 45 - py))
+                surf.blit(_coin_icon, (tx, by + 39 - py))
                 pt = pfont.render(f"{item.cost}", True, (255, 215, 0))
-                surf.blit(pt, (tx + 19, by + 44 - py))
+                surf.blit(pt, (tx + 19, by + 38 - py))
             # Aktualizuj pozycje klikalna (wspolrzedne ekranu)
             item.x, item.y = bx, by
-            item.width, item.height = panel_w - 30, 68
+            item.width, item.height = panel_w - 24, 58
         # Naloz caly panel z przezroczystoscia
         if alpha < 255:
             surf.set_alpha(alpha)

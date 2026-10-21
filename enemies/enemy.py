@@ -346,7 +346,7 @@ class Enemy:
        # y 600-720 - drewniany pomost przy statku). Po zejsciu z pomostu
        # predkosc wraca do normalnej (flaga _docks_slow z gen_enemies).
        if getattr(self, "_docks_slow", False) and _PIER_RECT[0] <= self.x < _PIER_RECT[0] + _PIER_RECT[2] and _PIER_RECT[1] <= self.y < _PIER_RECT[1] + _PIER_RECT[3]:
-           current_vel *= 0.85
+           current_vel *= getattr(self, "_docks_factor", 0.85)  # Docks L1: 0.85, L2: 0.70
        step_len = current_vel / 3.0
        dist_to_target = math.sqrt((x2 - self.x)**2 + (y2 - self.y)**2)
        step_len = min(step_len, dist_to_target)
@@ -371,12 +371,13 @@ class Enemy:
            else:
                self.path_pos += 1
        
-    def hit(self, damage):
+    def hit(self, damage, flash=True):
         if self.dying or self.dead:
             return False
         self.health -= damage
-        self.hurt_timer = 6
-        self.flash_timer = 4  # V1: blysk przy trafieniu
+        if flash:
+            self.hurt_timer = 6
+            self.flash_timer = 4  # V1: blysk przy trafieniu
         if self.health <= 0:
             self.dying = True
             self.die_count = 0

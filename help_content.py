@@ -5,9 +5,9 @@ z klas wiez w momencie rysowania - zawsze zgodne z balansem gry, bez
 recznego przepisywania po kazdej zmianie liczb."""
 import i18n
 from towers.woodenTower import (WoodenTower, MetalTower, GoldenTower,
-                                FireTower, BlazeTower)
+                                FireTower, BlazeTower, IceTower)
 
-_CLASSES = [WoodenTower, MetalTower, GoldenTower, FireTower, BlazeTower]
+_CLASSES = [WoodenTower, MetalTower, GoldenTower, FireTower, BlazeTower, IceTower]
 _RATE = 100 / 60.0  # strzalow na sekunde (cooldown 60 tickow przy 100 Hz)
 
 _ROLE_KEYS = {
@@ -16,6 +16,7 @@ _ROLE_KEYS = {
     "GoldenTower": "help.role.gold",
     "FireTower": "help.role.fire",
     "BlazeTower": "help.role.blaze",
+    "IceTower": "help.role.ice",
 }
 _SHORT = {
     "WoodenTower": "Wood",
@@ -23,6 +24,7 @@ _SHORT = {
     "GoldenTower": "Gold",
     "FireTower": "Fire",
     "BlazeTower": "Blaze",
+    "IceTower": "Ice",
 }
 _LINK_KEYS = {
     "WoodenTower": "link.wood",
@@ -30,6 +32,7 @@ _LINK_KEYS = {
     "GoldenTower": "link.gold",
     "FireTower": "link.fire",
     "BlazeTower": "link.blaze",
+    "IceTower": "link.ice",
 }
 
 
@@ -85,6 +88,7 @@ def pages():
         (t("help.e4"), "text"),
         (t("help.e5"), "text"),
         (t("help.e6"), "text"),
+        (t("help.e8"), "text"),
         ("", "text"),
         (t("help.e7"), "dim"),
     ]

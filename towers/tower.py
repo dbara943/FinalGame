@@ -164,7 +164,7 @@ class Tower:
 
     _LINK_KEYS = {"WoodenTower": "wood", "MetalTower": "metal",
                   "GoldenTower": "gold", "FireTower": "fire",
-                  "BlazeTower": "blaze"}
+                  "BlazeTower": "blaze", "IceTower": "ice"}
 
     def get_link_type(self, towers):
         """Link sasiada: wieza tego samego typu w promieniu 100px ->

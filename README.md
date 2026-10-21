@@ -10,24 +10,27 @@ Built with **Python** and **Pygame**. Cartoon-style graphics, dynamic gameplay, 
 
 ## Gameplay
 
-Survive **10 waves** of increasingly dangerous enemies. Each wave arrives by ship — watch it sail in, dock, and disembark its crew of monsters. They follow the dirt path to your glass research facility. Stop them with towers, or lose lives with every breach.
+Survive **20 waves** of increasingly dangerous enemies. Each wave arrives by ship — watch it sail in, dock, and disembark its crew of monsters. They follow the dirt path to your glass research facility. Stop them with towers, or lose lives with every breach.
 
 - **Lives:** Enemies that reach the facility cost you a life and shatter its glass walls
 - **Economy:** Earn gold for every kill. Golden (elite) enemies are tougher but worth 5× more
-- **Victory:** Survive all 10 waves, including the final boss
+- **Victory:** Survive all 20 waves, including the final boss (bosses sail in on waves 4, 8, 12, 16 and 20)
+- **Free placement:** towers can be built anywhere on the island — the placement preview (green/red) blocks only the water, the cliff, the road, the facility, the tent, the shop panel and other towers
+- **Fantasy weather:** on top of rain, a wave can bring a Blood Moon (faster enemies, stronger towers), Ghostly Fog (+25% gold), an Aurora (abilities recharge faster), a Meteor Shower or a Golden Wind (+3 gold per kill)
 - **Endless mode:** After victory, keep going — enemies scale +5% HP per wave, bigger gold bonuses per wave. Wave composition shifts toward the strongest enemy types the deeper you go (the golden-elite chance stays at the default 8%, same as the campaign), so late endless is far more dangerous
-- **Endless jump (unlocks in endless mode):** once a run reaches endless (wave 11+), the pause menu (ESC) gains a wave field + JUMP button that teleports your current run to ANY wave 1–999 — forward or back (even to wave 1, which restarts the campaign with your current towers, money, lives and upgrades): the field is cleared (enemies, projectiles, pending bosses), the ship sails in again, and the jumped wave pays NO round-start gold (just that once — beating it makes the next wave pay normally). Enter 10 for an Easter egg: a rematch against the full final wave and a boss with 20× HP that BESIEGES your building — it stays at the gate attacking once per second, each hit costing 1 life, until you kill it (a guard can still sacrifice itself to block one hit). A new run hides the jump again until endless is reached
+- **Endless jump (unlocks in endless mode):** once a run reaches endless (wave 21+), the pause menu (ESC) gains a wave field + JUMP button that teleports your current run to ANY wave 1–999 — forward or back (even to wave 1, which restarts the campaign with your current towers, money, lives and upgrades): the field is cleared (enemies, projectiles, pending bosses), the ship sails in again, and the jumped wave pays NO round-start gold (just that once — beating it makes the next wave pay normally). Enter 20 for an Easter egg: a rematch against the final boss with 20× HP that BESIEGES your building — it stays at the gate attacking once per second, each hit costing 1 life, until you kill it (a guard can still sacrifice itself to block one hit). A new run hides the jump again until endless is reached
 
 ---
 
 ## Towers
 
-Five unique towers, each with 3 levels, distinct projectiles, and a special ability:
+Six unique towers, each with 3 levels, distinct projectiles, and a special ability:
 
 | Tower | Cost | Damage | Ability |
 |-------|------|--------|---------|
 | Wood Tower | $100 | 1 | **Rapid Fire** — temporary fire-rate boost |
-| Metal Tower | $500 | 3 | **Frost Nova** — slows all enemies in range |
+| Metal Tower | $500 | 3 | **Barrage** — volley at up to 6 enemies; its shots pierce to a nearby second enemy |
+| Ice Tower | $650 | 2 | **Frost Nova** — slows all enemies in range; every hit slows |
 | Gold Tower | $750 | 5 | **Golden Touch** — marks enemies for double gold |
 | Fire Tower | $1,000 | 9 | **Meteor** — devastating area strike |
 | Blaze Tower | $2,000 | 12 | **Armageddon** — massive screen-wide damage |
@@ -45,10 +48,10 @@ Upgrades add damage per level by tier (Wood +2, Metal +3, Gold +4, Fire +6, Blaz
 
 ## Clickable Buildings
 
-**Glass Research Facility** (click it!) — 10 one-time upgrades per run, sorted by price:
+**Glass Research Facility** (click it!) — 11 upgrades per run, sorted by price; every upgrade has a **second level** (gold II icon) that strengthens its effect:
 War Treasury $1,200, Bounty Board $1,500, Lucky Charm $2,000, Reinforced Docks $2,500, Storm Caller $3,000, Reinforced Walls $3,500, Ammunition Depot $4,000, Repair Drones $5,000 (+1 max life right away, then heals +1 life every 2 waves, up to max), Tesla Coil $6,500, and the secret **Call the Cavalry** $10,000 (endless only). Buying Repair Drones turns its slot into the **Drone Launch Facility** $8,000 (same slot, same icon — no locked/blacked-out entry).
 
-**War Tent** (click it!) — 10 one-time upgrades per run, sorted by price:
+**War Tent** (click it!) — 10 upgrades per run, sorted by price; every upgrade also has a **second level** (gold II icon):
 Field Medic $1,500 (barrage destroy chance 50% → 25%), Scout Reports $2,000, Supply Lines $2,500 (towers 15% cheaper), War Drums $3,000, Signal Fire $3,500 (campfire grows 2×, all Fire/Blaze towers shoot 12% faster, dancers guard with bows), Guerrilla Training $4,000, Honor Banner $4,000 (+10% damage, no flag visual), Spike Barricade $4,500, Recon Balloon $5,500, Sabotage $6,000.
 
 ---

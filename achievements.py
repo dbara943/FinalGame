@@ -30,7 +30,7 @@ ACHIEVEMENTS = [
      lambda s: s.get("max_wave", 0) >= 5),
     ("veteran", "Veteran", "Reach wave 8.", "waves",
      lambda s: s.get("max_wave", 0) >= 8),
-    ("champion", "Champion", "Win the game (wave 10).", "victory",
+    ("champion", "Champion", "Win the game (wave 20).", "victory",
      lambda s: s.get("wins", 0) >= 1),
     ("flawless", "Flawless", "Complete a wave without losing lives.", "defense",
      lambda s: s.get("flawless_waves", 0) >= 1),
