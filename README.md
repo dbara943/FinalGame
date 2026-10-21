@@ -16,7 +16,7 @@ Survive **10 waves** of increasingly dangerous enemies. Each wave arrives by shi
 - **Economy:** Earn gold for every kill. Golden (elite) enemies are tougher but worth 5× more
 - **Victory:** Survive all 10 waves, including the final boss
 - **Endless mode:** After victory, keep going — enemies scale +5% HP per wave, bigger gold bonuses per wave. Wave composition shifts toward the strongest enemy types the deeper you go (the golden-elite chance stays at the default 8%, same as the campaign), so late endless is far more dangerous
-- **Endless jump (unlocks in endless mode):** once a run reaches endless (wave 11+), the pause menu (ESC) gains a wave field + JUMP button that teleports your current run: the field is cleared (enemies, projectiles, pending bosses), but your towers, money, lives and upgrades stay, the ship sails in again, and the jumped wave pays NO round-start gold (just that once — beating it makes the next wave pay normally). Enter 10 for an Easter egg: a rematch against the final boss with 10× HP. A new run hides the jump again until endless is reached
+- **Endless jump (unlocks in endless mode):** once a run reaches endless (wave 11+), the pause menu (ESC) gains a wave field + JUMP button that teleports your current run to ANY wave 1–999 — forward or back (even to wave 1, which restarts the campaign with your current towers, money, lives and upgrades): the field is cleared (enemies, projectiles, pending bosses), the ship sails in again, and the jumped wave pays NO round-start gold (just that once — beating it makes the next wave pay normally). Enter 10 for an Easter egg: a rematch against the full final wave and a boss with 20× HP that BESIEGES your building — it stays at the gate attacking once per second, each hit costing 1 life, until you kill it (a guard can still sacrifice itself to block one hit). A new run hides the jump again until endless is reached
 
 ---
 
@@ -92,7 +92,7 @@ Nine enemy types with full walk, hurt, and death animations:
 ## Features
 
 - **Animated pirate ship** — sails in from alternating sides with pirate fanfare, docks, disembarks enemies, and departs; lively animations (wave bobbing, rotation, wake trail, bow splashes, glowing demonic rune)
-- **Cannon barrage** — on waves 4 and 8 (with enough lives), the ship sails to a bombardment position and fires cannonballs at your towers; during the barrage all menus close so the cinematic is visible (ESC still opens pause)
+- **Cannon barrage** — on waves 4 and 8 (with enough lives), the ship sails to a bombardment position and fires cannonballs at 2 of your towers; in endless mode it targets 1 tower on every wave; during the barrage all menus close so the cinematic is visible (ESC still opens pause)
 - **Call the Cavalry** — an allied ship intercepts the pirate ship, cripples it, then bombards enemies in endless mode; once the chase starts, input is no longer blocked
 - **50 achievements** — tracked across runs with unlock popups, persistent save, and a gallery in the main menu
 - **7 languages** — full UI localization (EN / PL / DE / ES / FR / PT-BR / RU) with a flag picker in the main menu; the choice persists between launches
@@ -104,7 +104,7 @@ Nine enemy types with full walk, hurt, and death animations:
 - **Spike Barricade** — spikes on the road deal 8 damage per second and can kill enemies on their own (damage is checked against the enemy sprite's hitbox, and kills pay out a flying coin like tower kills); each of the 3 spike clusters is clickable like a tower, upgradeable by 2 levels (8/14/22 DPS, prices scaled by difficulty) and sellable
 - **Gold on coin landing** — kill gold is added only when the flying gold coin lands in the counter, not the moment the enemy dies
 - **Tesla Coil** — visible coil on the facility roof; zaps start at the electrode ball and never target enemies still on the pier. In clear weather it fires every 1.8s: 75 damage, range 400, single target. During a storm there is no timed fire — lightning strikes the coil (bolt from the sky, then the charge travels down the coil, roughly every 2.5s at random), and only then does it discharge: 100 damage, range 700, up to 3 targets (main + 2 chained). Buying the coil guarantees a storm next round (2 rounds if Storm Caller was bought earlier)
-- **Repair drone** — flies above the Tesla Coil (never clipped by it)
+- **Repair drone** — does real repair work on the building: it flies to the nearest visible damage (jagged cracks, broken windows, a burning window), welds cracks and panes or sprays foam on the fire for ~3 s each, and the damage disappears until the building is hit again; with nothing to fix it orbits the building. Building damage itself comes in 3 stages as lives fall: cracks → broken windows → smoke, rubble and a burning window
 - **Drone Launch Facility** — flat rectangular dock on the building roof; launches a combat drone that zigzags across the map at a calmer speed, keeps its distance from enemies while strafing them with an animated minigun (8 dmg/shot, with sound), and fires a rocket launcher every ~20s (150 splash damage in 120px, with launch + explosion sounds). The rocket launcher sits vertical when idle and swings to aim at the target while firing. Then kamikazes into a random enemy (400 splash in 140px). Lifetime 2–4 min, then a 3-min rearm. The dock shows only the countdown: KAMIKAZE while the drone flies, NEXT DRONE while rearming. The drone model shows both weapons: minigun on the left, rocket launcher on the right
 - **Tower upgrade menu** — vivid hologram buttons and brighter text (stronger fill, thicker borders, lightened tower colors)
 - **Particle effects** — muzzle flashes, explosions, damage numbers, glass shards
@@ -140,7 +140,7 @@ Nine enemy types with full walk, hurt, and death animations:
 | **Ctrl+Z** | Undo last tower placement / upgrade |
 
 ### Pause Menu (ESC)
-- Resume / Restart Game / Forfeit Run / How to Play
+- Resume / Restart Game / Forfeit Run / How to Play (3 pages: basics & controls, a tower table with damage/DPS/upgrade costs/links computed live from the game data, and endless-mode rules; arrow keys or A/D turn pages)
 - Music and Sound Effects toggles (with checkmarks)
 - Fullscreen toggle
 - Game speed: 1× / 2× / 3×

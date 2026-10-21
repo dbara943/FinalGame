@@ -37,8 +37,9 @@ from towers.woodenTower import (WoodenTower, MetalTower, GoldenTower, FireTower,
                                 _gold_tint,
                                 sound_1 as tower_sound_1, sound_2 as tower_sound_2,
                                 sound_3 as tower_sound_3, sound_4 as tower_sound_4,
-                                sound_5 as tower_sound_5)
-from ships.ship import Ship
+                                sound_5 as tower_sound_5,
+                                shoot_snd as tower_shoot_snd)
+from ships.ship import Ship, pirate_snd
 from ships.ally_ship import AllyShip
 from menu.menu import VerticalMenu, Menu
 from towers.tower import menu_bg as _tower_menu_bg, upgrade_btn as _upgrade_btn, sell_btn as _sell_btn
@@ -236,6 +237,9 @@ class Game:
         self._fullscreen = True
         self.show_menu = False  # menu ESC
         self._show_help = False  # pod-ekran "How to Play"
+        self._help_page = 0  # strona pomocy (0=podstawy, 1=wieze, 2=endless)
+        self._help_prev_rect = None
+        self._help_next_rect = None
         self._forfeit = False  # rezygnacja z gry (ESC -> Forfeit Run)
         self._menu_buttons = []  # [rect, action] - budowane w draw_menu
         # Skok do fali endless z menu pauzy: pole tekstowe + przycisk
@@ -375,6 +379,11 @@ class Game:
         self._tombstones = []  # R.I.P. stones for fallen guards (reset each run)
         # Dron naprawczy (wizualny)
         self._drone_angle = 0.0
+        # Dron naprawczy: punkty uszkodzen budynku, ktore juz naprawil
+        # (czyszcone przy utracie zycia - uszkodzenia wracaja), oraz stan
+        # jego pracy (pozycja / cel / postep zadania).
+        self._drone_fixed = set()
+        self._repair_drone = {"x": 260.0, "y": 200.0, "target": None, "work": 0}
         # Tesla Coil
         self._tesla_cooldown = 0
         # Combat drone (Drone Launch Facility) - 100Hz logic ticks
@@ -417,6 +426,10 @@ class Game:
         self._endless_rain_left = 0  # pozostale fale deszczu w endless (gwarantowana burza)
         self._clear_snap = None  # snapshot wrogow dla failsafe'a czyszczenia planszy
         self.raining = False  # 7: deszcz
+        try:
+            sound_rain.stop()  # zadna zapetlona sciana deszczu z poprzedniej gry
+        except Exception:
+            pass
         self.raindrops = []  # krople deszczu [(x, y, speed)]
         self.wave_report = None  # 9: raport po fali (tekst, timer)
         self._wave_kills_start = 0
@@ -474,7 +487,11 @@ class Game:
                       tower_sound_4, tower_sound_5, sound_win, sound_lose, sound_roar,
                       sound_levelup, sound_horn, sound_rain, sound_gull, sound_fanfare,
                       sound_minigun, sound_rocket, sound_rocket_boom,
-                      *shoot_sounds.values()):
+                      *shoot_sounds.values(),
+                      # Faktyczne dzwieki strzalow wiez zyja w woodenTower
+                      # (shoot_snd) - bez nich mute nie lapal strzalow.
+                      *tower_shoot_snd.values(),
+                      *([pirate_snd] if pirate_snd is not None else [])):
                 s.set_volume(0)
         self.bg = pygame.image.load(os.path.join("images", "bg_noship.png"))
         self.bg = pygame.transform.scale(self.bg, (self.width, self.height))
@@ -611,13 +628,14 @@ class Game:
                 self.waiting_for_clear = True
                 self._clear_timer = 0
                 # Bombardowanie: fala 4 (index 3) przy max zyciach, fala 8 (index 7) przy >polowy zyc
-                # Endless: CO FALE w 2 losowe wieze, bez warunkow zyciowych
+                # Liczba celow (Daniel 2026-10-21): kampania 2 wieze,
+                # endless CO FALE tylko 1 wieza, bez warunkow zyciowych
                 wave_num = self.wave + 1
                 should_bombard = False
-                bombard_targets = 3
+                bombard_targets = 2
                 if self.endless:
                     should_bombard = True
-                    bombard_targets = 2
+                    bombard_targets = 1
                 elif wave_num == 4 and self.lives >= self._start_lives:
                     should_bombard = True
                 elif wave_num == 8 and self.lives > self._start_lives // 2:
@@ -719,8 +737,12 @@ class Game:
         fala NIE placi bonusu startowego (tylko ten jeden raz); po jej
         ukonczeniu nastepna fala placi juz normalnie.
         n >= 11: sklad/HP jak przy naturalnym dojsciu do tej fali.
-        n == 10: EASTER EGG - rewanz z bossem finalnym z 10x HP;
-        po jego fali gra przechodzi w endless od fali 11."""
+        n == 10: EASTER EGG - rewanz z bossem finalnym z 20x HP, ktory po
+        dojsciu do budynku OBLEGA go (atak co 1 s = -1 zycie, az budynek
+        padnie albo boss zginie); po jego fali gra przechodzi w endless
+        od fali 11.
+        n <= 9: zwykla fala kampanii (skok WSTECZ tez jest dozwolony);
+        tryb endless wylacza sie i gra wraca do kampanii."""
         # Anuluj stawianie wiezy ze zwrotem (jak ESC)
         if getattr(self, "moving_object", None) is not None:
             try:
@@ -761,14 +783,27 @@ class Game:
             self.ship = Ship(os.path.join("images", "ship.png"),
                              dock_x=278, dock_y=669, screen_w=self.width)
             self.ship.sail_in()
-        if n <= 10:
+        if n <= 9:
+            # Zwykla fala kampanii (tez skok wstecz, np. na fale 1)
+            self.endless = False
+            self.endless_wave = 0
+            self.wave = n - 1
+            self.current_wave = waves[self.wave][:]
+            self._wave_start_lives = self.lives
+            self.wave_banner_text = tr("banner.wave", n=n)
+            self.wave_banner_timer = 120
+        elif n == 10:
             self.endless = True
             self.endless_wave = 0
             self.wave = 9
             self.current_wave = waves[9][:]
             self._wave_start_lives = self.lives
-            self.pending_bosses.append(Boss(final=True,
-                hp=int(950 * self._diff("enemy_hp_mult") * 10)))
+            _egg = Boss(final=True,
+                hp=int(950 * self._diff("enemy_hp_mult") * 20))
+            # Easter egg: boss nie znika po jednym zyciu - oblega budynek
+            # i co sekunde zdejmuje 1 zycie, dopoki nie zginie
+            _egg._building_attacker = True
+            self.pending_bosses.append(_egg)
             self.wave_banner_text = tr("banner.final_boss")
             self.wave_banner_timer = 150
         else:
@@ -784,7 +819,7 @@ class Game:
             n = int(self._pause_wave_txt)
         except ValueError:
             return
-        n = max(10, min(999, n))
+        n = max(1, min(999, n))
         self.jump_to_wave(n)
         self._pause_wave_txt = ""
         self._pause_wave_focus = False
@@ -1078,7 +1113,7 @@ class Game:
             self.show_menu = False
             self.paused = False
 
-    def _start_bombardment(self, num_targets=3):
+    def _start_bombardment(self, num_targets=2):
         """Rozpoczyna cinematic bombardowania: statek plynie na srodek oceanu.
         Call the Cavalry: pierwsze bombardowanie w endless po kupnie - przechwycenie."""
         # Przechwycenie: sojusznik niszczy pirata zamiast barazu w wieze
@@ -1705,6 +1740,13 @@ class Game:
                 if event.type == pygame.MOUSEBUTTONUP:
                     self.menu_dragging = False
                 if event.type == pygame.KEYDOWN:
+                    # Pomoc otwarta: strzalki / A,D zmieniaja strone (nie zamykaja)
+                    if getattr(self, '_show_help', False) and event.key in (pygame.K_LEFT, pygame.K_a):
+                        self._help_page = max(0, self._help_page - 1)
+                        continue
+                    if getattr(self, '_show_help', False) and event.key in (pygame.K_RIGHT, pygame.K_d):
+                        self._help_page = min(2, self._help_page + 1)
+                        continue
                     # ESC = cancel first, pause menu only if nothing to cancel
                     if event.key == pygame.K_ESCAPE:
                         if getattr(self, '_show_help', False):
@@ -1761,17 +1803,16 @@ class Game:
                     # Q: aktywacja umiejetnosci wybranej wiezy
                     if event.key == pygame.K_q and self.selected_tower:
                         self.selected_tower.activate_ability(self.enemies, self.projectiles)
-                    # F11: przelacz fullscreen / okno 1:1 (ostrzejsze piksele)
+                    # F11: przelacz fullscreen / normalne okno gry 1124x720
                     if event.key == pygame.K_F11:
                         self._fullscreen = not self._fullscreen
                         if self._fullscreen:
                             self._screen = pygame.display.set_mode(
                                 (self._native_w, self._native_h), pygame.FULLSCREEN)
                         else:
-                            # Okno w natywnej rozdzielczosci (czarne tlo, gra 1:1 na srodku)
-                            self._screen = pygame.display.set_mode((self._native_w, self._native_h))
-                        # Zaktualizuj rzeczywisty rozmiar
-                        self._native_w, self._native_h = self._screen.get_size()
+                            # Zwykle okno w rozmiarze gry (wczesniej: okno na
+                            # caly ekran z czarnym tlem i gra 1:1 na srodku)
+                            self._screen = pygame.display.set_mode((self.width, self.height))
                     if event.key == pygame.K_F3:
                         self._debug_show = not getattr(self, '_debug_show', False)
                     # Spacja: pauza
@@ -1853,7 +1894,13 @@ class Game:
                     # Menu ESC ma pierwszenstwo - takze podczas barazu (pauza musi byc klikalna)
                     if self.show_menu:
                         if self._show_help:
-                            self._show_help = False
+                            # Strzalki pomocy zmieniaja strone; klik gdzie indziej zamyka
+                            if self._help_prev_rect and self._help_prev_rect.collidepoint(pos):
+                                self._help_page = max(0, self._help_page - 1)
+                            elif self._help_next_rect and self._help_next_rect.collidepoint(pos):
+                                self._help_page = min(2, self._help_page + 1)
+                            else:
+                                self._show_help = False
                         elif self._pause_jump_input and self._pause_jump_input.collidepoint(pos):
                             self._pause_wave_focus = True
                         elif self._pause_jump_btn and self._pause_jump_btn.collidepoint(pos):
@@ -2129,6 +2176,14 @@ class Game:
 
     def reset_game(self):
         """Resetuje stan gry do poczatku (na potrzeby przycisku RESTART)."""
+        # Deszcz: zatrzymaj zapetlony dzwiek i pogode - inaczej po forfeit
+        # w deszczu i starcie nowej gry szum deszczu gral w nieskonczonosc
+        # (petla mixer nie gasla wraz ze stara rozgrywka).
+        try:
+            sound_rain.stop()
+        except Exception:
+            pass
+        self.raining = False
         self.enemies = []
         self.towers = []
         self.projectiles = []
@@ -2155,6 +2210,8 @@ class Game:
         self._logic_tick = 0
         self._spawn_cd = 0
         self._wave_start_lives = self._start_lives
+        self._drone_fixed = set()
+        self._repair_drone = {"x": 260.0, "y": 200.0, "target": None, "work": 0}
         self.stats_kills = 0
         self.stats_highest_wave_beaten = 0
         self.stats_gold = 0
@@ -2320,6 +2377,8 @@ class Game:
         # Combat drone (Drone Launch Facility)
         self._update_combat_drone()
         self._update_balloon()
+        # Dron naprawczy: zadania przy uszkodzeniach budynku
+        self._update_repair_drone()
         # Achievements: max_gold_held = szczyt kasy (nie tylko przy zabojstwach)
         self._ach_stats["max_gold_held"] = max(self._ach_stats.get("max_gold_held", 0), self.money)
         # Achievements: sprawdzanie co 60 tickow + zapis postepu (kumulatywnie)
@@ -2409,7 +2468,9 @@ class Game:
         elif self.display_money > self.money:
             self.display_money = self.money
         # Dynamiczna muzyka: intensywna TYLKO podczas bossa (nie przy malych zyciach).
-        if self.sound and not self.music_muted:
+        # Warunek na music_muted (nie na staruszkowe self.sound z menu) - po
+        # wlaczeniu muzyki klawiszem M przelaczanie sciezek tez ma dzialac.
+        if not self.music_muted:
             boss_alive = any(isinstance(en, Boss) for en in self.enemies)
             want_intense = boss_alive
             if want_intense != self._music_intense:
@@ -2440,6 +2501,19 @@ class Game:
         # Update wrogow (animacje, ruch, timery) - TU, nie w draw()!
         for en in self.enemies:
             en.update()
+            # Boss-oblegacz (easter egg fali 10): co 1 s uderza w budynek.
+            # Kazde uderzenie = -1 zycie + efekty jak przy przepuszczeniu
+            # wroga; jak zycia sie skoncza, budynek pada (porazka).
+            if getattr(en, "_building_hit", False):
+                en._building_hit = False
+                if not self._dancer_sacrifice(en):
+                    sound_1.play()
+                    sound_glass.play()
+                    self.lives -= 1
+                    self._drone_fixed = set()
+                    self.screen_shake = max(getattr(self, "screen_shake", 0), 6)
+                    self.particles.burst(300, 350, (180, 220, 255), count=18, speed=3, life=40, size=4, gravity=0.3)
+                    self.particles.burst(en.x, en.y - 30, (255, 170, 80), count=10, speed=3, life=25, size=3)
             # A7: kurz - usuniety na prosbe gracza
             # Slad lodu za spowolnionymi - usuniety na prosbe gracza
             # Slady stop bossa - usuniete na prosbe gracza
@@ -2473,6 +2547,7 @@ class Game:
                 sound_1.play()
                 sound_glass.play()  # tluczone szklo - budynek jest szklany
                 self.lives -= 1
+                self._drone_fixed = set()  # nowe trafienie = uszkodzenia wracaja, dron naprawia od nowa
                 # Efekt tluczonego szkla przy budynku
                 self.particles.burst(300, 350, (180, 220, 255), count=15, speed=3, life=40, size=4, gravity=0.3)
                 # Q6: auto-pauza przy 3 zyciach - usunieta na prosbe gracza
@@ -2869,6 +2944,12 @@ class Game:
             continue_rect = None
         # Tlo: mapa skarbow (win) / minimalistyczna porazka (lose) / ciemne (forfeit)
         is_defeat = not won and not forfeited
+        if is_defeat:
+            # Island Lost: przyciski nizej (Daniel 2026-10-21) - motto
+            # "the island still needs you" zostaje na miejscu, a RESTART /
+            # MAIN MENU / QUIT nie wchodza juz w statystyki i motto.
+            for _r in (restart_rect, menu_rect, quit_rect):
+                _r.y += 36
         if won and not forfeited:
             self._draw_victory_map()
             stat_color = (80, 50, 25)
@@ -3330,11 +3411,12 @@ class Game:
         for fx, fy, col in self.flowers:
             pygame.draw.circle(self.win, col, (fx, fy), 4)
             pygame.draw.circle(self.win, (255, 255, 200), (fx, fy), 2)
-        # Klucz ptakow (losowo)
-        if self._frame % 500 == 0 and len(self.bird_flocks) < 2:
+        # Klucz ptakow (losowo) - na pauzie stoja jak reszta zwierzat
+        if not self.paused and self._frame % 500 == 0 and len(self.bird_flocks) < 2:
             self.bird_flocks.append([0, random.randint(80, 180), 0])
         for flock in self.bird_flocks[:]:
-            flock[0] += 3; flock[2] += 1
+            if not self.paused:
+                flock[0] += 3; flock[2] += 1
             for i in range(5):
                 bx = flock[0] - i * 25
                 by = flock[1] + abs(i - 2) * 12
@@ -3431,8 +3513,19 @@ class Game:
         self.music_muted = on
         if on:
             pygame.mixer.music.pause()
-        else:
+        elif pygame.mixer.music.get_busy():
             pygame.mixer.music.unpause()
+        else:
+            # Sciezka byla ZATRZYMANA, nie spauzowana (np. gra startowala
+            # z wylaczonym dzwiekiem z menu) - samo unpause nic nie da,
+            # dlatego M "nie dzialalo". Zaladuj biezaca sciezke i graj.
+            track = ("sounds/music_intense.wav" if getattr(self, "_music_intense", False)
+                     else "sounds/music.wav")
+            try:
+                pygame.mixer.music.load(track)
+                pygame.mixer.music.play(loops=-1)
+            except Exception:
+                pass
 
     def _set_sfx_muted(self, on):
         """SFX = WSZYSTKIE dzwieki poza muzyka (strzaly, umiejetnosci, wieze,
@@ -3444,9 +3537,16 @@ class Game:
                   sound_win, sound_lose, sound_roar,
                   sound_levelup, sound_horn, sound_gull, sound_fanfare,
                   tower_sound_1, tower_sound_2, tower_sound_3, tower_sound_4, tower_sound_5,
-                  *shoot_sounds.values()):
+                  *shoot_sounds.values(),
+                  # Prawdziwe dzwieki strzalow (woodenTower.shoot_snd) i fanfara
+                  # statku - wczesniej mute ich nie obejmowal i strzaly bylo
+                  # slychac mimo wylaczonych efektow.
+                  *tower_shoot_snd.values(),
+                  *([pirate_snd] if pirate_snd is not None else [])):
             s.set_volume(vol)
         # Bazowe glosnosci (ciszej niz reszta - nie 1.0)
+        for s in tower_shoot_snd.values():
+            s.set_volume(0 if on else 0.35)  # strzaly wiez: baza 0.35, nie 1.0
         sound_rain.set_volume(0 if on else 0.35)
         sound_minigun.set_volume(0 if on else 0.35)
         sound_rocket.set_volume(0 if on else 0.5)
@@ -3467,6 +3567,7 @@ class Game:
             self._forfeit = True
         elif action == "help":
             self._show_help = True
+            self._help_page = 0
         elif action == "music":
             self._set_music_muted(not self.music_muted)
         elif action == "sfx":
@@ -3477,8 +3578,8 @@ class Game:
                 self._screen = pygame.display.set_mode(
                     (self._native_w, self._native_h), pygame.FULLSCREEN)
             else:
-                self._screen = pygame.display.set_mode((self._native_w, self._native_h))
-            self._native_w, self._native_h = self._screen.get_size()
+                # Zwykle okno w rozmiarze gry 1124x720 (jak F11)
+                self._screen = pygame.display.set_mode((self.width, self.height))
         elif action == "speed":
             self.speed = {1: 2, 2: 3, 3: 1}[self.speed]
         elif action == "quit":
@@ -3583,30 +3684,64 @@ class Game:
             self.draw_help_overlay()
 
     def draw_help_overlay(self):
-        hw, hh = 560, 440
+        """Pomoc w grze: 3 strony (podstawy / wieze z liczbami z klas /
+        endless). Tresc z help_content - wspoldzielona z menu glownym."""
+        import help_content
+        all_pages = help_content.pages()
+        page = max(0, min(self._help_page, len(all_pages) - 1))
+        lines = all_pages[page]
+        hw, hh = 800, 640
         hx, hy = (self.width - hw) // 2, (self.height - hh) // 2
         pygame.draw.rect(self.win, (20, 25, 32), (hx, hy, hw, hh), border_radius=16)
         pygame.draw.rect(self.win, (70, 80, 95), (hx, hy, hw, hh), 2, border_radius=16)
         title = self.font_p36.render(tr("menu.help"), True, (255, 215, 100))
-        self.win.blit(title, (hx + (hw - title.get_width()) // 2, hy + 20))
-        lines = [
-            tr("help.l1"),
-            tr("help.l2"),
-            tr("help.l3"),
-            "",
-            tr("help.l4"),
-            tr("help.l5"),
-            tr("help.l6"),
-            tr("help.l7"),
-            tr("help.l8"),
-            "",
-            tr("help.esc"),
-        ]
-        y = hy + 70
-        for ln in lines:
-            t = self.font_btn18.render(ln, True, (220, 220, 220))
-            self.win.blit(t, (hx + 30, y))
-            y += 28
+        self.win.blit(title, (hx + (hw - title.get_width()) // 2, hy + 14))
+        y = hy + 62
+        for text, style in lines:
+            if text == "":
+                y += 8
+                continue
+            if style == "header":
+                f, c, step = self.font_btn18, (255, 215, 100), 28
+            elif style == "tower":
+                f, c, step = self.font_btn18, (140, 220, 255), 22
+            elif style == "sub":
+                f, c, step = self.font_btn18, (185, 195, 205), 20
+            elif style == "dim":
+                f, c, step = self.font_btn18, (150, 158, 168), 22
+            else:
+                f, c, step = self.font_btn18, (225, 228, 232), 25
+            # Dlugie linie (notatki) zawijaj do szerokosci panelu
+            words = text.split()
+            wrapped, cur = [], ""
+            for w_ in words:
+                trial = (cur + " " + w_).strip()
+                if f.size(trial)[0] > hw - 60 and cur:
+                    wrapped.append(cur)
+                    cur = w_
+                else:
+                    cur = trial
+            if cur:
+                wrapped.append(cur)
+            for wi, wl in enumerate(wrapped):
+                t = f.render(wl, True, c)
+                self.win.blit(t, (hx + (36 if style == "sub" else 28), y))
+                y += step if wi == len(wrapped) - 1 else 18
+        # Nawigacja: strzalki + licznik stron
+        nav = self.font_btn18.render(
+            tr("help.nav", a=page + 1, b=len(all_pages)), True, (160, 168, 178))
+        self.win.blit(nav, (hx + (hw - nav.get_width()) // 2, hy + hh - 40))
+        self._help_prev_rect = pygame.Rect(hx + 14, hy + hh - 52, 44, 36)
+        self._help_next_rect = pygame.Rect(hx + hw - 58, hy + hh - 52, 44, 36)
+        for rect, glyph, enabled in (
+                (self._help_prev_rect, "<", page > 0),
+                (self._help_next_rect, ">", page < len(all_pages) - 1)):
+            pygame.draw.rect(self.win, (45, 55, 68) if enabled else (30, 36, 44),
+                             rect, border_radius=8)
+            g = self.font_btn18.render(glyph, True,
+                                       (255, 255, 255) if enabled else (90, 98, 108))
+            self.win.blit(g, (rect.x + (rect.w - g.get_width()) // 2,
+                              rect.y + (rect.h - g.get_height()) // 2))
 
     def _present(self):
         """Wyswietla bufor 1124x720 w natywnej rozdzielczosci (smoothscale HQ)."""
@@ -3628,42 +3763,153 @@ class Game:
             sy = self._native_h / self.height
             return (pos[0] / sx, pos[1] / sy)
         else:
-            ox = (self._native_w - self.width) // 2
-            oy = (self._native_h - self.height) // 2
+            # Okno ma rozmiar gry, wiec offset liczymy z rozmiaru OKNA
+            # (nie z natywnej rozdzielczosci monitora)
+            _sw, _sh = self._screen.get_size()
+            ox = (_sw - self.width) // 2
+            oy = (_sh - self.height) // 2
             return (pos[0] - ox, pos[1] - oy)
 
     def _mouse_pos(self):
         """Pozycja myszy w wspolrzednych gry."""
         return self._to_game_pos(pygame.mouse.get_pos())
 
+    # Punkty uszkodzen na fasadzie budynku: id -> (x, y, zadanie drona).
+    # Te same punkty rysuja zniszczenia i wyznaczaja dronowi prace.
+    _DMG_POINTS = {
+        "crack1": (206, 322, "weld"),
+        "crack2": (418, 292, "weld"),
+        "crack3": (300, 218, "weld"),
+        "win1": (232, 240, "weld"),
+        "win2": (356, 318, "weld"),
+        "win3": (398, 244, "weld"),
+        "fire1": (292, 298, "extinguish"),
+    }
+
+    def _damage_stage(self):
+        """0 = budynek caly, 1 = pekniecia, 2 = wybite okna + dym,
+        3 = pozar okna, okopcenia i gruz. Progi proporcjonalne do
+        startowych zyc (dziala tez po kupnie Walls)."""
+        frac = self.lives / max(1, self._start_lives)
+        if frac > 0.75:
+            return 0
+        if frac > 0.50:
+            return 1
+        if frac > 0.25:
+            return 2
+        return 3
+
+    def _active_damage_points(self):
+        """Id uszkodzen widocznych na obecnym etapie, minus te juz
+        naprawione przez drona (do nastepnego trafienia w budynek)."""
+        st = self._damage_stage()
+        ids = []
+        if st >= 1:
+            ids += ["crack1", "crack2"]
+        if st >= 2:
+            ids += ["crack3", "win1", "win2"]
+        if st >= 3:
+            ids += ["win3", "fire1"]
+        return [i for i in ids if i not in self._drone_fixed]
+
+    def _draw_crack(self, x, y, seed, length=48):
+        """Postrzepione pekniecie z odgalezieniem (stabilne miedzy klatkami -
+        losowanie z seeda, nie z globalnego random)."""
+        rng = random.Random(seed)
+        pts = [(x, y)]
+        cx, cy = x, y
+        for _ in range(4):
+            cx += rng.randint(-7, 7)
+            cy += length // 4
+            pts.append((cx, cy))
+        pygame.draw.lines(self.win, (38, 36, 40), False, pts, 2)
+        bx, by = pts[1]
+        pygame.draw.line(self.win, (38, 36, 40), (bx, by),
+                         (bx + rng.randint(8, 16), by + rng.randint(4, 10)), 1)
+
+    def _draw_broken_window(self, x, y, seed):
+        """Wybita szyba: ciemne wnetrze, gwiazda pekniec, odlamany rog."""
+        pygame.draw.rect(self.win, (16, 22, 30), (x - 17, y - 20, 34, 40))
+        rng = random.Random(seed)
+        cx, cy = x + rng.randint(-6, 6), y + rng.randint(-6, 6)
+        for k in range(5):
+            a = k * 1.256 + rng.uniform(-0.2, 0.2)
+            ex = cx + int(15 * math.cos(a))
+            ey = cy + int(18 * math.sin(a))
+            pygame.draw.line(self.win, (195, 220, 238), (cx, cy), (ex, ey), 1)
+        pygame.draw.polygon(self.win, (140, 180, 200),
+                            [(x - 17, y + 20), (x - 3, y + 20), (x - 17, y + 5)])
+
+    def _draw_fire_window(self, x, y, t, scale=1.0):
+        """Plonace okno: ciemne wnetrze, poswiata, falujace jezyki ognia."""
+        pygame.draw.rect(self.win, (22, 16, 12), (x - 17, y - 20, 34, 40))
+        glow = pygame.Surface((96, 84), pygame.SRCALPHA)
+        pygame.draw.ellipse(glow, (255, 140, 40, 65), glow.get_rect())
+        self.win.blit(glow, (x - 48, y - 42))
+        for i, (ox, hbase) in enumerate(((-9, 30), (0, 42), (9, 26))):
+            h = (hbase + 7 * math.sin(t * 9 + i * 1.7)) * scale
+            if h <= 3:
+                continue
+            sway = 3 * math.sin(t * 7 + i)
+            pts = [(x + ox - 6, y + 16), (x + ox + sway, y + 16 - h), (x + ox + 6, y + 16)]
+            pygame.draw.polygon(self.win, (255, 110, 25), pts)
+            pts2 = [(x + ox - 3, y + 16), (x + ox + sway * 0.6, y + 16 - h * 0.55),
+                    (x + ox + 3, y + 16)]
+            pygame.draw.polygon(self.win, (255, 205, 90), pts2)
+
     def draw_castle_damage(self):
-        """1: Wizualne uszkodzenia zamku zaleza od liczby zyc."""
-        cx, cy = 300, 375  # koniec sciezki (baza)
+        """Uszkodzenia budynku wg etapu (patrz _damage_stage): pekniecia,
+        wybite okna, dym z dachu, plonace okno, okopcenia i gruz. Punkty
+        naprawione przez drona znikaja do nastepnego trafienia."""
+        st = self._damage_stage()
+        if st == 0:
+            return
         t = self._anim_s
-        if self.lives <= 15:
-            # Pekniecia
-            for x1, y1, x2, y2 in [(cx-20, cy-30, cx-5, cy-10), (cx+15, cy-35, cx+5, cy-15),
-                                    (cx-10, cy+10, cx-25, cy+30)]:
-                pygame.draw.line(self.win, (40, 40, 40), (x1, y1), (x2, y2), 3)
-        if self.lives <= 10:
-            # Dym (3 smugi)
-            for i in range(3):
-                sx = cx - 20 + i * 20
-                sy = cy - 50 - ((t * 30 + i * 20) % 40)
-                alpha = int(120 * (1 - ((t * 30 + i * 20) % 40) / 40))
-                s = pygame.Surface((24, 24), pygame.SRCALPHA)
-                pygame.draw.circle(s, (100, 100, 100, alpha), (12, 12), 10)
-                self.win.blit(s, (sx - 12, sy - 12))
-        if self.lives <= 5:
-            # Ogien (plomienie)
+        active = set(self._active_damage_points())
+        # Dym z dachu (etap 2+): miekkie kleby wznoszace sie i blaknace
+        if st >= 2:
             for i in range(4):
-                fx = cx - 30 + i * 20
-                fy = cy - 20
-                h = 18 + 8 * math.sin(t * 8 + i * 1.5)
-                pts = [(fx - 8, fy), (fx, fy - h), (fx + 8, fy)]
-                pygame.draw.polygon(self.win, (255, 120, 20), pts)
-                pts2 = [(fx - 4, fy), (fx, fy - h * 0.6), (fx + 4, fy)]
-                pygame.draw.polygon(self.win, (255, 220, 80), pts2)
+                ph = ((t * 22 + i * 26) % 104) / 104.0
+                sx = 300 + int(14 * math.sin(ph * 5 + i)) + int(ph * 20)
+                sy = 192 - int(ph * 80)
+                r = 10 + int(ph * 17)
+                alpha = int(100 * (1 - ph))
+                s = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
+                pygame.draw.circle(s, (92, 92, 98, alpha), (r, r), r)
+                self.win.blit(s, (sx - r, sy - r))
+        # Pekniecia na scianach
+        for pid, seed in (("crack1", 11), ("crack2", 23), ("crack3", 37)):
+            if pid in active:
+                x, y, _ = self._DMG_POINTS[pid]
+                self._draw_crack(x, y, seed)
+        # Wybite okna
+        for pid, seed in (("win1", 41), ("win2", 53), ("win3", 67)):
+            if pid in active:
+                x, y, _ = self._DMG_POINTS[pid]
+                self._draw_broken_window(x, y, seed)
+        if st >= 3:
+            # Okopcenie pod plonacym oknem i przy podstawie
+            sc = pygame.Surface((90, 60), pygame.SRCALPHA)
+            pygame.draw.ellipse(sc, (30, 26, 22, 90), sc.get_rect())
+            self.win.blit(sc, (292 - 45, 298 + 8))
+            # Gruz u podstawy budynku
+            for gx, gw, gh in ((252, 26, 9), (282, 20, 13), (312, 30, 8)):
+                pygame.draw.polygon(self.win, (105, 100, 95),
+                                    [(gx, 376), (gx + gw // 2, 376 - gh), (gx + gw, 376)])
+                pygame.draw.polygon(self.win, (80, 76, 72),
+                                    [(gx + gw // 2, 376 - gh), (gx + gw, 376), (gx + gw // 2, 376)])
+        # Plonace okno (etap 3) - gaszone przez drona kurczy sie z postepem pracy
+        if "fire1" in active:
+            x, y, _ = self._DMG_POINTS["fire1"]
+            scale = 1.0
+            d = self._repair_drone
+            if d.get("target") == "fire1" and d.get("work", 0) > 0:
+                scale = max(0.15, 1.0 - d["work"] / 300.0)
+            self._draw_fire_window(x, y, t, scale)
+            if not self.paused and random.random() < 0.25:
+                self.particles.burst(x + random.randint(-10, 10), y - 14,
+                                     (255, 160, 60), count=1, speed=0.7, life=26,
+                                     size=2, gravity=-0.06)
 
     def announce(self, text):
         """37: ogloszenie spikera - jak w LoL: jedno naraz, nowe zastepuje stare."""
@@ -3734,29 +3980,34 @@ class Game:
         # 14: balon - REMOVED: single Recon Balloon in draw_tent_visuals now handles it
         # (Previously this ambient balloon + the upgrade balloon = two balloons at once.)
 
-        # 12: teczowe rybki
-        self.fish_timer -= 1
-        if self.fish_timer <= 0:
-            self.fish_timer = random.randint(150, 400)
-            self.fishes.append([random.randint(150, 950), 655, random.uniform(-2, 2), -7,
-                                0, random.choice([(255, 120, 150), (120, 200, 255), (255, 220, 100), (150, 255, 180)])])
+        # 12: teczowe rybki (stan zmienia sie TYLKO poza pauza - na pauzie
+        # zwierzeta stoja w miejscu, jak wszystko inne w grze)
+        if not self.paused:
+            self.fish_timer -= 1
+            if self.fish_timer <= 0:
+                self.fish_timer = random.randint(150, 400)
+                self.fishes.append([random.randint(150, 950), 655, random.uniform(-2, 2), -7,
+                                    0, random.choice([(255, 120, 150), (120, 200, 255), (255, 220, 100), (150, 255, 180)])])
+            for f in self.fishes:
+                f[4] += 1
+                f[0] += f[2]; f[1] += f[3]; f[3] += 0.35
         for f in self.fishes[:]:
-            f[4] += 1
-            f[0] += f[2]; f[1] += f[3]; f[3] += 0.35
             pygame.draw.ellipse(self.win, f[5], (f[0] - 8, f[1] - 4, 16, 8))
             if f[1] > 670:
                 self.fishes.remove(f)
 
         # 15: wieloryb
-        self.whale_timer -= 1
-        if self.whale_timer <= 0 and self.whale is None:
+        if not self.paused:
+            self.whale_timer -= 1
+        if self.whale_timer <= 0 and self.whale is None and not self.paused:
             # Wynurzenie TYLKO poza pomostem (pomost: x 240-580) - ciemne
             # cielsko na tle desek wygladalo jak przeciecie grafiki pomostu
             _wx = random.randint(90, 180) if random.random() < 0.3 else random.randint(650, 1000)
             self.whale = [_wx, 0]
             self.whale_timer = random.randint(2800, 4500)
         if self.whale:
-            self.whale[1] += 1
+            if not self.paused:
+                self.whale[1] += 1
             wt = self.whale[1]
             x = self.whale[0]
             # Wynurzenie: 0-60 w gore, 60-140 na gorze, 140-200 w dol
@@ -3765,7 +4016,7 @@ class Game:
                 y = 660 + depth
                 pygame.draw.ellipse(self.win, (70, 90, 120), (x - 45, y - 14, 90, 28))
                 pygame.draw.polygon(self.win, (70, 90, 120), [(x + 35, y), (x + 55, y - 18), (x + 42, y)])
-                if 60 < wt < 140 and wt % 20 == 0:
+                if 60 < wt < 140 and wt % 20 == 0 and not self.paused:
                     self.particles.burst(x - 10, y - 20, (200, 230, 255), count=4, speed=2, life=25, size=3, gravity=-0.1)
             else:
                 self.whale = None
@@ -3782,10 +4033,11 @@ class Game:
         # 17: kraby na plazy
         _px0, _py0, _pw, _ph = _PIER_RECT
         for cr in self.crabs:
-            cr[2] += 0.05 * cr[3]
-            cr[0] += 0.6 * cr[3]
-            if cr[0] > 1050: cr[3] = -1
-            if cr[0] < 80: cr[3] = 1
+            if not self.paused:  # kraby stoja na pauzie (jak ptaki i reszta)
+                cr[2] += 0.05 * cr[3]
+                cr[0] += 0.6 * cr[3]
+                if cr[0] > 1050: cr[3] = -1
+                if cr[0] < 80: cr[3] = 1
             # Pomost jest NAD woda - krab przechodzi POD nim (nie rysujemy
             # na pomoście; ruch idzie dalej, wiec wylania sie z drugiej strony)
             if _px0 - 15 < cr[0] < _px0 + _pw + 15 and _py0 < cr[1] < _py0 + _ph:
@@ -4899,26 +5151,90 @@ class Game:
         pygame.draw.polygon(s, (255, 180, 60, 30 + int(20 * pulse)), pts)
         self.win.blit(s, (0, 0))
 
-    def draw_repair_drone(self):
-        """Wizualny dron krazacy wokol budynku (po kupnie Repair Drones)."""
+    def _update_repair_drone(self):
+        """Dron naprawczy ma KONKRETNE zadania (logika, ticki 100 Hz):
+        leci do najblizszego uszkodzenia budynku i pracuje przy nim 3 s -
+        spawanie pekniec i wybitych szyb (iskry) albo gaszenie plonacego
+        okna (strumien piany). Naprawiony punkt znika do nastepnego
+        trafienia w budynek. Bez uszkodzen: spokojna orbita jak dawniej."""
         if "drones" not in self.building_upgrades:
             return
-        if not self.paused:
-            self._drone_angle += 0.03
-        bx, by = 260, 285  # srodek budynku
-        rx, ry = 150, 80
-        dx = bx + rx * math.cos(self._drone_angle)
-        dy = by + ry * math.sin(self._drone_angle)
+        d = self._repair_drone
+        active = self._active_damage_points()
+        if d["target"] not in active:
+            d["target"] = None
+            d["work"] = 0
+        if d["target"] is None and active:
+            d["target"] = min(active, key=lambda pid:
+                              (self._DMG_POINTS[pid][0] - d["x"]) ** 2
+                              + (self._DMG_POINTS[pid][1] - d["y"]) ** 2)
+        if d["target"] is not None:
+            px, py, kind = self._DMG_POINTS[d["target"]]
+            tx, ty = px, py - 30  # zawis tuz nad punktem pracy
+            dx, dy = tx - d["x"], ty - d["y"]
+            dist = math.hypot(dx, dy)
+            if dist > 4:
+                step = min(dist, 1.7)
+                d["x"] += dx / dist * step
+                d["y"] += dy / dist * step
+                d["work"] = 0
+            else:
+                d["work"] += 1
+                if kind == "weld":
+                    if d["work"] % 5 == 0:
+                        self.particles.burst(px, py, (255, 230, 150), count=3,
+                                             speed=2, life=14, size=2, gravity=0.25)
+                        self.particles.burst(px, py, (255, 160, 60), count=2,
+                                             speed=1.5, life=10, size=2, gravity=0.25)
+                else:  # gaszenie plonacego okna
+                    if d["work"] % 3 == 0:
+                        self.particles.burst(px + random.randint(-6, 6),
+                                             py + random.randint(-4, 8),
+                                             (200, 230, 255), count=4, speed=1.2,
+                                             life=16, size=3, gravity=0.05)
+                if d["work"] >= 300:  # 3 s pracy = punkt naprawiony
+                    self._drone_fixed.add(d["target"])
+                    d["target"] = None
+                    d["work"] = 0
+        else:
+            # Brak uszkodzen - orbita wokol budynku
+            self._drone_angle += 0.018
+            tx = 260 + 150 * math.cos(self._drone_angle)
+            ty = 285 + 80 * math.sin(self._drone_angle)
+            dx, dy = tx - d["x"], ty - d["y"]
+            dist = math.hypot(dx, dy)
+            if dist > 2:
+                step = min(dist, 1.7)
+                d["x"] += dx / dist * step
+                d["y"] += dy / dist * step
+
+    def draw_repair_drone(self):
+        """Dron naprawczy: korpus + wirniki; gdy pracuje, rysuje wiazke
+        robocza do punktu (spawanie = jasna linia i rozblysk, gaszenie =
+        niebieski strumien). Pozycje liczy _update_repair_drone."""
+        if "drones" not in self.building_upgrades:
+            return
+        d = self._repair_drone
+        dx, dy = d["x"], d["y"]
+        t = self._anim_s
+        if d["target"] is not None and d["work"] > 0:
+            px, py, kind = self._DMG_POINTS[d["target"]]
+            if kind == "weld":
+                pygame.draw.line(self.win, (255, 240, 180),
+                                 (int(dx), int(dy) + 6), (px, py), 2)
+                r = 3 + int(2 * abs(math.sin(t * 40)))
+                pygame.draw.circle(self.win, (255, 255, 220), (px, py), r)
+            else:
+                pygame.draw.line(self.win, (190, 225, 255),
+                                 (int(dx), int(dy) + 6), (px, py), 3)
         # Korpus drona
         pygame.draw.ellipse(self.win, (70, 80, 95), (dx - 14, dy - 8, 28, 16))
         pygame.draw.ellipse(self.win, (40, 200, 255), (dx - 6, dy - 4, 12, 8))
-        # Wirniki
+        # Wirniki (rozmyte od predkosci - faza z zegara animacji)
+        rw = 20 + int(3 * math.sin(t * 45))
         for ox, oy in [(-16, -10), (16, -10), (-16, 10), (16, 10)]:
             pygame.draw.ellipse(self.win, (200, 220, 235, 160),
-                                (dx + ox - 10, dy + oy - 3, 20, 6))
-        # Zielony wskaznik naprawy
-        if int(self._drone_angle * 10) % 30 == 0:
-            self.particles.burst(dx, dy + 10, (100, 255, 150), count=2, speed=1, life=20, size=2)
+                                (dx + ox - rw // 2, dy + oy - 3, rw, 6))
 
     # ---- Combat drone (Drone Launch Facility) ----
     # Logika w tickach 100Hz (update_game_logic): 2-4 min zycia = 12000-24000,

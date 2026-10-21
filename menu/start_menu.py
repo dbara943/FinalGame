@@ -47,6 +47,7 @@ class StartMenu:
         self.diff_idx = 1  # domyslnie NORMAL
         self.sound = True
         self.show_help = False
+        self.help_page = 0
         self.show_achievements = False
         self.show_resolution = False
         self.clock = pygame.time.Clock()
@@ -416,54 +417,77 @@ class StartMenu:
         self.win.blit(hint, (px + (pw - hint.get_width()) // 2, py + ph - 35))
 
     def draw_help(self):
-        # Panel: wysokosc DOKLADNIE na miare tresci (wczesniej stale 560,
-        # a tresc potrzebuje 567 - ostatnia linia wystawala poza panel).
-        _steps = {"title": 40, "header": 30, "dim": 30, "text": 26, "spacer": 12}
-        _lines = [
-            ("sm.help.title", "title"),
-            ("", "spacer"),
-            ("sm.help.l1", "text"),
-            ("sm.help.l2", "text"),
-            ("sm.help.l3", "text"),
-            ("sm.help.l4", "text"),
-            ("", "spacer"),
-            ("sm.help.controls", "header"),
-            ("sm.help.c1", "text"),
-            ("sm.help.c2", "text"),
-            ("sm.help.c3", "text"),
-            ("sm.help.c4", "text"),
-            ("sm.help.c5", "text"),
-            ("sm.help.c6", "text"),
-            ("sm.help.c7", "text"),
-            ("sm.help.c8", "text"),
-            ("", "spacer"),
-            ("sm.help.tips", "header"),
-            ("sm.help.t1", "text"),
-            ("sm.help.t2", "text"),
-            ("", "spacer"),
-            ("sm.help.back", "dim"),
-        ]
-        _total = 25 + sum(_steps[s] for _, s in _lines) + 20
-        panel = pygame.Rect(self.rw // 2 - 360, self.rh // 2 - _total // 2, 720, _total)
+        # Pomoc: 3 strony, tresc wspoldzielona z gra (help_content - liczby
+        # wiez liczone z klas). Strone zmienia sie strzalkami w panelu;
+        # klik gdzie indziej zamyka (jak dawniej).
+        import help_content
+        all_pages = help_content.pages()
+        page = max(0, min(getattr(self, "help_page", 0), len(all_pages) - 1))
+        raw_lines = all_pages[page]
+        # Dedykowany mniejszy font pomocy - small_font (Arial 22) jest za
+        # szeroki i panel strony wiez nie miescil sie w 720 px wysokosci.
+        if not hasattr(self, "_help_font"):
+            self._help_font = pygame.font.SysFont("arial", 19)
+            self._help_font_b = pygame.font.SysFont("arial", 19, bold=True)
+        _steps = {"header": 27, "text": 22, "tower": 23, "sub": 21, "dim": 22}
+        # Zawijanie dlugich linii do szerokosci panelu
+        lines = []
+        for text, style in raw_lines:
+            if text == "":
+                lines.append(("", "spacer"))
+                continue
+            fnt = self._help_font
+            words = text.split()
+            cur = ""
+            for w_ in words:
+                trial = (cur + " " + w_).strip()
+                if fnt.size(trial)[0] > 736 and cur:
+                    lines.append((cur, style))
+                    cur = w_
+                else:
+                    cur = trial
+            if cur:
+                lines.append((cur, style))
+        _total = 58 + sum(_steps.get(s, 12) if s != "spacer" else 12 for _, s in lines) + 52
+        pw = 780
+        panel = pygame.Rect(self.rw // 2 - pw // 2, self.rh // 2 - _total // 2, pw, _total)
         pygame.draw.rect(self.win, (12, 24, 44), panel, border_radius=16)
         pygame.draw.rect(self.win, (255, 255, 255), panel, 2, border_radius=16)
-        lines = _lines
-        y = panel.y + 25
+        title = self.btn_font.render(t("sm.help.title"), True, (255, 210, 63))
+        self.win.blit(title, (panel.centerx - title.get_width() // 2, panel.y + 14))
+        y = panel.y + 58
         for line, style in lines:
             if style == "spacer":
                 y += 12
                 continue
-            if style == "title":
-                f, c, step = self.btn_font, (255, 210, 63), 40
-            elif style == "header":
-                f, c, step = self.small_font, (255, 210, 63), 30
+            if style == "header":
+                f, c = self._help_font_b, (255, 210, 63)
+            elif style == "tower":
+                f, c = self._help_font_b, (140, 220, 255)
+            elif style == "sub":
+                f, c = self._help_font, (185, 195, 205)
             elif style == "dim":
-                f, c, step = self.small_font, (140, 150, 160), 30
+                f, c = self._help_font, (140, 150, 160)
             else:
-                f, c, step = self.small_font, (225, 232, 240), 26
-            t_surf = f.render(t(line), True, c)
+                f, c = self._help_font, (225, 232, 240)
+            t_surf = f.render(line, True, c)
             self.win.blit(t_surf, (panel.centerx - t_surf.get_width() // 2, y))
-            y += step
+            y += _steps.get(style, 25)
+        # Nawigacja: strzalki + licznik stron + podpowiedz zamkniecia
+        nav = self._help_font.render(
+            t("help.nav", a=page + 1, b=len(all_pages)), True, (150, 158, 168))
+        self.win.blit(nav, (panel.centerx - nav.get_width() // 2, panel.bottom - 34))
+        self._help_prev_rect = pygame.Rect(panel.x + 14, panel.bottom - 46, 44, 34)
+        self._help_next_rect = pygame.Rect(panel.right - 58, panel.bottom - 46, 44, 34)
+        for rect, glyph, enabled in (
+                (self._help_prev_rect, "<", page > 0),
+                (self._help_next_rect, ">", page < len(all_pages) - 1)):
+            pygame.draw.rect(self.win, (35, 55, 80) if enabled else (22, 34, 50),
+                             rect, border_radius=8)
+            g = self._help_font.render(glyph, True,
+                                       (255, 255, 255) if enabled else (90, 98, 108))
+            self.win.blit(g, (rect.x + (rect.w - g.get_width()) // 2,
+                              rect.y + (rect.h - g.get_height()) // 2))
 
     def run(self):
         """Petla menu. Zwraca slownik z ustawieniami albo None przy wyjsciu."""
@@ -510,8 +534,16 @@ class StartMenu:
                         else:
                             self.show_resolution = False
                             clicked_something = True
-                    elif self.show_help or self.show_resolution:
-                        self.show_help = False
+                    elif self.show_help:
+                        # Strzalki pomocy zmieniaja strone; inny klik zamyka
+                        if hasattr(self, "_help_prev_rect") and self._help_prev_rect.collidepoint(event.pos):
+                            self.help_page = max(0, getattr(self, "help_page", 0) - 1)
+                        elif hasattr(self, "_help_next_rect") and self._help_next_rect.collidepoint(event.pos):
+                            self.help_page = min(2, getattr(self, "help_page", 0) + 1)
+                        else:
+                            self.show_help = False
+                        clicked_something = True
+                    elif self.show_resolution:
                         self.show_resolution = False
                         clicked_something = True
                     else:
@@ -557,6 +589,7 @@ class StartMenu:
                             clicked_something = True
                         elif self.buttons["help"].collidepoint(pos):
                             self.show_help = True
+                            self.help_page = 0
                             clicked_something = True
                         elif self.buttons["quit"].collidepoint(pos):
                             clicked_something = True

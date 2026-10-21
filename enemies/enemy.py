@@ -111,9 +111,13 @@ class Enemy:
             self.imgs = self.imgs[:]
             self.die_imgs = self.die_imgs[:]
             self.hurt_imgs = self.hurt_imgs[:]
+            if self.attack_imgs:
+                self.attack_imgs = self.attack_imgs[:]
             self._imgs_copied = True
-            # Skalowanie 1.25x + zloty filtr NA STALE (pre-render, nie co klatke)
-            for lst in (self.imgs, self.die_imgs, self.hurt_imgs):
+            # Skalowanie 1.25x + zloty filtr NA STALE (pre-render, nie co klatke).
+            # attack_imgs TEZ - bez tego elita przy ataku na budynek wracala
+            # do zwyklych kolorow (klatki ataku nie mialy zlotego filtra).
+            for lst in (self.imgs, self.die_imgs, self.hurt_imgs, self.attack_imgs):
                 for i, img in enumerate(lst):
                     w, h = img.get_size()
                     scaled = pygame.transform.scale(img, (int(w * 1.25), int(h * 1.25)))
@@ -164,7 +168,28 @@ class Enemy:
                 self._flash_cache = {'img': self.img, 'surf': flash_surf}
             img_to_draw = self._flash_cache['surf']
         # V2: wskaznik spowolnienia - usuniety na prosbe gracza
-        win.blit(img_to_draw, (self.x - img_to_draw.get_width()/2, self.y - img_to_draw.get_height()/2 - 35))
+        _blit_x = self.x - img_to_draw.get_width()/2
+        _blit_y = self.y - img_to_draw.get_height()/2 - 35
+        win.blit(img_to_draw, (_blit_x, _blit_y))
+        # Spowolnienie = wyrazna powloka lodu NA wrogu (polprzezroczysty
+        # jasnoniebieski filtr w ksztalcie sylwetki + krysztalki lodu przy
+        # stopach). Wrog zostaje w pelni widoczny i animowany - zadnego
+        # "ducha" ani zamrozonej pozy. Cache per klatka animacji.
+        if self.slow_timer > 0 and not self.dying and not self.dead and self.flash_timer <= 0:
+            if not hasattr(self, '_ice_cache') or self._ice_cache.get('img') is not self.img:
+                mask = pygame.mask.from_surface(self.img)
+                ice_surf = mask.to_surface(setcolor=(165, 215, 255, 95),
+                                           unsetcolor=(0, 0, 0, 0))
+                self._ice_cache = {'img': self.img, 'surf': ice_surf}
+            win.blit(self._ice_cache['surf'], (_blit_x, _blit_y))
+            # Krysztalki lodu przy stopach (deterministyczne wg pozycji -
+            # nie migocza losowo co klatke)
+            _seed = int(self.x) // 7 + int(self.y) // 5
+            for i in range(3):
+                cx = int(self.x) - 14 + ((_seed * (i + 3)) % 28)
+                cy = int(self.y) + 2 - ((_seed * (i + 1)) % 4)
+                pygame.draw.line(win, (210, 240, 255), (cx, cy), (cx - 2, cy - 6), 2)
+                pygame.draw.line(win, (210, 240, 255), (cx, cy), (cx + 2, cy - 6), 2)
         # Pasek HP tylko gdy ranny (wydajnosc) - pelne HP = brak paska
         if not self.dying and self.health < self.max_health:
             self.draw_health_bar(win)
@@ -189,6 +214,19 @@ class Enemy:
             self.die_count = 0
         # Atak na baze - animacja ataku zamiast natychmiastowego znikniecia
         if self.attacking:
+            # EASTER EGG (boss rewanzowy ze skoku na fale 10): zamiast jednego
+            # uderzenia i znikniecia OBLEGA budynek - petla animacji ataku,
+            # a co 100 tickow (1 s) stawia flage _building_hit, ktora Game
+            # zamienia na -1 zycie. Zyje przy bramie, dopoki nie zginie -
+            # wieze moga go normalnie celowac (nie ma reached_end).
+            if getattr(self, "_building_attacker", False):
+                self.attack_count += 1
+                if self.attack_imgs:
+                    idx = (self.attack_count // 4) % len(self.attack_imgs)
+                    self.img = self.attack_imgs[idx]
+                if self.attack_count % 100 == 0:
+                    self._building_hit = True
+                return
             if self.attack_imgs:
                 self.attack_count += 1
                 idx = min(self.attack_count // 4, len(self.attack_imgs) - 1)
@@ -211,9 +249,12 @@ class Enemy:
             self.img = self.hurt_imgs[(6 - self.hurt_timer) % len(self.hurt_imgs)]
             self.hurt_timer -= 1
         else:
-            # Animacja co 4 ticki (nie co klatke - wczesniej bylo za szybko)
+            # Animacja co 4 ticki (nie co klatke - wczesniej bylo za szybko).
+            # Spowolniony wrog: krok animacji co 8 tickow - nogi ida w tempie
+            # ruchu (polowa predkosci), zamiast slizgac sie jak bryla lodu.
+            _step = 8 if self.slow_timer > 0 else 4
             self._anim_tick = getattr(self, '_anim_tick', 0) + 1
-            if self._anim_tick >= 4:
+            if self._anim_tick >= _step:
                 self._anim_tick = 0
                 self.animation_count += 1
                 if self.animation_count >= len(self.imgs):

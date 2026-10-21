@@ -4,6 +4,15 @@ import math
 import time
 import os
 
+# Fanfara piracka przy wplynieciu - JEDEN wspoldzielony obiekt, zeby
+# wyciszenie SFX w game.py moglo ustawic mu glosnosc (wczesniej sail_in
+# tworzylo nowy Sound przy kazdym wplynieciu i mute go nie lapal -
+# "dzwiek poczatku fali" gral mimo wylaczonych efektow).
+try:
+    pirate_snd = pygame.mixer.Sound(os.path.join("sounds", "music_pirate.wav"))
+except Exception:
+    pirate_snd = None
+
 class Ship:
     """Statek desantowy: przyplywa na kazda fale (losowo z lewej/prawej),
     cumuje w porcie, desantuje wrogow i odplywa."""
@@ -40,11 +49,11 @@ class Ship:
             self.img = pygame.transform.flip(self.base_img, True, False)
         self.y = self.dock_y
         self.state = Ship.IN
-        # Piracki fanfar przy wplynieciu
+        # Piracki fanfar przy wplynieciu (wspoldzielony obiekt - patrz gora pliku)
         try:
-            snd = pygame.mixer.Sound(os.path.join("sounds", "music_pirate.wav"))
-            snd.play()
-        except:
+            if pirate_snd is not None:
+                pirate_snd.play()
+        except Exception:
             pass
 
     def sail_out(self):
