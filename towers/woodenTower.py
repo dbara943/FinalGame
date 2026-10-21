@@ -282,22 +282,26 @@ class MetalTower(WoodenTower):
         self.name = "metalTower"
 
     def activate_ability(self, enemies, projectiles):
-        """Barrage: salwa w do 6 najblizszych wrogow (kazdy pocisk 2x dmg,
-        przebijajacy jak zwykle strzaly Metala)."""
+        """Barrage: salwa w do 6 najblizszych wrogow NA CALEJ MAPIE
+        (Daniel: globalnie, nie tylko w zasiegu; kazdy pocisk 2x dmg,
+        przebijajacy jak zwykle strzaly Metala). Pociski maja flage
+        _barrage - game.py rysuje za nimi karmazynowe smugi i daje
+        rozblysk przy trafieniu."""
         if self.ability_cooldown > 0:
             return False
         living = [e for e in enemies
-                  if not e.dying and not e.dead and not e.reached_end
-                  and (e.x - self.x) ** 2 + (e.y - self.y) ** 2 <= 220 ** 2]
+                  if not e.dying and not e.dead and not e.reached_end]
         living.sort(key=lambda e: (e.x - self.x) ** 2 + (e.y - self.y) ** 2)
         targets = living[:6]
         if not targets:
             return False
         self.ability_cooldown = int(self.ability_max_cooldown * getattr(self, '_ability_cd_mult', 1.0))
         for t in targets:
-            projectiles.append(Projectile(
+            _p = Projectile(
                 self.x, self.y - 30, self.archer_imgs[0], t,
-                self.damage * 2, speed=13, source_tower=self))
+                self.damage * 2, speed=13, source_tower=self)
+            _p._barrage = True
+            projectiles.append(_p)
         return True
 """
 GOLDEN TOWER 

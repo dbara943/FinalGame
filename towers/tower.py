@@ -104,7 +104,7 @@ class Tower:
             # Menu rysowane osobno na samym wierzchu przez game.py (nieprzykryte przez inne wieze)
 
     def effective_range(self):
-        """PRAWDZIWY zasieg strzalu: baza (z poziomem) x deszcz (0.9)
+        """PRAWDZIWY zasieg strzalu: baza (z poziomem); deszcz nie zmniejsza zasiegu
         x Link Metal (1.25). Tego samego uzywa attack() i kolo zasiegu -
         kolo ZAWSZE pokazuje to, czym wieza realnie strzela."""
         r = self.range * getattr(self, '_rain_mod', 1.0)

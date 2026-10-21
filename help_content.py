@@ -7,7 +7,7 @@ import i18n
 from towers.woodenTower import (WoodenTower, MetalTower, GoldenTower,
                                 FireTower, BlazeTower, IceTower)
 
-_CLASSES = [WoodenTower, MetalTower, GoldenTower, FireTower, BlazeTower, IceTower]
+_CLASSES = [WoodenTower, MetalTower, IceTower, GoldenTower, FireTower, BlazeTower]  # jak sklep: rosnaco po cenie
 _RATE = 100 / 60.0  # strzalow na sekunde (cooldown 60 tickow przy 100 Hz)
 
 _ROLE_KEYS = {

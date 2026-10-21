@@ -60,8 +60,8 @@ wave_bg = pygame.transform.scale(pygame.image.load(os.path.join("images","wave.p
 towers_names = ["woodenTower", "metalTower", "goldenTower", "fireTower", "blazeTower", "iceTower"]
 # Mapowanie: nazwa klasy wiezy -> nazwa przycisku w sklepie (t1..t6).
 # get_item_cost() szuka po nazwie przycisku, wiec bez tego zwracal -1.
-tower_shop_names = {"woodenTower": "t1", "metalTower": "t2", "goldenTower": "t3",
-                    "fireTower": "t4", "blazeTower": "t5", "iceTower": "t6"}
+tower_shop_names = {"woodenTower": "t1", "metalTower": "t2", "iceTower": "t3",
+                    "goldenTower": "t4", "fireTower": "t5", "blazeTower": "t6"}
 # Upgrady klikalnego budynku (jednorazowe na run)
 BUILDING_UPGRADES = [
     {"id": "treasury", "name": "War Treasury", "cost": 1200,
@@ -121,7 +121,7 @@ UPGRADE_L2 = {
     "bounty": {"cost": 2400, "desc": "Level 2: bosses and elites give +100% gold in total."},
     "lucky": {"cost": 3200, "desc": "Level 2: 20% chance to deal 2x critical damage."},
     "docks": {"cost": 4000, "desc": "Level 2: enemies move 30% slower on the pier."},
-    "storm": {"cost": 4800, "desc": "Level 2: storms give +40% gold (instead of +25%)."},
+    "storm": {"cost": 4800, "desc": "Level 2: storms give +40% gold; Storm Caller lightning is stronger and strikes more often."},
     "walls": {"cost": 5600, "desc": "Level 2: +10 max lives in total."},
     "ammo": {"cost": 6400, "desc": "Level 2: all towers shoot 30% faster in total."},
     "drones": {"cost": 8000, "desc": "Level 2: heals +1 life every wave; the repair drone works faster."},
@@ -132,10 +132,10 @@ UPGRADE_L2 = {
     "scout": {"cost": 3200, "desc": "Level 2: ambush +50% damage in the first 6s after spawning."},
     "supply": {"cost": 4000, "desc": "Level 2: towers cost 25% less in total."},
     "drums": {"cost": 4800, "desc": "Level 2: tower abilities recharge 50% faster in total."},
-    "signal": {"cost": 5600, "desc": "Level 2: all Fire and Blaze towers shoot 24% faster in total."},
+    "signal": {"cost": 5600, "desc": "Level 2: Bonnie's arrows set enemies on fire, Clyde's arrows poison them."},
     "guerrilla": {"cost": 6400, "desc": "Level 2: +60% damage against slowed enemies in total."},
     "banner": {"cost": 6400, "desc": "Level 2: all towers deal +20% damage in total."},
-    "spikes": {"cost": 7200, "desc": "Level 2: spikes deal +50% damage."},
+    "spikes": {"cost": 7200, "desc": "Level 2: spikes deal +50% damage; their poison is stronger and lasts longer."},
     "balloon": {"cost": 8800, "desc": "Level 2: bombs every 2s, 220 damage."},
     "sabotage": {"cost": 9600, "desc": "Level 2: all enemies spawn with -25% HP in total."},
 }
@@ -338,8 +338,13 @@ class Game:
                 self._building_icons[uid] = pygame.transform.smoothscale(img, (56, 56))
             except:
                 self._building_icons[uid] = None
-        # Facility uses the same icon as Repair Drones (same icon, second tier)
-        self._building_icons["facility"] = self._building_icons.get("drones")
+        # Facility ma WLASNA ikone bojowego drona (Daniel: ma wygladac na
+        # bojowego, nie naprawczego); fallback = ikona dronow naprawczych
+        try:
+            _fimg = pygame.image.load(os.path.join("images", "upgrades", "facility.webp"))
+            self._building_icons["facility"] = pygame.transform.smoothscale(_fimg, (56, 56))
+        except:
+            self._building_icons["facility"] = self._building_icons.get("drones")
         # Ikony poziomu 2 (zlota ramka + odznaka II)
         self._building_icons2 = {}
         for uid in ("walls", "drones", "tesla", "treasury", "bounty",
@@ -349,7 +354,11 @@ class Game:
                 self._building_icons2[uid] = pygame.transform.smoothscale(img, (56, 56))
             except:
                 self._building_icons2[uid] = self._building_icons.get(uid)
-        self._building_icons2["facility"] = self._building_icons2.get("drones")
+        try:
+            _fimg2 = pygame.image.load(os.path.join("images", "upgrades", "facility_2.webp"))
+            self._building_icons2["facility"] = pygame.transform.smoothscale(_fimg2, (56, 56))
+        except:
+            self._building_icons2["facility"] = self._building_icons2.get("drones")
         self._building_desc_font = pygame.font.SysFont("arial", 16)
         # Upgrady namiotu (klikany namiot tipi)
         self.tent_upgrades = {}  # {id: poziom 1-2} kupionych upgradow
@@ -444,9 +453,14 @@ class Game:
         self._combat_drone = None
         self._facility_rearm = 0
         self._coil_strikes = []  # pioruny walace w cewke Tesli (burza)
+        self._storm_bolts = []  # pioruny Storm Callera walace we wrogow (FX + ttl)
+        self._storm_strike_cd = 0  # odliczanie do kolejnego pioruna Storm Callera
+        self._sea_raid_left = 0  # sztorm morski: ilu najezdzcow jeszcze wyjdzie z wody
+        self._sea_raid_cd = 0  # sztorm morski: odliczanie do kolejnego najezdzcy
         self._facility_tracers = []
         self._facility_blasts = []
         self._facility_rockets = []  # lecace rakiety drona bojowego
+        self._barrage_tracers = []  # smugi pociskow Barrage (FX)
         # Statek sojuszniczy (Call the Cavalry)
         self.pirate_crippled = False
         self.ally_ship = None
@@ -480,7 +494,7 @@ class Game:
         self._endless_rain_left = 0  # pozostale fale deszczu w endless (gwarantowana burza)
         self._clear_snap = None  # snapshot wrogow dla failsafe'a czyszczenia planszy
         self.raining = False  # 7: deszcz
-        self._phenomenon = None  # pogoda fantasy: blood_moon/fog/aurora/meteors/gold_wind
+        self._phenomenon = None  # pogoda fantasy: blood_moon/fog/aurora/gold_wind/sea_storm
         self._show_placement = False  # opcja: zamazanie pola stawiania (klawisz G / menu pauzy)
         self._placement_mask = None
         self._placement_sig = None
@@ -633,7 +647,7 @@ class Game:
         self._overlay_dawn.fill((255, 200, 150, 30))
         self.selected_tower = None
         # Sklep startuje PO LEWEJ stronie ekranu (dalej przeciggalny).
-        self.menu = VerticalMenu(100, 250, side_img)
+        self.menu = VerticalMenu(100, 285, side_img)  # nizej: nie wchodzi na panel wrogow (10,65, h=62)
         # Ikony sklepu: GRAFIKA WIEZY + jej pocisk w rogu (zamiast samych
         # mini-ikonek pociskow). Kompozyt 46x46 budowany z prawdziwych assetow.
         def _shop_icon(tower_file, proj_file):
@@ -645,12 +659,13 @@ class Game:
                 pygame.image.load(os.path.join("images", "turrets", "projectiles", proj_file)), (20, 20))
             _s.blit(_p, (26, 26))
             return _s
+        # Kolejnosc przyciskow = rosnaco po cenie (Daniel): 100/500/650/750/1000/2000
         self.menu.add_btn(_shop_icon("1.png", "2.png"), "t1", 100, damage=1)
         self.menu.add_btn(_shop_icon("2.png", "1.png"), "t2", 500, damage=3)
-        self.menu.add_btn(_shop_icon("3.png", "3.png"), "t3", 750, damage=5)
-        self.menu.add_btn(_shop_icon("4.png", "4.png"), "t4", 1000, damage=9)
-        self.menu.add_btn(_shop_icon("5.png", "5.png"), "t5", 2000, damage=12)
-        self.menu.add_btn(_shop_icon("6.png", "6.png"), "t6", 650, damage=2)
+        self.menu.add_btn(_shop_icon("6.png", "6.png"), "t3", 650, damage=2)
+        self.menu.add_btn(_shop_icon("3.png", "3.png"), "t4", 750, damage=5)
+        self.menu.add_btn(_shop_icon("4.png", "4.png"), "t5", 1000, damage=9)
+        self.menu.add_btn(_shop_icon("5.png", "5.png"), "t6", 2000, damage=12)
         # Trudnosc: ceny sklepu (wyswietlane + pobierane) - skalowane raz przy starcie.
         # EASY -20%, HARD +25%. Supply Lines liczy sie OD tych cen (shop_price).
         for _btn in self.menu.buttons:
@@ -775,8 +790,8 @@ class Game:
                 en.max_health = max(1, int(en.max_health * _hp_mult))
                 en.health = max(1, int(en.health * _hp_mult))
             en.velocity *= self._diff("enemy_speed_mult")
-            if getattr(self, "_phenomenon", None) == "blood_moon":
-                en.velocity *= 1.1  # Krwawy ksiezyc: wrogowie szybsi
+            # Krwawy ksiezyc NIE przyspiesza juz wrogow (Daniel: pogoda ma
+            # byc po naszej stronie) - zostaje tylko +10% dmg wiez.
             if "sabotage" in self.tent_upgrades:
                 # Tylko aktualne HP (widoczne na pasku), max zostaje
                 en.health = max(1, int(en.health * (0.75 if self._upg_level(self.tent_upgrades, "sabotage") >= 2 else 0.85)))
@@ -904,7 +919,42 @@ class Game:
         self.show_menu = False
         self.paused = False
 
-    _PHENOMENA = ("blood_moon", "fog", "aurora", "meteors", "gold_wind")
+    _PHENOMENA = ("blood_moon", "fog", "aurora", "gold_wind", "sea_storm")
+
+    def _spawn_sea_raider(self):
+        """Najezdzca sztormu morskiego: wychodzi z wody po prawej stronie
+        planszy (poza klifem po lewej), brodzi do brzegu i idzie prosto
+        na brame budynku. Zwykly ludzki wrog (animowane sprite'y klas
+        Swordman/Knight/Forkman), namierzany przez wieze jak kazdy inny;
+        przy bramie zachowuje sie jak zwykly wrog (atak = -1 zycie,
+        poswiecenie straznika go blokuje)."""
+        sx = random.randint(690, 1075)
+        en = random.choice((Swordman, Swordman, Knight, Forkman))()
+        en.path = [(sx, 692), (sx, 618), (250, 351)]
+        en._path_dirs = []
+        for i in range(len(en.path) - 1):
+            _x1, _y1 = en.path[i]
+            _x2, _y2 = en.path[i + 1]
+            _dx, _dy = _x2 - _x1, _y2 - _y1
+            _len = math.hypot(_dx, _dy) or 1.0
+            en._path_dirs.append((_dx / _len, _dy / _len))
+        en.x, en.y = sx, 692
+        en.path_pos = 0
+        en.dis = 0
+        # Skalowanie jak w gen_enemies: HP i predkosc trudnosci + sabotaz
+        _hp_mult = self._diff("enemy_hp_mult")
+        if _hp_mult != 1.0:
+            en.max_health = max(1, int(en.max_health * _hp_mult))
+            en.health = max(1, int(en.health * _hp_mult))
+        en.velocity *= self._diff("enemy_speed_mult")
+        if "sabotage" in self.tent_upgrades:
+            en.health = max(1, int(en.health * (0.75 if self._upg_level(self.tent_upgrades, "sabotage") >= 2 else 0.85)))
+        en._spawn_tick = self._logic_tick
+        en._sea_raider = True
+        en.update()  # inicjalizuj img, zeby byl widoczny od pierwszej klatki
+        en.x, en.y = sx, 692
+        self.enemies.append(en)
+        self.particles.burst(sx, 690, (200, 230, 245), count=8, speed=3, life=25, size=3)
 
     def _roll_phenomenon(self, wave_num, banner=True):
         """Pogoda fantasy: 18% szans na fale (nie na falach z bossem).
@@ -914,6 +964,11 @@ class Game:
             return False
         if random.random() < 0.18:
             self._phenomenon = random.choice(self._PHENOMENA)
+            if self._phenomenon == "sea_storm":
+                # Sztorm morski: harmonogram najezdzcow z wody (liczba
+                # rosnie z numerem fali; pierwszy po ~1,2 s)
+                self._sea_raid_left = 6 + max(0, int(wave_num)) // 2
+                self._sea_raid_cd = 120
             if banner:
                 self.wave_banner_text += tr("banner." + self._phenomenon)
             return True
@@ -1422,6 +1477,51 @@ class Game:
         self._spikes = [SpikeCluster(x + random.randint(-20, 20), y + random.randint(-10, 10), pm)
                         for x, y in base_pts]
 
+    def _apply_status(self, en, kind, dps, seconds):
+        """Naklada/odswieza status DoT na wrogu (kind: 'poison' | 'burn').
+        Zasada: silniejszy efekt wygrywa - slabszy tylko przedluza czas,
+        jesli jego dps jest nizsze od aktywnego. Czasy w tickach 100 Hz."""
+        ticks = int(seconds * 100)
+        if kind == "poison":
+            if dps >= getattr(en, "_poison_dps", 0.0) or getattr(en, "_poison_t", 0) <= 0:
+                en._poison_dps = float(dps)
+                en._poison_t = ticks
+            else:
+                en._poison_t = max(en._poison_t, ticks)
+        elif kind == "burn":
+            if dps >= getattr(en, "_burn_dps", 0.0) or getattr(en, "_burn_t", 0) <= 0:
+                en._burn_dps = float(dps)
+                en._burn_t = ticks
+            else:
+                en._burn_t = max(en._burn_t, ticks)
+
+    def _tick_statuses(self):
+        """Tickowanie trucizny i podpalenia (wolane z update_game_logic).
+        Obrazenia przez hit(flash=False) - jak kolce: bez bialego blysku,
+        zloto za zabojstwo liczy sie normalnie (pula w petli smierci)."""
+        for en in self.enemies:
+            if en.dying or en.dead or en.reached_end:
+                continue
+            for _tattr, _dattr, _numcol in (("_poison_t", "_poison_dps", (130, 255, 110)),
+                                            ("_burn_t", "_burn_dps", (255, 160, 70))):
+                _t = getattr(en, _tattr, 0)
+                if _t > 0:
+                    setattr(en, _tattr, _t - 1)
+                    _d = getattr(en, _dattr, 0.0) / 100.0
+                    if _d > 0:
+                        try:
+                            en.hit(_d, flash=False)
+                        except Exception:
+                            en.health -= _d
+                            if en.health <= 0 and not en.dying:
+                                en.dying = True
+                        self.stats_damage += _d
+                        if random.random() < 0.01:
+                            self.damage_numbers.append([en.x, en.y - 46,
+                                                        f"{getattr(en, _dattr, 0.0):.0f}", 26, _numcol])
+                    if _t - 1 <= 0:
+                        setattr(en, _dattr, 0.0)
+
     def _update_spikes(self):
         """Kolce rania TYLKO wrogow, ktorzy na nich stoja (elipsa zgodna
         z rysunkiem klastra: 5 kolcow na ~56x22 px) - wczesniejszy test
@@ -1439,8 +1539,16 @@ class Game:
                 _dy = (en.y - sp.y) / 15.0
                 if _dx * _dx + _dy * _dy <= 1.0:
                     dmg = sp.damage / 100.0  # dps przy logice 100 Hz
-                    if "spikes" in self.tent_upgrades and self._upg_level(self.tent_upgrades, "spikes") >= 2:
+                    _sp_lvl = self._upg_level(self.tent_upgrades, "spikes")
+                    if _sp_lvl >= 2:
                         dmg *= 1.5  # Spike Barricade L2: glebsze kolce
+                    # Trucizna z kolcow (Daniel): L1 slabsza i krotsza,
+                    # L2 mocniejsza i dluzsza; odswieza sie, poki wrog stoi
+                    # na kolcach, po zejsciu dziala jeszcze przez swoj czas.
+                    if _sp_lvl >= 2:
+                        self._apply_status(en, "poison", 6.0, 3.0)
+                    else:
+                        self._apply_status(en, "poison", 3.0, 2.0)
                     was_dying = en.dying
                     try:
                         en.hit(dmg, flash=False)
@@ -2358,9 +2466,14 @@ class Game:
         self._combat_drone = None
         self._facility_rearm = 0
         self._coil_strikes = []  # pioruny walace w cewke Tesli (burza)
+        self._storm_bolts = []  # pioruny Storm Callera walace we wrogow (FX + ttl)
+        self._storm_strike_cd = 0  # odliczanie do kolejnego pioruna Storm Callera
+        self._sea_raid_left = 0  # sztorm morski: ilu najezdzcow jeszcze wyjdzie z wody
+        self._sea_raid_cd = 0  # sztorm morski: odliczanie do kolejnego najezdzcy
         self._facility_tracers = []
         self._facility_blasts = []
         self._facility_rockets = []  # lecace rakiety drona bojowego
+        self._barrage_tracers = []  # smugi pociskow Barrage (FX)
         self.pirate_crippled = False
         self.ally_ship = None
         self._ally_strike_at = None
@@ -2500,6 +2613,8 @@ class Game:
                     self._tesla_zap()
         # Spike Barricade: kolce rania wrogow
         self._update_spikes()
+        # Statusy DoT: trucizna (kolce / Clyde) i podpalenie (Bonnie)
+        self._tick_statuses()
         # Straznicy przy budynku strzelaja z lukow
         self._update_guard_dancers()
         self._update_guard_arrows()
@@ -2508,35 +2623,39 @@ class Game:
         self._update_balloon()
         # Dron naprawczy: zadania przy uszkodzeniach budynku
         self._update_repair_drone()
-        # Deszcz meteorow (pogoda fantasy): co 1,4 s meteor spada na
-        # losowego wroga (45 dmg, male AoE 20 w promieniu 60)
-        if getattr(self, "_phenomenon", None) == "meteors":
-            self._meteor_cd -= 1
-            if self._meteor_cd <= 0:
-                self._meteor_cd = 140
+        # Sztorm morski (pogoda fantasy, zastepuje meteory): co ~3,2-4,8 s
+        # kolejny najezdzca wychodzi z wody i idzie na budynek.
+        if getattr(self, "_phenomenon", None) == "sea_storm":
+            self._sea_raid_cd -= 1
+            if getattr(self, "_sea_raid_left", 0) > 0 and self._sea_raid_cd <= 0:
+                self._sea_raid_cd = random.randint(320, 480)
+                self._sea_raid_left -= 1
+                self._spawn_sea_raider()
+        # Storm Caller: burza walczy po naszej stronie. Podczas deszczu
+        # (albo sztormu morskiego) pioruny wala w losowych wrogow:
+        # L1 co ~2,5 s za 60 dmg, L2 co ~2 s za 90 dmg.
+        if (self.raining or getattr(self, "_phenomenon", None) == "sea_storm") \
+                and "storm" in self.building_upgrades:
+            self._storm_strike_cd -= 1
+            if self._storm_strike_cd <= 0:
+                _slvl = self._upg_level(self.building_upgrades, "storm")
+                self._storm_strike_cd = 200 if _slvl >= 2 else 250
                 _living = [e for e in self.enemies
                            if not e.dying and not e.dead and not e.reached_end]
                 if _living:
                     _t = random.choice(_living)
-                    self._meteor_fx.append([_t.x, -20, _t])
-        for _mf in self._meteor_fx[:]:
-            _tgt = _mf[2]
-            if _tgt is None or _tgt.dead or _tgt.dying or _tgt.reached_end:
-                self._meteor_fx.remove(_mf)
-                continue
-            _mf[1] += 14
-            if _mf[1] >= _tgt.y - 30:
-                self._meteor_fx.remove(_mf)
-                self.particles.burst(_tgt.x, _tgt.y - 20, (255, 170, 80),
-                                     count=14, speed=4, size=4)
-                for en in self.enemies:
-                    if en.dying or en.dead or en.reached_end:
-                        continue
-                    if (en.x - _tgt.x) ** 2 + (en.y - _tgt.y) ** 2 <= 60 ** 2:
-                        _md = 45 if en is _tgt else 20
-                        en.hit(_md)
-                        self.stats_damage += _md
-                self.damage_numbers.append([_tgt.x, _tgt.y - 50, "45", 40, (255, 190, 90)])
+                    _dmg = 90 if _slvl >= 2 else 60
+                    self._storm_bolts.append([_t, 10])
+                    try:
+                        _t.hit(_dmg)
+                    except Exception:
+                        _t.health -= _dmg
+                        if _t.health <= 0 and not _t.dying:
+                            _t.dying = True
+                    self.stats_damage += _dmg
+                    self.damage_numbers.append([_t.x, _t.y - 55, str(_dmg), 35, (200, 220, 255)])
+                    self.particles.burst(_t.x, _t.y - 25, (190, 215, 255),
+                                         count=10, speed=4, life=25, size=3)
         # Achievements: max_gold_held = szczyt kasy (nie tylko przy zabojstwach)
         self._ach_stats["max_gold_held"] = max(self._ach_stats.get("max_gold_held", 0), self.money)
         # Achievements: sprawdzanie co 60 tickow + zapis postepu (kumulatywnie)
@@ -2610,8 +2729,8 @@ class Game:
             if self.money >= cost and self.is_valid_placement(gx, gy):
                 self.money -= cost
                 self._add_gold_spent(cost)
-                tower_map = {"t1": WoodenTower, "t2": MetalTower, "t3": GoldenTower,
-                             "t4": FireTower, "t5": BlazeTower}
+                tower_map = {"t1": WoodenTower, "t2": MetalTower, "t3": IceTower,
+                             "t4": GoldenTower, "t5": FireTower, "t6": BlazeTower}
                 tw = tower_map[name](gx, gy)
                 self.towers.append(tw)
                 self._apply_tower_upgrade_flags(tw)
@@ -2649,6 +2768,16 @@ class Game:
             mf[2] -= 1
             if mf[2] <= 0:
                 self.muzzle_flashes.remove(mf)
+        # Smugi Barrage: zanikanie
+        for _bt in self._barrage_tracers[:]:
+            _bt[4] -= 1
+            if _bt[4] <= 0:
+                self._barrage_tracers.remove(_bt)
+        # Pioruny Storm Callera: zanikanie FX
+        for _sb in self._storm_bolts[:]:
+            _sb[1] -= 1
+            if _sb[1] <= 0:
+                self._storm_bolts.remove(_sb)
         # Aktualizacja cooldownow umiejetnosci
         for tw in self.towers:
             if tw.ability_cooldown > 0:
@@ -2660,6 +2789,9 @@ class Game:
                 tw.attack_cooldown -= 1
         # Update wrogow (animacje, ruch, timery) - TU, nie w draw()!
         for en in self.enemies:
+            # Deszcz / sztorm morski: wrogowie brodza 10% wolniej
+            # (pogoda po stronie gracza; flaga czytana w Enemy.move)
+            en._rain_slow = self.raining or getattr(self, "_phenomenon", None) == "sea_storm"
             en.update()
             # Boss-oblegacz (easter egg fali 20): co 1 s uderza w budynek.
             # Kazde uderzenie = -1 zycie + efekty jak przy przepuszczeniu
@@ -2798,7 +2930,7 @@ class Game:
         for tw in self.towers:
             # 5: synergia - przeliczana tylko gdy wieze sie zmienia (flaga), nie co tick
             # 7: deszcz -10% zasiegu
-            tw._rain_mod = 0.9 if self.raining else 1.0
+            tw._rain_mod = 1.0  # deszcz NIE zmniejsza juz zasiegu wiez (pogoda pro-gracz)
             # Wizualne: czasteczki idle wiez
             if random.random() < 0.05:
                 tname = type(tw).__name__
@@ -2824,7 +2956,17 @@ class Game:
 
         # Pociski leca do celow; trafienie zadaje obrazenia.
         for proj in self.projectiles[:]:
+            _px, _py = proj.x, proj.y
             hit_enemy = proj.move()
+            if getattr(proj, "_barrage", False):
+                # Smuga za pociskiem Barrage (segment od poprzedniej pozycji)
+                self._barrage_tracers.append([_px, _py, proj.x, proj.y, 7])
+                if hit_enemy is not None:
+                    # Rozblysk trafienia Barrage (karmazyn + iskry)
+                    self.particles.burst(hit_enemy.x, hit_enemy.y - 20, (230, 32, 58),
+                                         count=10, speed=4, life=25, size=3)
+                    self.particles.burst(hit_enemy.x, hit_enemy.y - 20, (255, 190, 90),
+                                         count=6, speed=3, life=20, size=2)
             if hit_enemy is not None:
                 # R5: zapamietaj wieze
                 if proj.source_tower:
@@ -3328,7 +3470,7 @@ class Game:
                 self.moving_object.x, self.moving_object.y)
             self.moving_object.draw(self.win)
             # Kolo podgladu: ten sam efektywny zasieg co po postawieniu
-            self.moving_object._rain_mod = 0.9 if self.raining else 1.0
+            self.moving_object._rain_mod = 1.0  # jw.: brak kary zasiegu za deszcz
             self.moving_object.draw_radius(self.win)
             self.moving_object._placement_valid = None
         # Trupy pod wrogami (znikaja stopniowo)
@@ -3385,6 +3527,13 @@ class Game:
             self.ally_ship.draw(self.win, self._anim_s)
         self._draw_cannonballs()
         self._draw_mortars()
+        # Smugi Barrage (karmazynowe, zanikajace) - pod pociskami
+        for _bt in getattr(self, "_barrage_tracers", []):
+            _a = max(0, min(255, int(255 * _bt[4] / 7)))
+            _ts = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            pygame.draw.line(_ts, (230, 32, 58, _a), (int(_bt[0]), int(_bt[1])), (int(_bt[2]), int(_bt[3])), 3)
+            pygame.draw.line(_ts, (255, 190, 90, _a // 2), (int(_bt[0]), int(_bt[1])), (int(_bt[2]), int(_bt[3])), 1)
+            self.win.blit(_ts, (0, 0))
         for proj in self.projectiles:
             proj.draw(self.win)
         # Latajace liczby obrazen
@@ -3514,11 +3663,20 @@ class Game:
         self.draw_facility()
         self.draw_combat_drone()
         self.draw_tesla_bolts()
-        # Meteory pogody fantasy: pomaranczowa smuga spadajaca na cel
-        for _mf in getattr(self, "_meteor_fx", []):
-            pygame.draw.line(self.win, (255, 150, 60),
-                             (int(_mf[0]) + 12, int(_mf[1]) - 52), (int(_mf[0]), int(_mf[1])), 4)
-            pygame.draw.circle(self.win, (255, 200, 110), (int(_mf[0]), int(_mf[1])), 5)
+        # Pioruny Storm Callera: postrzepiony piorun z nieba w cel
+        # (poswiata + wlasciwy zygzak; kazda klatka losuje nowy ksztalt -
+        # wyglada jak prawdziwy, migoczacy piorun)
+        for _sb in getattr(self, "_storm_bolts", []):
+            _t = _sb[0]
+            if _t is None or getattr(_t, "dead", False):
+                continue
+            _bx = _t.x
+            _pts = [(_bx + random.randint(-26, 26), 0)]
+            for _j in range(1, 7):
+                _pts.append((_bx + random.randint(-20, 20), int((_t.y - 30) * _j / 6)))
+            _pts.append((int(_t.x), int(_t.y - 30)))
+            pygame.draw.lines(self.win, (170, 200, 255), False, _pts, 5)
+            pygame.draw.lines(self.win, (255, 255, 215), False, _pts, 2)
         self.draw_building_menu()
         self.draw_tent_menu()
         self.draw_achievement_popup()
@@ -3536,11 +3694,11 @@ class Game:
             pos = self._mouse_pos()
             hovered = self.menu.get_hovered(pos[0], pos[1])
             if hovered:
-                tmp = {"t1": WoodenTower, "t2": MetalTower, "t3": GoldenTower,
-                       "t4": FireTower, "t5": BlazeTower}.get(hovered)
+                tmp = {"t1": WoodenTower, "t2": MetalTower, "t3": IceTower,
+                       "t4": GoldenTower, "t5": FireTower, "t6": BlazeTower}.get(hovered)
                 if tmp:
                     tw = tmp(pos[0], pos[1])
-                    tw._rain_mod = 0.9 if self.raining else 1.0
+                    tw._rain_mod = 1.0  # deszcz NIE zmniejsza juz zasiegu wiez (pogoda pro-gracz)
                     tw.draw_radius(self.win)
                     # Q12: DPS vs srednia
                     avg = sum(t.damage for t in self.towers) / max(1, len(self.towers))
@@ -3684,7 +3842,7 @@ class Game:
         # (9/12) i nie uwzglednial Bannera.
         _dmgm = 1.1 if "banner" in self.tent_upgrades else 1.0
         for _btn, _cls in zip(self.menu.buttons,
-                              (WoodenTower, MetalTower, GoldenTower, FireTower, BlazeTower, IceTower)):
+                              (WoodenTower, MetalTower, IceTower, GoldenTower, FireTower, BlazeTower)):
             _btn.damage = math.ceil(_cls.base_damage * _dmgm)
         self.menu.draw(self.win, self._mouse_pos(), discount=discount)
         self.draw_hud()
@@ -3781,8 +3939,6 @@ class Game:
             self._set_music_muted(not self.music_muted)
         elif action == "sfx":
             self._set_sfx_muted(not self.sfx_muted)
-        elif action == "placement":
-            self._show_placement = not self._show_placement
         elif action == "fullscreen":
             self._fullscreen = not self._fullscreen
             if self._fullscreen:
@@ -3812,7 +3968,6 @@ class Game:
             (tr("pause.help"), "help"),
             (tr("pause.music"), "music", not self.music_muted),
             (tr("pause.sfx"), "sfx", not self.sfx_muted),
-            (tr("pause.placement"), "placement", self._show_placement),
             (tr("pause.fullscreen", state=tr("common.on") if self._fullscreen else tr("common.off")), "fullscreen"),
             (tr("pause.speed", n=self.speed), "speed"),
             (tr("pause.quit"), "quit"),
@@ -4341,14 +4496,25 @@ class Game:
             ax, ay = a["x"], a["y"]
             tx, ty = a.get("tx", ax), a.get("ty", ay)
             ang = math.atan2(ty - ay, tx - ax)
-            # Strzala: drzewce + grot w kierunku lotu
+            # Strzala: drzewce + grot w kierunku lotu. Zywiolowe (Signal L2)
+            # maja kolor drzewca/grotu i swiecacy czubek: ogien Bonnie =
+            # pomarancz, trucizna Clyde'a = zielen.
             ex = ax + math.cos(ang) * 12
             ey = ay + math.sin(ang) * 12
-            pygame.draw.line(self.win, (200, 180, 150), (ax, ay), (ex, ey), 2)
-            pygame.draw.polygon(self.win, (220, 220, 220),
+            _kind = a.get("kind")
+            if _kind == "burn":
+                _shaft, _head, _glow = (255, 170, 80), (255, 110, 40), (255, 150, 50)
+            elif _kind == "poison":
+                _shaft, _head, _glow = (150, 220, 120), (90, 200, 80), (130, 255, 110)
+            else:
+                _shaft, _head, _glow = (200, 180, 150), (220, 220, 220), None
+            pygame.draw.line(self.win, _shaft, (ax, ay), (ex, ey), 2)
+            pygame.draw.polygon(self.win, _head,
                                 [(ex, ey),
                                  (ex - math.cos(ang + 2.6) * 6, ey - math.sin(ang + 2.6) * 6),
                                  (ex - math.cos(ang - 2.6) * 6, ey - math.sin(ang - 2.6) * 6)])
+            if _glow:
+                pygame.draw.circle(self.win, _glow, (int(ex), int(ey)), 3)
         for d in self._dancers:
             if not d["alive"]:
                 continue
@@ -4579,6 +4745,13 @@ class Game:
                     self.stats_damage += 25
                     self.damage_numbers.append([tgt.x, tgt.y - 40, "25", 40])
                     self.particles.burst(a["x"], a["y"], (200, 180, 150), count=3, speed=3, life=15, size=2)
+                    # Zywiol strzaly (Signal Fire L2): status + kolorowy rozblysk
+                    if a.get("kind") == "burn":
+                        self._apply_status(tgt, "burn", 3.0, 3.0)
+                        self.particles.burst(a["x"], a["y"], (255, 140, 50), count=6, speed=3, life=20, size=3)
+                    elif a.get("kind") == "poison":
+                        self._apply_status(tgt, "poison", 2.5, 4.0)
+                        self.particles.burst(a["x"], a["y"], (120, 240, 100), count=6, speed=3, life=20, size=3)
                 if a in self._guard_arrows:
                     self._guard_arrows.remove(a)
             else:
@@ -4696,8 +4869,13 @@ class Game:
                     if d2 < best_d2:
                         best, best_d2 = en, d2
                 if best:
-                    # Strzala jako widoczny pocisk (trafienie w _update_guard_arrows)
-                    self._guard_arrows.append({"x": d["x"], "y": d["y"] - 20, "tx": best.x, "ty": best.y - 20, "target": best, "guard": d})
+                    # Strzala jako widoczny pocisk (trafienie w _update_guard_arrows).
+                    # Signal Fire L2: Bonnie strzela PLONACYMI strzalami
+                    # (podpalenie), Clyde ZATRUTYMI (trucizna).
+                    _kind = None
+                    if self._upg_level(self.tent_upgrades, "signal") >= 2:
+                        _kind = "burn" if d.get("name") == "Bonnie" else "poison"
+                    self._guard_arrows.append({"x": d["x"], "y": d["y"] - 20, "tx": best.x, "ty": best.y - 20, "target": best, "guard": d, "kind": _kind})
                     self.particles.burst(d["x"], d["y"] - 25, (200, 180, 150), count=3, speed=3, life=15, size=2)
                     d["cd"] = 120  # 2s
                 else:
@@ -4798,14 +4976,31 @@ class Game:
             return
         t = self._anim_s
         if ph == "blood_moon":
-            # Krwawy ksiezyc: czerwona poswiata na caly ekran + wielki
-            # czerwony ksiezyc na niebie
+            # Krwawy ksiezyc (Daniel: ma byc NAPRAWDE krwiscie): mocna
+            # czerwona lawa na cala plansze (pulsujaca), krwawy pas nieba
+            # i wielki ksiezyc z poswiata. Zadnych bonusow dla wrogow -
+            # tylko +10% dmg wiez (w logice trafien).
+            _pulse = int(14 * math.sin(t * 1.6))
             ov = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-            ov.fill((150, 25, 20, 55))
+            ov.fill((168, 12, 6, 96 + _pulse))
+            # ciemniejsze, krwawsze niebo u gory
+            pygame.draw.rect(ov, (120, 4, 2, 90), (0, 0, self.width, 190))
+            # winieta: krwawsze brzegi planszy
+            pygame.draw.rect(ov, (140, 6, 4, 70), (0, 0, self.width, self.height), 46)
             self.win.blit(ov, (0, 0))
-            pygame.draw.circle(self.win, (196, 62, 48), (850, 74), 34)
-            pygame.draw.circle(self.win, (168, 44, 38), (838, 66), 9)  # krater
-            pygame.draw.circle(self.win, (176, 50, 40), (862, 84), 6)  # krater
+            # Poswiata ksiezyca + sam ksiezyc (wiekszy niz dawniej)
+            _glow = pygame.Surface((220, 220), pygame.SRCALPHA)
+            pygame.draw.circle(_glow, (220, 40, 26, 60), (110, 110), 104)
+            pygame.draw.circle(_glow, (225, 55, 34, 80), (110, 110), 76)
+            self.win.blit(_glow, (850 - 110, 78 - 110))
+            pygame.draw.circle(self.win, (206, 44, 30), (850, 78), 50)
+            pygame.draw.circle(self.win, (172, 30, 22), (832, 64), 13)   # krater
+            pygame.draw.circle(self.win, (180, 36, 26), (866, 92), 9)    # krater
+            pygame.draw.circle(self.win, (178, 34, 24), (856, 52), 6)    # krater
+            # Krew kapiaca z ksiezyca
+            _drip = int((t * 26) % 60)
+            pygame.draw.line(self.win, (190, 30, 20), (842, 124), (842, 124 + _drip), 4)
+            pygame.draw.circle(self.win, (190, 30, 20), (842, 128 + _drip), 4)
         elif ph == "fog":
             # Upiorna mgla: dryfujace, polprzezroczyste pasma na roznych
             # wysokosciach (wolny ruch od czasu animacji - pauza je trzyma)
@@ -4829,6 +5024,39 @@ class Game:
                 pygame.draw.lines(rib, (*col, 40), False,
                                   [(x, y + 16) for (x, y) in pts], 22)
                 self.win.blit(rib, (0, 0))
+        elif ph == "sea_storm":
+            # Sztorm morski: ciemna morska poswiata, ukosne smugi deszczu,
+            # piana na wodzie i rzadkie blyski piorunow nad morzem
+            ov = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            ov.fill((10, 38, 54, 92))
+            pygame.draw.rect(ov, (6, 24, 38, 70), (0, 0, self.width, 170))
+            self.win.blit(ov, (0, 0))
+            # Smugi deszczu (deterministyczne od czasu animacji)
+            rs = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            for i in range(46):
+                rx = int((i * 173 + t * 620) % (self.width + 160)) - 80
+                ry = int((i * 269 + t * 880) % (self.height + 120)) - 60
+                pygame.draw.line(rs, (190, 220, 240, 130), (rx, ry), (rx - 9, ry + 26), 2)
+            self.win.blit(rs, (0, 0))
+            # Piana na wodzie: jasne luki fal przy brzegu i na otwartej wodzie
+            for i in range(9):
+                fx = 40 + i * 128 + int(14 * math.sin(t * 1.3 + i * 1.7))
+                fy = 648 + (i % 3) * 26 + int(4 * math.sin(t * 2.0 + i))
+                pygame.draw.arc(self.win, (215, 238, 248),
+                                (fx, fy, 74, 20), 0.15 * math.pi, 0.85 * math.pi, 3)
+            # Błysk pioruna nad morzem (rzadko, jak przy zwyklej burzy)
+            if random.random() < 0.006:
+                self.lightning_timer = 8
+            if self.lightning_timer > 0:
+                self.lightning_timer -= 1  # gaszenie tu, bo draw_day_night robi to tylko dla self.raining
+                flash = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+                flash.fill((255, 255, 255, int(70 * self.lightning_timer / 8)))
+                self.win.blit(flash, (0, 0))
+                lx = random.randint(650, 1050)
+                pts = [(lx, 0)]
+                for j in range(8):
+                    pts.append((lx + random.randint(-28, 28), (j + 1) * 52))
+                pygame.draw.lines(self.win, (255, 255, 200), False, pts, 3)
         elif ph == "gold_wind":
             # Zloty wiatr: zlote drobiny pedzone w poprzek ekranu
             for i in range(16):
@@ -5160,15 +5388,19 @@ class Game:
 
     def _apply_tower_upgrade_flags(self, tw):
         """Ustawia flagi upgradow (budynek + namiot) na wiezy.
-        Efekty skalowane poziomem: Ammo +15%/poz., Signal +12%/poz.
-        (Fire/Blaze), Banner +10%/poz., Drums 0.7 / 0.5."""
+        Efekty skalowane poziomem: Ammo +15%/poz., Signal +12% tylko L1
+        (Fire/Blaze; L2 = zywiolowe strzaly straznikow),
+        Banner +10%/poz., Drums 0.7 / 0.5."""
         tw._fire_rate_mult = 1.0
         if "ammo" in self.building_upgrades:
             tw._fire_rate_mult *= 1 + 0.15 * self._upg_level(self.building_upgrades, "ammo")
         # Signal Fire: +12% fire rate za poziom dla WSZYSTKICH wiez Fire/Blaze
         # (globalnie, bez zasiegu ogniska). Tylko 2 typy wiez, wiec nie jest OP.
         if "signal" in self.tent_upgrades and type(tw).__name__ in ("FireTower", "BlazeTower"):
-            tw._fire_rate_mult *= 1 + 0.12 * self._upg_level(self.tent_upgrades, "signal")
+            # Tylko L1 daje +12% tempa. L2 NIE doklada tempa - zamiast tego
+            # daje straznikom zywiolowe strzaly (Bonnie plonace, Clyde
+            # zatrute; obsluga w _update_guard_dancers / _arrows).
+            tw._fire_rate_mult *= 1.12
         tw._dmg_mult = 1.0
         if "banner" in self.tent_upgrades:
             tw._dmg_mult *= 1 + 0.10 * self._upg_level(self.tent_upgrades, "banner")
@@ -6015,7 +6247,8 @@ class Game:
         Rosnie/kurczy sie z liczba posiadanych typow; kolejnosc bez zmian."""
         tower_types = [
             ("Wood", "Rapid Fire", (205, 133, 63)),    # jasny braz
-            ("Metal", "Frost Nova", (135, 206, 250)),     # jasny blekit
+            ("Metal", "Barrage", (230, 32, 58)),         # karmazyn (nowy kolor Barrage)
+            ("Ice", "Frost Nova", (135, 206, 250)),       # jasny blekit (po Barrage'u)
             ("Gold", "Golden Touch", (255, 215, 0)),    # zloto
             ("Fire", "Meteor", (255, 99, 71)),            # pomidorowy
             ("Blaze", "Armageddon", (218, 112, 214)),     # orchidea
@@ -6457,7 +6690,7 @@ class Game:
     def add_tower(self, name):
         x, y = self._mouse_pos()
         name_list = ["t1", "t2", "t3", "t4", "t5", "t6"]
-        object_list = [WoodenTower(x,y), MetalTower(x,y), GoldenTower(x,y), FireTower(x,y), BlazeTower(x,y), IceTower(x,y)]
+        object_list = [WoodenTower(x,y), MetalTower(x,y), IceTower(x,y), GoldenTower(x,y), FireTower(x,y), BlazeTower(x,y)]
         
         try:
             obj = object_list[name_list.index(name)]

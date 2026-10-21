@@ -284,7 +284,7 @@ class VerticalMenu(Menu):
 
     def get_rect(self):
         """Prostokat panelu sklepu (do przecigania i hover)."""
-        panel_w = 184
+        panel_w = 164
         panel_h = len(self.buttons) * 66 + 46
         return pygame.Rect(self.x - panel_w // 2, self.y - 140, panel_w, panel_h)
 
@@ -294,7 +294,7 @@ class VerticalMenu(Menu):
         # mouse_pos w wspolrzednych gry (po przeskalowaniu) - do hovera
         if mouse_pos is None:
             mouse_pos = pygame.mouse.get_pos()
-        panel_w = 184
+        panel_w = 164
         panel_h = len(self.buttons) * 66 + 46
         px = self.x - panel_w // 2
         py = self.y - 140
@@ -334,8 +334,8 @@ class VerticalMenu(Menu):
             nfont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
             dfont = pygame.font.SysFont("segoe ui, calibri, arial", 12)
             pfont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
-            names = [_t("tower.wood"), _t("tower.metal"), _t("tower.gold"),
-                     _t("tower.fire"), _t("tower.blaze"), _t("tower.ice")]
+            names = [_t("tower.wood"), _t("tower.metal"), _t("tower.ice"),
+                     _t("tower.gold"), _t("tower.fire"), _t("tower.blaze")]
             tx = bx + 58 - px  # wspolna lewa krawedz tekstu
             nm = nfont.render(names[idx] if idx < len(names) else item.name, True, (230, 235, 240))
             surf.blit(nm, (tx, by + 4 - py))

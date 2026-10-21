@@ -67,6 +67,13 @@ class Enemy:
         self.die_count = 0
         self.hurt_timer = 0
         self.slow_timer = 0
+        # Statusy DoT (paczka 26): trucizna (kolce / strzaly Clyde'a)
+        # i podpalenie (strzaly Bonnie). Tickowanie w game.py
+        # (Game._tick_statuses) - tu tylko stan + grafika.
+        self._poison_t = 0        # ticki pozostalej trucizny
+        self._poison_dps = 0.0    # obrazenia na sekunde
+        self._burn_t = 0          # ticki pozostalego podpalenia
+        self._burn_dps = 0.0      # obrazenia na sekunde
         self.base_velocity = 3
         self.flash_timer = 0  # V1: bialy blysk przy trafieniu
         self.last_hit_by = None  # R5: wieza ktora zadala ostatni cios
@@ -190,6 +197,43 @@ class Enemy:
                 cy = int(self.y) + 2 - ((_seed * (i + 1)) % 4)
                 pygame.draw.line(win, (210, 240, 255), (cx, cy), (cx - 2, cy - 6), 2)
                 pygame.draw.line(win, (210, 240, 255), (cx, cy), (cx + 2, cy - 6), 2)
+        # Trucizna: zielona powloka na sylwetce + babelki unoszace sie
+        # przy wrogu (deterministyczne wg pozycji i czasu gry - bez losowego
+        # migotania; czas z licznika animacji wroga, rosnie co klatke update)
+        if getattr(self, '_poison_t', 0) > 0 and not self.dying and not self.dead and self.flash_timer <= 0:
+            if not hasattr(self, '_poison_cache') or self._poison_cache.get('img') is not self.img:
+                mask = pygame.mask.from_surface(self.img)
+                poison_surf = mask.to_surface(setcolor=(110, 230, 90, 85),
+                                              unsetcolor=(0, 0, 0, 0))
+                self._poison_cache = {'img': self.img, 'surf': poison_surf}
+            win.blit(self._poison_cache['surf'], (_blit_x, _blit_y))
+            _phase = int(getattr(self, 'dis', 0) * 2)
+            for i in range(3):
+                _bx = int(self.x) - 12 + ((int(self.x) // 5 + i * 11) % 24)
+                _rise = (_phase * (1 + i) + i * 23) % 34
+                _by = int(self.y) - 6 - _rise
+                _br = 3 - _rise // 14
+                if _br > 0:
+                    pygame.draw.circle(win, (140, 255, 110), (_bx, _by), _br, 1)
+        # Podpalenie: pomaranczowa powloka + migoczace plomienie przy stopach
+        if getattr(self, '_burn_t', 0) > 0 and not self.dying and not self.dead and self.flash_timer <= 0:
+            if not hasattr(self, '_burn_cache') or self._burn_cache.get('img') is not self.img:
+                mask = pygame.mask.from_surface(self.img)
+                burn_surf = mask.to_surface(setcolor=(255, 130, 40, 85),
+                                            unsetcolor=(0, 0, 0, 0))
+                self._burn_cache = {'img': self.img, 'surf': burn_surf}
+            win.blit(self._burn_cache['surf'], (_blit_x, _blit_y))
+            _phase = int(getattr(self, 'dis', 0) * 3)
+            _seed = int(self.x) // 6 + int(self.y) // 4
+            for i in range(3):
+                _fx = int(self.x) - 13 + ((_seed * (i + 2) + _phase // 3) % 26)
+                _fh = 7 + ((_phase // 2 + i * 5) % 6)
+                pygame.draw.polygon(win, (255, 150, 50),
+                                    [(_fx - 3, int(self.y) + 2), (_fx + 3, int(self.y) + 2),
+                                     (_fx, int(self.y) + 2 - _fh)])
+                pygame.draw.polygon(win, (255, 210, 110),
+                                    [(_fx - 1, int(self.y) + 1), (_fx + 1, int(self.y) + 1),
+                                     (_fx, int(self.y) + 1 - _fh // 2)])
         # Pasek HP tylko gdy ranny (wydajnosc) - pelne HP = brak paska
         if not self.dying and self.health < self.max_health:
             self.draw_health_bar(win)
@@ -347,6 +391,10 @@ class Enemy:
        # predkosc wraca do normalnej (flaga _docks_slow z gen_enemies).
        if getattr(self, "_docks_slow", False) and _PIER_RECT[0] <= self.x < _PIER_RECT[0] + _PIER_RECT[2] and _PIER_RECT[1] <= self.y < _PIER_RECT[1] + _PIER_RECT[3]:
            current_vel *= getattr(self, "_docks_factor", 0.85)  # Docks L1: 0.85, L2: 0.70
+       # Deszcz / sztorm morski: brodzenie 10% wolniej (flaga _rain_slow
+       # ustawiana co tick przez game.py; pogoda ma pomagac graczowi)
+       if getattr(self, "_rain_slow", False):
+           current_vel *= 0.9
        step_len = current_vel / 3.0
        dist_to_target = math.sqrt((x2 - self.x)**2 + (y2 - self.y)**2)
        step_len = min(step_len, dist_to_target)
