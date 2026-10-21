@@ -370,5 +370,8 @@
  "banner.aurora": " [AURORA]",
  "banner.meteors": " [CHUVA DE METEOROS]",
  "banner.gold_wind": " [VENTO DOURADO]",
- "help.e8": "Clima fantástico pode aparecer em qualquer onda: Lua de Sangue (inimigos mais rápidos, torres mais fortes), Névoa Fantasma (+25% ouro), Aurora (habilidades mais rápidas), Chuva de Meteoros, Vento Dourado (+3 ouro por eliminação)."
+ "help.e8": "Clima fantástico pode aparecer em qualquer onda: Lua de Sangue (inimigos mais rápidos, torres mais fortes), Névoa Fantasma (+25% ouro), Aurora (habilidades mais rápidas), Chuva de Meteoros, Vento Dourado (+3 ouro por eliminação).",
+ "pause.placement": "Área de construção",
+ "notif.placement_on": "Área de construção: ON",
+ "notif.placement_off": "Área de construção: OFF"
 }

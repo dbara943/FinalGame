@@ -370,5 +370,8 @@
  "banner.aurora": " [AURORE]",
  "banner.meteors": " [PLUIE DE MÉTÉORES]",
  "banner.gold_wind": " [VENT DORÉ]",
- "help.e8": "Une météo fantastique peut apparaître à chaque vague : Lune de Sang (ennemis plus rapides, tours plus fortes), Brume Spectrale (+25 % d'or), Aurore (capacités plus rapides), Pluie de Météores, Vent Doré (+3 or par élimination)."
+ "help.e8": "Une météo fantastique peut apparaître à chaque vague : Lune de Sang (ennemis plus rapides, tours plus fortes), Brume Spectrale (+25 % d'or), Aurore (capacités plus rapides), Pluie de Météores, Vent Doré (+3 or par élimination).",
+ "pause.placement": "Zone de construction",
+ "notif.placement_on": "Zone de construction : OUI",
+ "notif.placement_off": "Zone de construction : NON"
 }

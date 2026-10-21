@@ -370,5 +370,8 @@
  "banner.aurora": " [AURORA]",
  "banner.meteors": " [METEOR SHOWER]",
  "banner.gold_wind": " [GOLDEN WIND]",
- "help.e8": "Fantasy weather can appear on any wave: Blood Moon (faster enemies, stronger towers), Ghostly Fog (+25% gold), Aurora (abilities recharge faster), Meteor Shower, Golden Wind (+3 gold per kill)."
+ "help.e8": "Fantasy weather can appear on any wave: Blood Moon (faster enemies, stronger towers), Ghostly Fog (+25% gold), Aurora (abilities recharge faster), Meteor Shower, Golden Wind (+3 gold per kill).",
+ "pause.placement": "Placement area",
+ "notif.placement_on": "Placement area: ON",
+ "notif.placement_off": "Placement area: OFF"
 }

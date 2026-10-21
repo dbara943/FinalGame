@@ -370,5 +370,8 @@
  "banner.aurora": " [AURORA]",
  "banner.meteors": " [LLUVIA DE METEOROS]",
  "banner.gold_wind": " [VIENTO DORADO]",
- "help.e8": "El clima fantástico puede aparecer en cualquier oleada: Luna de Sangre (enemigos más rápidos, torres más fuertes), Niebla Fantasma (+25% oro), Aurora (habilidades más rápidas), Lluvia de Meteoros, Viento Dorado (+3 oro por baja)."
+ "help.e8": "El clima fantástico puede aparecer en cualquier oleada: Luna de Sangre (enemigos más rápidos, torres más fuertes), Niebla Fantasma (+25% oro), Aurora (habilidades más rápidas), Lluvia de Meteoros, Viento Dorado (+3 oro por baja).",
+ "pause.placement": "Área de construcción",
+ "notif.placement_on": "Área de construcción: SÍ",
+ "notif.placement_off": "Área de construcción: NO"
 }

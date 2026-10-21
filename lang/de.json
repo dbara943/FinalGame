@@ -370,5 +370,8 @@
  "banner.aurora": " [POLARLICHT]",
  "banner.meteors": " [METEORENREGEN]",
  "banner.gold_wind": " [GOLDWIND]",
- "help.e8": "Fantasy-Wetter kann auf jeder Welle erscheinen: Blutmond (schnellere Gegner, stärkere Türme), Geisternebel (+25% Gold), Polarlicht (Fähigkeiten laden schneller), Meteorregen, Goldwind (+3 Gold pro Kill)."
+ "help.e8": "Fantasy-Wetter kann auf jeder Welle erscheinen: Blutmond (schnellere Gegner, stärkere Türme), Geisternebel (+25% Gold), Polarlicht (Fähigkeiten laden schneller), Meteorregen, Goldwind (+3 Gold pro Kill).",
+ "pause.placement": "Baufläche",
+ "notif.placement_on": "Baufläche: AN",
+ "notif.placement_off": "Baufläche: AUS"
 }

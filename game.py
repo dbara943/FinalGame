@@ -481,6 +481,9 @@ class Game:
         self._clear_snap = None  # snapshot wrogow dla failsafe'a czyszczenia planszy
         self.raining = False  # 7: deszcz
         self._phenomenon = None  # pogoda fantasy: blood_moon/fog/aurora/meteors/gold_wind
+        self._show_placement = False  # opcja: zamazanie pola stawiania (klawisz G / menu pauzy)
+        self._placement_mask = None
+        self._placement_sig = None
         self._meteor_cd = 0
         self._meteor_fx = []
         try:
@@ -1925,6 +1928,11 @@ class Game:
                             self._screen = pygame.display.set_mode((self.width, self.height))
                     if event.key == pygame.K_F3:
                         self._debug_show = not getattr(self, '_debug_show', False)
+                    # G: zamazanie pola stawiania wl/wyl
+                    if event.key == pygame.K_g:
+                        self._show_placement = not getattr(self, "_show_placement", False)
+                        self.gold_notifications.append(
+                            [tr("notif.placement_on" if self._show_placement else "notif.placement_off"), 120])
                     # Spacja: pauza
                     if event.key == pygame.K_SPACE:
                         self.paused = not self.paused
@@ -3293,6 +3301,13 @@ class Game:
                                 drawn_links.add(key)
                                 pygame.draw.line(self.win, (255, 215, 0, 120),
                                                (tw.x, tw.y - 20), (tw2.x, tw2.y - 20), 2)
+        # Opcja: zamazanie pola stawiania (maska liczona leniwie,
+        # przeliczana gdy zmieni sie uklad wiez albo pozycja sklepu)
+        if getattr(self, "_show_placement", False):
+            if (getattr(self, "_placement_mask", None) is None
+                    or getattr(self, "_placement_sig", None) != self._placement_signature()):
+                self._build_placement_mask()
+            self.win.blit(self._placement_mask, (0, 0))
         # Ognisko z tanczacymi PRZED wiezami - wieze zawsze widoczne nad animacja
         self.draw_campfire()
         for tw in self.towers:
@@ -3764,6 +3779,8 @@ class Game:
             self._set_music_muted(not self.music_muted)
         elif action == "sfx":
             self._set_sfx_muted(not self.sfx_muted)
+        elif action == "placement":
+            self._show_placement = not self._show_placement
         elif action == "fullscreen":
             self._fullscreen = not self._fullscreen
             if self._fullscreen:
@@ -3793,6 +3810,7 @@ class Game:
             (tr("pause.help"), "help"),
             (tr("pause.music"), "music", not self.music_muted),
             (tr("pause.sfx"), "sfx", not self.sfx_muted),
+            (tr("pause.placement"), "placement", self._show_placement),
             (tr("pause.fullscreen", state=tr("common.on") if self._fullscreen else tr("common.off")), "fullscreen"),
             (tr("pause.speed", n=self.speed), "speed"),
             (tr("pause.quit"), "quit"),
@@ -6143,13 +6161,19 @@ class Game:
                 return True
         return False
 
-    def is_valid_placement(self, x, y):
-        """Czy mozna postawic wieze w (x, y). NOWY MODEL (Daniel): wieze
-        mozna stawiac na calej planszy, a nie tylko w recznie rysowanych
-        strefach (przez strefy dobre miejsca na trawie odrzucalo).
-        Blokady: marginesy/HUD, panel sklepu (tam gdzie aktualnie stoi),
-        budynek, namiot, woda i klif (z pikseli tla), droga (odleglosc
-        od sciezki < 38) i inne wieze (< 52 px)."""
+    # Podstawa wiezy: elipsa 80x30 - dokladnie ta, ktora podglad stawiania
+    # rysuje u stop wiezy (footprint w draw_placement_grid). Srodek elipsy
+    # jest 7 px pod punktem kotwicy wiezy (x, y).
+    _BASE_RX = 40
+    _BASE_RY = 15
+    _BASE_CY = 7
+
+    def _point_placeable(self, x, y):
+        """Reguly PUNKTOWE obszaru stawiania: czy pojedynczy punkt planszy
+        jest w dozwolonym obszarze. Blokady: marginesy/HUD, panel sklepu
+        (tam gdzie aktualnie stoi), budynek, namiot, woda i klif (z pikseli
+        tla), droga (odleglosc od sciezki < 38). Test wiez jest osobno -
+        w is_valid_placement (elipsy nie moga na siebie nachodzic)."""
         if x < 30 or x > self.width - 30 or y < 48 or y > self.height - 24:
             return False
         # Panel sklepu (przeciggalny - blokuje tylko swoj aktualny prostokat)
@@ -6197,11 +6221,75 @@ class Game:
                 dist = math.hypot(x - px, y - py)
             if dist < 38:
                 return False
-        # Na innej wiezy
+        return True
+
+    def is_valid_placement(self, x, y):
+        """Czy mozna postawic wieze w (x, y). Model PODSTAWY (Daniel):
+        liczy sie tylko elipsa podstawy 80x30 - kazdy jej punkt (srodek +
+        16 probek na obwodzie) musi byc w dozwolonym obszarze, a elipsy
+        wiez nie moga na siebie nachodzic. Nachodzenie elips liczy sie
+        w metryce skalowanej (elipsy -> kola jednostkowe): nachodza, gdy
+        (dx/40)^2 + (dy/15)^2 < 4 - czyli w poziomie potrzeba 80 px,
+        w pionie tylko 30 px, wieze moga stac blizej niz dawniej (52 px)."""
+        cx, cy = x, y + self._BASE_CY
+        if not self._point_placeable(cx, cy):
+            return False
+        for k in range(16):
+            a = 2 * math.pi * k / 16
+            if not self._point_placeable(cx + self._BASE_RX * math.cos(a),
+                                          cy + self._BASE_RY * math.sin(a)):
+                return False
         for tw in self.towers:
-            if math.hypot(x - tw.x, y - tw.y) < 52:
+            dx = (x - tw.x) / self._BASE_RX
+            dy = (y - tw.y) / self._BASE_RY
+            if dx * dx + dy * dy < 4.0:
                 return False
         return True
+
+    def _placement_signature(self):
+        """Podpis stanu wplywajacego na maske pola (wieze + pozycja sklepu)."""
+        try:
+            r = self.menu.get_rect()
+            shop = (r.x, r.y, r.w, r.h)
+        except Exception:
+            shop = None
+        return (tuple((tw.x, tw.y) for tw in self.towers), shop)
+
+    def _build_placement_mask(self):
+        """Maska zamazania pola stawiania: siatka co 8 px - zielono tam,
+        gdzie elipsa podstawy zmiescilaby sie w calosci, czerwono tam,
+        gdzie nie. Buforowana; przeliczana gdy zmieni sie podpis stanu."""
+        step = 8
+        cols = self.width // step + 1
+        rows = self.height // step + 1
+        grid = [[self._point_placeable(gx * step, gy * step)
+                 for gx in range(cols)] for gy in range(rows)]
+        mask = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        green = (70, 255, 130, 44)
+        red = (255, 70, 70, 26)
+        for gy in range(rows):
+            for gx in range(cols):
+                x, y = gx * step, gy * step
+                ok = grid[gy][gx]
+                if ok:
+                    cx, cy = x, y + self._BASE_CY
+                    for k in range(16):
+                        a = 2 * math.pi * k / 16
+                        sx = int(round((cx + self._BASE_RX * math.cos(a)) / step))
+                        sy = int(round((cy + self._BASE_RY * math.sin(a)) / step))
+                        if not (0 <= sx < cols and 0 <= sy < rows) or not grid[sy][sx]:
+                            ok = False
+                            break
+                if ok:
+                    for tw in self.towers:
+                        dx = (x - tw.x) / self._BASE_RX
+                        dy = (y - tw.y) / self._BASE_RY
+                        if dx * dx + dy * dy < 4.0:
+                            ok = False
+                            break
+                pygame.draw.rect(mask, green if ok else red, (x, y, step, step))
+        self._placement_mask = mask
+        self._placement_sig = self._placement_signature()
 
     def draw_hud(self):
         # DEBUG: F3 pokazuje stan wewnetrzny

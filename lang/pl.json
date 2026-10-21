@@ -370,5 +370,8 @@
  "banner.aurora": " [ZORZA]",
  "banner.meteors": " [DESZCZ METEORYTÓW]",
  "banner.gold_wind": " [ZŁOTY WIATR]",
- "help.e8": "Na każdej fali może pojawić się pogoda fantasy: Krwawy Księżyc (szybsi wrogowie, silniejsze wieże), Upiorna Mgła (+25% złota), Zorza (szybsze odnawianie umiejętności), Deszcz Meteorytów, Złoty Wiatr (+3 złota za zabójstwo)."
+ "help.e8": "Na każdej fali może pojawić się pogoda fantasy: Krwawy Księżyc (szybsi wrogowie, silniejsze wieże), Upiorna Mgła (+25% złota), Zorza (szybsze odnawianie umiejętności), Deszcz Meteorytów, Złoty Wiatr (+3 złota za zabójstwo).",
+ "pause.placement": "Pole stawiania",
+ "notif.placement_on": "Pole stawiania: WŁ",
+ "notif.placement_off": "Pole stawiania: WYŁ"
 }
