@@ -484,6 +484,8 @@ class Game:
         self._show_placement = False  # opcja: zamazanie pola stawiania (klawisz G / menu pauzy)
         self._placement_mask = None
         self._placement_sig = None
+        self._field_grid = None  # siatka namalowanego pola stawiania (maska PNG)
+        self._field_grid_tried = False
         self._meteor_cd = 0
         self._meteor_fx = []
         try:
@@ -6168,12 +6170,60 @@ class Game:
     _BASE_RY = 15
     _BASE_CY = 7
 
+    # Pole stawiania namalowane przez Daniela (2026-10-21): maska PNG
+    # 1124x720, bialy = wolno stawiac. Wczytywana raz, do siatki co 4 px.
+    _FIELD_CELL = 4
+
+    def _painted_field(self):
+        """Siatka bool namalowanego pola albo None, gdy brak pliku maski."""
+        if self._field_grid_tried:
+            return self._field_grid
+        self._field_grid_tried = True
+        try:
+            surf = pygame.image.load(
+                os.path.join("images", "placement_mask.png"))
+            cell = self._FIELD_CELL
+            cols = self.width // cell + 1
+            rows = self.height // cell + 1
+            grid = []
+            for gy in range(rows):
+                py = min(self.height - 1, gy * cell + cell // 2)
+                row = []
+                for gx in range(cols):
+                    px = min(self.width - 1, gx * cell + cell // 2)
+                    row.append(surf.get_at((px, py))[0] > 127)
+                grid.append(row)
+            self._field_grid = grid
+        except Exception:
+            self._field_grid = None
+        return self._field_grid
+
     def _point_placeable(self, x, y):
-        """Reguly PUNKTOWE obszaru stawiania: czy pojedynczy punkt planszy
-        jest w dozwolonym obszarze. Blokady: marginesy/HUD, panel sklepu
-        (tam gdzie aktualnie stoi), budynek, namiot, woda i klif (z pikseli
-        tla), droga (odleglosc od sciezki < 38). Test wiez jest osobno -
+        """Reguly PUNKTOWE obszaru stawiania. Glowne zrodlo prawdy: pole
+        namalowane przez Daniela (images/placement_mask.png) - koniec
+        z wiezami "na niebie". Jedyna dynamiczna blokada dokladana na
+        maske: panel sklepu (przeciaggalny, blokuje swoj aktualny
+        prostokat). Gdyby pliku maski brakowalo, dzialaja dawne reguly
+        (_point_placeable_legacy). Test wiez jest osobno -
         w is_valid_placement (elipsy nie moga na siebie nachodzic)."""
+        field = self._painted_field()
+        if field is not None:
+            if x < 0 or y < 0 or x >= self.width or y >= self.height:
+                return False
+            if not field[int(y) // self._FIELD_CELL][int(x) // self._FIELD_CELL]:
+                return False
+            try:
+                if self.menu.get_rect().inflate(12, 12).collidepoint(x, y):
+                    return False
+            except Exception:
+                pass
+            return True
+        return self._point_placeable_legacy(x, y)
+
+    def _point_placeable_legacy(self, x, y):
+        """Dawne reguly pikselowe (awaryjne, gdyby brakowalo maski):
+        marginesy/HUD, panel sklepu, budynek, namiot, woda i klif
+        z pikseli tla, droga (odleglosc od sciezki < 38)."""
         if x < 30 or x > self.width - 30 or y < 48 or y > self.height - 24:
             return False
         # Panel sklepu (przeciggalny - blokuje tylko swoj aktualny prostokat)
