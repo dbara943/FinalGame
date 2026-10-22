@@ -44,6 +44,7 @@ from ships.ally_ship import AllyShip
 from menu.menu import VerticalMenu, Menu
 from towers.tower import menu_bg as _tower_menu_bg, upgrade_btn as _upgrade_btn, sell_btn as _sell_btn
 from effects.particles import ParticleSystem, FloatingCoin, Shockwave
+import help_content
 import time
 import random
 
@@ -132,7 +133,7 @@ UPGRADE_L2 = {
     "scout": {"cost": 3200, "desc": "Level 2: ambush +50% damage in the first 6s after spawning."},
     "supply": {"cost": 4000, "desc": "Level 2: towers cost 25% less in total."},
     "drums": {"cost": 4800, "desc": "Level 2: tower abilities recharge 50% faster in total."},
-    "signal": {"cost": 5600, "desc": "Level 2: Bonnie's arrows set enemies on fire, Clyde's arrows poison them."},
+    "signal": {"cost": 5600, "desc": "Level 2: Bonnie's arrows set enemies on fire, Clyde's arrows poison them. Fire and Blaze towers shoot 15% faster in total."},
     "guerrilla": {"cost": 6400, "desc": "Level 2: +60% damage against slowed enemies in total."},
     "banner": {"cost": 6400, "desc": "Level 2: all towers deal +20% damage in total."},
     "spikes": {"cost": 7200, "desc": "Level 2: spikes deal +50% damage and poison passing enemies."},
@@ -2834,9 +2835,12 @@ class Game:
                 # Golden Touch: podwojna kasa (oznaczeni lub globalny buff)
                 if getattr(d, '_gold_marked', False):
                     _mult *= 2.0
-                # Link Gold (Midas): zabojstwo zaliczone zlinkowanej wiezy
-                # Gold placi +50% zlota
-                if getattr(getattr(d, 'last_hit_by', None), '_link', None) == 'gold':
+                # Link Gold (Midas): +50% zlota - gdy dobijajaca wieza to
+                # zlinkowana Gold ALBO gdy wroga oznaczyla Golden Touch
+                # wieza z aktywnym linkiem (flaga na oznaczeniu, batch 28).
+                # Oba warunki naraz wciaz daja tylko jedno x1.5.
+                if getattr(getattr(d, 'last_hit_by', None), '_link', None) == 'gold' \
+                        or getattr(d, '_gold_mark_link', False):
                     _mult *= 1.5
                 # Bounty Board: bossowie i elity +50% zlota za poziom
                 if "bounty" in self.building_upgrades and (isinstance(d, Boss) or d.elite):
@@ -2997,6 +3001,12 @@ class Game:
                     if not hit_enemy.elite:
                         hit_enemy.apply_golden()
                         hit_enemy._gold_marked = True
+                        # Link Gold strzelajacej wiezy jedzie z OZNACZENIEM
+                        # (Daniel, batch 28): +50% Midasa nalezy sie, gdy
+                        # wieza oznaczajaca miala aktywny link - niezaleznie
+                        # od tego, kto/kiedy dobije oznaczonego wroga.
+                        if getattr(proj.source_tower, "_link", None) == "gold":
+                            hit_enemy._gold_mark_link = True
                     dmg = proj.damage * hit_enemy.get_damage_mult(proj.damage_type)
                     hit_enemy.hit(dmg)
                     self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 40, str(int(dmg)), 30, (255, 215, 0)])
@@ -3667,7 +3677,6 @@ class Game:
             self.win.blit(dark, (0, 0))
         
         # U9: podglad zasiegu wiezy ze sklepu (hover)
-        # Q12: porownanie DPS
         if not self.moving_object:
             pos = self._mouse_pos()
             hovered = self.menu.get_hovered(pos[0], pos[1])
@@ -3678,14 +3687,8 @@ class Game:
                     tw = tmp(pos[0], pos[1])
                     tw._rain_mod = 1.0  # deszcz NIE zmniejsza juz zasiegu wiez (pogoda pro-gracz)
                     tw.draw_radius(self.win)
-                    # Q12: DPS vs srednia
-                    avg = sum(t.damage for t in self.towers) / max(1, len(self.towers))
-                    diff = tw.damage - avg
-                    cfont = self.font_c13
-                    ctxt = tr("hud.dps_avg", dmg=tw.damage, diff=f"{'+' if diff >= 0 else ''}{diff:.0f}")
-                    ccol = (100, 255, 100) if diff >= 0 else (255, 150, 150)
-                    clabel = cfont.render(ctxt, True, ccol)
-                    self.win.blit(clabel, (pos[0] + 15, pos[1] - 25))
+                    # Podpisu "DPS x (+/-y vs avg)" NIE rysujemy (Daniel:
+                    # funkcja do usuniecia - zostaje sam podglad zasiegu).
         # U10: pokaz wszystkie zasiegi (R)
         if self.show_all_ranges:
             for tw in self.towers:
@@ -5363,7 +5366,12 @@ class Game:
         # kupno L2 ich nie resetuje. Walls/Drones: bonus zycia przy KAZDYM
         # poziomie (to jest istota ich L2).
         if uid == "facility" and _new_level == 1:
-            self._facility_rearm = self._DRONE_REARM  # pierwszy dron dokladnie po 3:00
+            # Pierwszy dron startuje OD RAZU po zakupie (Daniel, batch
+            # 28 - wczesniej trzeba bylo czekac cale 3:00).
+            self._spawn_combat_drone()
+        elif uid == "facility" and _new_level == 2:
+            # L2 kupione w trakcie przerwy: przerwa skraca sie do 2:00
+            self._facility_rearm = min(self._facility_rearm, 10800)
         if uid == "docks":
             # Pomost: spowolnienie dotyczy tez wrogow juz na mapie (na pomoście)
             _df = 0.70 if _new_level >= 2 else 0.85
@@ -5411,19 +5419,18 @@ class Game:
 
     def _apply_tower_upgrade_flags(self, tw):
         """Ustawia flagi upgradow (budynek + namiot) na wiezy.
-        Efekty skalowane poziomem: Ammo +15%/poz., Signal +12% tylko L1
-        (Fire/Blaze; L2 = zywiolowe strzaly straznikow),
-        Banner +10%/poz., Drums 0.7 / 0.5."""
+        Efekty skalowane poziomem: Ammo +15%/poz., Signal +12% (L1)
+        / +15% w sumie (L2) dla Fire/Blaze + zywiolowe strzaly
+        straznikow na L2, Banner +10%/poz., Drums 0.7 / 0.5."""
         tw._fire_rate_mult = 1.0
         if "ammo" in self.building_upgrades:
             tw._fire_rate_mult *= 1 + 0.15 * self._upg_level(self.building_upgrades, "ammo")
-        # Signal Fire: +12% fire rate za poziom dla WSZYSTKICH wiez Fire/Blaze
-        # (globalnie, bez zasiegu ogniska). Tylko 2 typy wiez, wiec nie jest OP.
+        # Signal Fire: tempo strzalow wiez Fire/Blaze (globalnie, bez
+        # zasiegu ogniska): L1 = +12%, L2 = +15% W SUMIE (Daniel, batch
+        # 28) - a oprocz tego L2 daje straznikom zywiolowe strzaly
+        # (Bonnie plonace, Clyde zatrute; _update_guard_dancers/_arrows).
         if "signal" in self.tent_upgrades and type(tw).__name__ in ("FireTower", "BlazeTower"):
-            # Tylko L1 daje +12% tempa. L2 NIE doklada tempa - zamiast tego
-            # daje straznikom zywiolowe strzaly (Bonnie plonace, Clyde
-            # zatrute; obsluga w _update_guard_dancers / _arrows).
-            tw._fire_rate_mult *= 1.12
+            tw._fire_rate_mult *= 1.15 if self._upg_level(self.tent_upgrades, "signal") >= 2 else 1.12
         tw._dmg_mult = 1.0
         if "banner" in self.tent_upgrades:
             tw._dmg_mult *= 1 + 0.10 * self._upg_level(self.tent_upgrades, "banner")
@@ -5799,7 +5806,7 @@ class Game:
     # Logika w tickach 100Hz (update_game_logic): 2-4 min zycia = 12000-24000,
     # rearm 3 min = 18000, minigun 0.15s = 15 tickow.
     _FACILITY_POS = (165, 198)  # flat rectangle dock, placed via drag tool
-    _DRONE_LIFE = (12000, 24000)
+    _DRONE_LIFE = (18000, 18000)  # kamikaze ZAWSZE po 3:00 od pojawienia sie (Daniel; wczesniej losowe 2-4 min)
     _DRONE_REARM = 18000
     _DRONE_FIRE_CD = 15
     _DRONE_SPEED = 2.2  # wolniej - wczesniej latal jak rozwscieczony komar
@@ -5819,9 +5826,9 @@ class Game:
 
     def _spawn_combat_drone(self):
         """Drone emerges from the facility box."""
-        # Start drona = poczatek kolejnego 3-minutowego cyklu
-        _rearm = 10800 if self._upg_level(self.building_upgrades, "facility") >= 2 else self._DRONE_REARM
-        self._facility_rearm = _rearm
+        # Zegar przerwy NIE startuje tu, tylko przy detonacji
+        # (_detonate_drone): cykl to lot 3:00 -> kamikaze -> przerwa
+        # 3:00 (2:00 na L2) -> kolejny dron (Daniel, batch 28).
         fx, fy = self._FACILITY_POS
         self._combat_drone = {
             "x": float(fx), "y": float(fy), "state": "emerge", "emerge_t": 40,
@@ -5895,11 +5902,10 @@ class Game:
         if "facility" not in self.building_upgrades:
             return
         d = self._combat_drone
-        # Harmonogram kamikadze: zegar 3:00 chodzi ZAWSZE (tez podczas lotu
-        # drona), a reset jest przy STARCIE drona - dzieki temu drony leca
-        # dokladnie co 3 minuty od zakupu: 3:00, 6:00, 9:00... Wczesniej
-        # odliczanie szlo tylko bez aktywnego drona, wiec przerwy byly
-        # 3 min + czas lotu, a licznik nie zawsze pokazywal 3:00.
+        # Harmonogram (Daniel, batch 28): dron pojawia sie od razu po
+        # zakupie, kamikaze robi zawsze po 3:00 lotu (stale _DRONE_LIFE),
+        # a po detonacji liczy sie przerwa 3:00 (2:00 na L2) do kolejnego
+        # drona. Zegar przerwy chodzi tylko, gdy drona nie ma.
         if self._facility_rearm > 0:
             self._facility_rearm -= 1
         if d is None:
@@ -6114,8 +6120,9 @@ class Game:
                 self.stats_damage += _kdmg
                 self.damage_numbers.append([en.x, en.y - 40, str(_kdmg), 60])
         self._combat_drone = None
-        # Bez resetu zegara przy smierci: cykl 3:00 liczy sie od STARTU
-        # drona (reset w _spawn_combat_drone), nie od jego kamikadze.
+        # Przerwa po kamikaze (Daniel, batch 28): kolejny dron dopiero
+        # po 3:00 (2:00 przy Facility L2) od detonacji - nie od razu.
+        self._facility_rearm = 10800 if self._upg_level(self.building_upgrades, "facility") >= 2 else self._DRONE_REARM
         self.gold_notifications.append([tr("notif.drone_down"), 200])
 
     def draw_facility(self):
@@ -6234,9 +6241,18 @@ class Game:
         px_, py_ = -math.sin(lang), math.cos(lang)
         pygame.draw.circle(self.win, (255, 120, 60), (int(lx1 + px_ * 3), int(ly1 + py_ * 3)), 3)
         pygame.draw.circle(self.win, (255, 120, 60), (int(lx1 - px_ * 3), int(ly1 - py_ * 3)), 3)
-        # Kamikaze: czerwona poswiata
-        if d.get("state") == "kamikaze":
-            pygame.draw.circle(self.win, (255, 60, 60), (int(x), int(y)), 26, 2)
+        # Kamikaze: znacznik na CELU nurkowania, nie na dronie (Daniel:
+        # pierscien na dronie wygladal, jakby to dron byl namierzany -
+        # a to dron namierza). Pulsujacy celownik w punkcie detonacji.
+        if d.get("state") == "kamikaze" and d.get("kamikaze_pos"):
+            _kx, _ky = d["kamikaze_pos"]
+            _kr = int(20 + 3 * math.sin(self._anim_s * 10))
+            pygame.draw.circle(self.win, (255, 60, 60), (int(_kx), int(_ky)), _kr, 2)
+            pygame.draw.circle(self.win, (255, 60, 60), (int(_kx), int(_ky)), 3)
+            for _dx, _dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                pygame.draw.line(self.win, (255, 60, 60),
+                                 (int(_kx + _dx * (_kr - 6)), int(_ky + _dy * (_kr - 6))),
+                                 (int(_kx + _dx * (_kr + 6)), int(_ky + _dy * (_kr + 6))), 2)
 
     def draw_tesla_bolts(self):
         """Rysuje pioruny Tesli (krotkotrwale)."""

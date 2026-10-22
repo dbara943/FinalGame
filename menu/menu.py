@@ -135,16 +135,23 @@ class Menu():
             win.blit(slabel, (px + 14, py + 52))
         else:
             eff_dmg = math.ceil(int(tw.damage * getattr(tw, '_synergy', 1.0)) * getattr(tw, '_dmg_mult', 1.0))
+            _frm = getattr(tw, '_fire_rate_mult', 1.0)
+            if getattr(tw, '_link', None) == 'wood':
+                _frm *= 1.3  # Link Wood w wyswietlanym DPS
+            shots_per_s = 100.0 * _frm / 60.0
+            dps = eff_dmg * shots_per_s
             _rngm = getattr(tw, '_rain_mod', 1.0)
             if getattr(tw, '_link', None) == 'metal':
                 _rngm *= 1.25  # Link Metal w wyswietlanym zasiegu
             eff_rng = int(tw.range * _rngm)
             slabel = stat_font.render(_t("tm.stats1", dmg=eff_dmg, rng=eff_rng), True, bright)
             win.blit(slabel, (px + 14, py + 52))
-            # Linii "DPS" nie rysujemy (Daniel: srednie DPS w menu wiezy
-            # usuwamy - zostaja DMG/RNG i liczba zabojstw).
+            # Linia DPS w menu wiezy ZOSTAJE (Daniel, batch 28: usuniecie
+            # w batchu 27 bylo pomylka - chodzilo o hover w sklepie).
+            dlabel = stat_font.render(_t("tm.stats2", dps=f"{dps:.1f}"), True, bright)
+            win.blit(dlabel, (px + 14, py + 68))
             klabel = stat_font.render(_t("tm.kills", n=tw.kills), True, bright)
-            win.blit(klabel, (px + 14, py + 68))
+            win.blit(klabel, (px + 122, py + 68))
         if tname == "SpikeCluster":
             klabel = stat_font.render(_t("tm.kills", n=tw.kills), True, bright)
             win.blit(klabel, (px + 14, py + 68))
