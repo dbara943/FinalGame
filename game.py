@@ -351,6 +351,12 @@ class Game:
         self._true_victory = False
         self._robot_img_cache = {}
         self._site_surf = None
+        self._site_pos = None  # None = domyslny punkt; gracz przeciaga plac jak wieze
+        self._site_dragging = False
+        self._site_drag_dx = 0
+        self._site_drag_dy = 0
+        self._site_drag_from = None
+        self._site_drag_valid = True
         self._building_rect = pygame.Rect(110, 158, 353, 231)  # bbox of drawn highlight polygon
         self._building_icons = {}
         for uid in ("walls", "drones", "tesla", "treasury", "bounty",
@@ -1996,8 +2002,13 @@ class Game:
                     _gx, _gy = self._to_game_pos(event.pos)
                     self.menu.x = max(100, min(self.width - 100, _gx + self.menu_drag_dx))
                     self.menu.y = max(190, min(self.height - 190, _gy + self.menu_drag_dy))
+                # Przeciganie placu budowy TYTANA (jak wieza: tylko na zielone)
+                if event.type == pygame.MOUSEMOTION and self._site_dragging:
+                    _gx, _gy = self._to_game_pos(event.pos)
+                    self._site_drag_move((_gx, _gy))
                 if event.type == pygame.MOUSEBUTTONUP:
                     self.menu_dragging = False
+                    self._site_drag_end()
                 if event.type == pygame.KEYDOWN:
                     # Pomoc otwarta: strzalki / A,D zmieniaja strone (nie zamykaja)
                     if getattr(self, '_show_help', False) and event.key in (pygame.K_LEFT, pygame.K_a):
@@ -2192,6 +2203,9 @@ class Game:
                             self.menu_drag_dx = self.menu.x - pos[0]
                             self.menu_drag_dy = self.menu.y - pos[1]
                             continue
+                    # Przeciganie placu budowy TYTANA: klik na rusztowanie = drag
+                    if not _upg_open and self._site_drag_start(pos):
+                        continue
                     # Q3: Shift+klik = szybka sprzedaz wiezy / klastra kolcow
                     keys = pygame.key.get_mods()
                     if keys & pygame.KMOD_SHIFT and self.selected_tower:
@@ -2475,6 +2489,8 @@ class Game:
         self._bot = None
         self._robot_wave_total = 0
         self._true_victory = False
+        self._site_pos = None
+        self._site_dragging = False
         try:
             self.ship.x, self.ship.y = self.ship.dock_x, self.ship.dock_y
         except Exception:
@@ -5510,8 +5526,74 @@ class Game:
     # ============ Batch 29: wiezyczki Walls L2 + PROJEKT TYTAN ============
 
     def _robot_site(self):
-        """Plac budowy TYTANA: trawa w luku drogi, na wschod od budynku."""
-        return (700, 545)
+        """Plac budowy TYTANA. Domyslnie trawa w luku drogi (660,500 -
+        zweryfikowany zielony punkt maski); gracz moze plac przeciagac,
+        ale upuscic wolno tylko na zielone pole, jak wieze."""
+        return getattr(self, "_site_pos", None) or (660, 500)
+
+    def _robot_eye(self, b, bob=0.0, yoff=0.0):
+        """Punkt wizjera (sprite 75%): stad leca promienie z oczu."""
+        return (b["x"] + b["facing"] * 81, b["y"] - 214 + bob + yoff)
+
+    def _site_valid(self, x, y):
+        """Czy plac moze stac w (x,y): dokladnie jak wieza - cala elipsa
+        podstawy 80x30 (srodek + 16 probek obwodowych) na zielonym polu."""
+        if not self._point_placeable(x, y):
+            return False
+        for i in range(16):
+            a = 2 * math.pi * i / 16
+            if not self._point_placeable(x + 40 * math.cos(a), y + 15 * math.sin(a)):
+                return False
+        return True
+
+    def _site_rect(self):
+        sx, sy = self._robot_site()
+        return pygame.Rect(sx - 130, sy - 200, 260, 215)
+
+    def _site_moved(self):
+        """Po przeniesieniu placu: robotnicy dostaja nowe stanowiska
+        (dochodza tam sami, trybem 'working')."""
+        sx, sy = self._robot_site()
+        spots = [(sx - 60, sy + 7), (sx + 70, sy + 7)]
+        i = 0
+        for d in self._dancers:
+            if d.get("alive") and d.get("mode") == "working":
+                d["work_x"], d["work_y"] = spots[i % len(spots)]
+                i += 1
+
+    def _site_drag_start(self, pos):
+        """Poczatek przeciagania placu (jak wieza: tylko w trakcie budowy,
+        bez otwartego menu i bez wiezy w rece). True = klik zlapany."""
+        if not self._robot or self._robot_phase:
+            return False
+        if getattr(self, "moving_object", None) is not None:
+            return False
+        if not self._site_rect().collidepoint(pos):
+            return False
+        sx, sy = self._robot_site()
+        self._site_dragging = True
+        self._site_drag_from = (sx, sy)
+        self._site_drag_dx = sx - pos[0]
+        self._site_drag_dy = sy - pos[1]
+        self._site_drag_valid = True
+        return True
+
+    def _site_drag_move(self, pos):
+        if not self._site_dragging:
+            return
+        nx = max(140, min(990, pos[0] + self._site_drag_dx))
+        ny = max(240, min(690, pos[1] + self._site_drag_dy))
+        self._site_pos = (nx, ny)
+        self._site_drag_valid = self._site_valid(nx, ny)
+
+    def _site_drag_end(self):
+        if not self._site_dragging:
+            return
+        self._site_dragging = False
+        if not self._site_drag_valid:
+            # Jak wieza na czerwonym: nie wolno - plac wraca na miejsce
+            self._site_pos = self._site_drag_from
+        self._site_moved()
 
     def _robot_unlocked(self):
         """Odblokowanie TYTANA: KAZDY inny upgrade (budynek + namiot) kupiony
@@ -5545,12 +5627,10 @@ class Game:
         self._add_gold_spent(cost)
         dur = 5 if len(alive) >= 2 else 10
         self._robot = {"waves_started": 0, "duration": dur, "final_armed": False}
-        sx, sy = self._robot_site()
-        spots = [(sx - 60, sy + 7), (sx + 70, sy + 7)]
-        for i, d in enumerate(alive):
+        for d in alive:
             d["mode"] = "working"
             d["target"] = None
-            d["work_x"], d["work_y"] = spots[i % len(spots)]
+        self._site_moved()
         # Tylko zloty pasek powiadomien: tekst jest za dlugi na wielki banner fali
         self.gold_notifications.append([tr("robot.started", waves=dur), 260])
 
@@ -5710,8 +5790,8 @@ class Game:
                     hp = max(0, int(getattr(best, "health", 0)))
                     best.hit(999999)
                     self.stats_damage += hp
-                    mx = b["x"] + b["facing"] * 138
-                    my = b["y"] - 148
+                    # Promien leci z OCZU (wizjer), nie z dziala na ramieniu
+                    mx, my = self._robot_eye(b)
                     b["beam"] = {"x1": mx, "y1": my, "x2": best.x, "y2": best.y - 20, "t": 20}
                     self.particles.burst(best.x, best.y - 20, (255, 150, 80),
                                           count=10, speed=3, life=20, size=3)
@@ -5827,13 +5907,19 @@ class Game:
         sx, sy = self._robot_site()
         p = self._robot_progress()
         img = self._robot_sprite(False)
-        reveal = int(380 * p)
+        W, H = img.get_size()
+        reveal = int(H * p)
         if reveal > 4:
             prev = self.win.get_clip()
-            self.win.set_clip(pygame.Rect(sx - 200, sy - reveal, 400, reveal))
-            self.win.blit(img, (sx - 192, sy - 380))
+            self.win.set_clip(pygame.Rect(sx - W // 2 - 8, sy - reveal, W + 16, reveal))
+            self.win.blit(img, (sx - W // 2, sy - H))
             self.win.set_clip(prev)
         self.win.blit(self._site_surface(), (sx - 125, sy - 168))
+        if self._site_dragging:
+            # Jak przy stawianiu wiezy: stopa placu + kolor walidacji
+            col = (90, 230, 120) if self._site_drag_valid else (235, 70, 60)
+            pygame.draw.ellipse(self.win, col, (sx - 40, sy - 15, 80, 30), 3)
+            pygame.draw.rect(self.win, col, (sx - 125, sy - 168, 250, 175), 2)
         # Etykieta + pasek postepu nad rusztowaniem
         lbl = self.font_btn18.render(
             f"{tr('hud.robot')}: {self._robot['waves_started']}/{self._robot['duration']}",
@@ -5845,33 +5931,31 @@ class Game:
         pygame.draw.rect(self.win, (255, 190, 70), (bx, by + 22, int(124 * p), 6), border_radius=3)
 
     def _draw_robot(self):
-        """TYTAN w scenie koncowej: wielki sprite (lustro wg kierunku),
-        pulsujacy wizjer, wiazki lasera (marsz + final w statek)."""
+        """TYTAN w scenie koncowej: sprite 75% (lustro wg kierunku),
+        pulsujacy wizjer, promienie z oczu (marsz + final w statek)."""
         if self._robot_phase not in ("rise", "march", "laser", "sink"):
             return
         b = self._bot
         img = self._robot_sprite(b["facing"] < 0)
+        W, H = img.get_size()
         bob = math.sin(b["t"] * 0.25) * 2 if self._robot_phase == "march" else 0
         yoff = (1 - min(1, b["t"] / 50)) * 55 if self._robot_phase == "rise" else 0
-        self.win.blit(img, (b["x"] - 192, b["y"] - 380 + bob + yoff))
-        # Pulsujacy czerwony wizjer
-        vx = b["x"] + b["facing"] * 108
-        vy = b["y"] - 285 + bob + yoff
+        self.win.blit(img, (b["x"] - W // 2, b["y"] - H + bob + yoff))
+        # Pulsujacy czerwony wizjer - zrodlo promieni
+        ex, ey = self._robot_eye(b, bob, yoff)
         r = 5 + int(2 * math.sin(b["t"] * 0.2))
-        pygame.draw.circle(self.win, (255, 60, 50), (int(vx), int(vy)), r)
-        # Wiazka marszowa (krotka)
+        pygame.draw.circle(self.win, (255, 60, 50), (int(ex), int(ey)), r)
+        # Wiazka marszowa (krotka, z oczu)
         if b.get("beam"):
             bm = b["beam"]
             self._draw_beam(bm["x1"], bm["y1"] + bob, bm["x2"], bm["y2"])
-        # Final: ladowanie wizjera-dziala, potem stala wiazka w statek
+        # Final: ladowanie wizjera, potem stala wiazka z oczu w statek
         if self._robot_phase == "laser":
-            mx = b["x"] + b["facing"] * 138
-            my = b["y"] - 148
             if b["t"] < 45:
-                pygame.draw.circle(self.win, (255, 120, 60), (int(mx), int(my)), 3 + b["t"] // 3)
-                pygame.draw.circle(self.win, (255, 240, 220), (int(mx), int(my)), 2 + b["t"] // 6)
+                pygame.draw.circle(self.win, (255, 120, 60), (int(ex), int(ey)), 3 + b["t"] // 3)
+                pygame.draw.circle(self.win, (255, 240, 220), (int(ex), int(ey)), 2 + b["t"] // 6)
             else:
-                self._draw_beam(mx, my, self.ship.x - 20, self.ship.y - 25)
+                self._draw_beam(ex, ey, self.ship.x - 20, self.ship.y - 25)
 
     def _upg_level(self, container, uid):
         """Poziom upgrade'a (0 = niekupiony). Kontenery upgradow to dict
