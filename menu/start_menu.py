@@ -417,9 +417,12 @@ class StartMenu:
         self.win.blit(hint, (px + (pw - hint.get_width()) // 2, py + ph - 35))
 
     def draw_help(self):
-        # Pomoc: 3 strony, tresc wspoldzielona z gra (help_content - liczby
-        # wiez liczone z klas). Strone zmienia sie strzalkami w panelu;
-        # klik gdzie indziej zamyka (jak dawniej).
+        # Pomoc: strony wspoldzielone z gra (help_content - liczby wiez
+        # liczone z klas). Uklad jak w pomocy w grze: tekst do lewej,
+        # bloki wiez ze ZDJECIEM wiezy i wcieciem, kroki wieksze od
+        # wysokosci fontu (zawijany tekst nie nachodzi na siebie).
+        # Linie "tower" niosa 3. element = nazwe klasy (sprite) - starszy
+        # rozpakowujacy kod (text, style) wywalal sie na nich (batch 27).
         import help_content
         all_pages = help_content.pages()
         page = max(0, min(getattr(self, "help_page", 0), len(all_pages) - 1))
@@ -429,26 +432,44 @@ class StartMenu:
         if not hasattr(self, "_help_font"):
             self._help_font = pygame.font.SysFont("arial", 19)
             self._help_font_b = pygame.font.SysFont("arial", 19, bold=True)
-        _steps = {"header": 27, "text": 22, "tower": 23, "sub": 21, "dim": 22}
-        # Zawijanie dlugich linii do szerokosci panelu
+        _steps = {"header": 28, "text": 24, "tower": 24, "sub": 23, "dim": 23}
+        # Zawijanie dlugich linii do szerokosci panelu (bloki wiez maja
+        # wezsza kolumne przez zdjecie po lewej); po bloku wiezy spacer.
         lines = []
-        for text, style in raw_lines:
+        _subs_left = 0
+        for raw in raw_lines:
+            text, style = raw[0], raw[1]
+            extra = raw[2] if len(raw) > 2 else None
             if text == "":
-                lines.append(("", "spacer"))
+                lines.append(("", "spacer", None, 0))
                 continue
-            fnt = self._help_font
+            if style == "tower":
+                _subs_left = 2
+            _in_block = style == "tower" or (style == "sub" and _subs_left > 0)
+            limit = 660 if _in_block else 716
+            # Wciecie liczone TU, na liniach logicznych - w petli rysujacej
+            # zawiniete kawalki wygladalyby jak osobne linie i blok wiezy
+            # tracil wciecie od drugiej zawinietej linii statystyk.
+            _xoff_line = 96 if _in_block else (36 if style == "sub" else 28)
+            fnt = self._help_font_b if style in ("header", "tower") else self._help_font
             words = text.split()
             cur = ""
+            _first = True
             for w_ in words:
                 trial = (cur + " " + w_).strip()
-                if fnt.size(trial)[0] > 736 and cur:
-                    lines.append((cur, style))
+                if fnt.size(trial)[0] > limit and cur:
+                    lines.append((cur, style, extra if _first else None, _xoff_line))
+                    _first = False
                     cur = w_
                 else:
                     cur = trial
             if cur:
-                lines.append((cur, style))
-        _total = 58 + sum(_steps.get(s, 12) if s != "spacer" else 12 for _, s in lines) + 52
+                lines.append((cur, style, extra if _first else None, _xoff_line))
+            if style == "sub" and _subs_left > 0:
+                _subs_left -= 1
+                if _subs_left == 0:
+                    lines.append(("", "spacer", None, 0))
+        _total = 58 + sum(_steps.get(s, 12) if s != "spacer" else 12 for _, s, _e, _x in lines) + 52
         pw = 780
         panel = pygame.Rect(self.rw // 2 - pw // 2, self.rh // 2 - _total // 2, pw, _total)
         pygame.draw.rect(self.win, (12, 24, 44), panel, border_radius=16)
@@ -456,7 +477,7 @@ class StartMenu:
         title = self.btn_font.render(t("sm.help.title"), True, (255, 210, 63))
         self.win.blit(title, (panel.centerx - title.get_width() // 2, panel.y + 14))
         y = panel.y + 58
-        for line, style in lines:
+        for line, style, extra, _xoff in lines:
             if style == "spacer":
                 y += 12
                 continue
@@ -470,8 +491,13 @@ class StartMenu:
                 f, c = self._help_font, (140, 150, 160)
             else:
                 f, c = self._help_font, (225, 232, 240)
+            if style == "tower":
+                _spr = help_content.TOWER_SPRITES.get(extra or "")
+                if _spr:
+                    _img = pygame.transform.scale(_spr[0], (52, 52))
+                    self.win.blit(_img, (panel.x + 28, y - 4))
             t_surf = f.render(line, True, c)
-            self.win.blit(t_surf, (panel.centerx - t_surf.get_width() // 2, y))
+            self.win.blit(t_surf, (panel.x + _xoff, y))
             y += _steps.get(style, 25)
         # Nawigacja: strzalki + licznik stron + podpowiedz zamkniecia
         nav = self._help_font.render(
@@ -506,6 +532,19 @@ class StartMenu:
                 if event.type == pygame.QUIT:
                     pygame.mixer.music.stop()
                     return None
+                # Pomoc: strzalki / A,D zmieniaja strone, ESC zamyka
+                # (wczesniej klawiatura w ogole nie dzialala w menu
+                # startowym - obslugiwane byly tylko kliki w strzalki).
+                if event.type == pygame.KEYDOWN and self.show_help:
+                    import help_content as _hc
+                    if event.key in (pygame.K_LEFT, pygame.K_a):
+                        self.help_page = max(0, getattr(self, "help_page", 0) - 1)
+                    elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                        self.help_page = min(len(_hc.pages()) - 1,
+                                             getattr(self, "help_page", 0) + 1)
+                    elif event.key == pygame.K_ESCAPE:
+                        self.show_help = False
+                    continue
                 # Scroll w achievementach
                 if event.type == pygame.MOUSEWHEEL and self.show_achievements:
                     if hasattr(self, "_ach_max_scroll"):
@@ -539,7 +578,9 @@ class StartMenu:
                         if hasattr(self, "_help_prev_rect") and self._help_prev_rect.collidepoint(event.pos):
                             self.help_page = max(0, getattr(self, "help_page", 0) - 1)
                         elif hasattr(self, "_help_next_rect") and self._help_next_rect.collidepoint(event.pos):
-                            self.help_page = min(2, getattr(self, "help_page", 0) + 1)
+                            import help_content as _hc
+                            self.help_page = min(len(_hc.pages()) - 1,
+                                                 getattr(self, "help_page", 0) + 1)
                         else:
                             self.show_help = False
                         clicked_something = True
