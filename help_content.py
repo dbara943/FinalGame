@@ -6,6 +6,18 @@ recznego przepisywania po kazdej zmianie liczb."""
 import i18n
 from towers.woodenTower import (WoodenTower, MetalTower, GoldenTower,
                                 FireTower, BlazeTower, IceTower)
+from towers.woodenTower import (tower_imgs1, tower_imgs2, tower_imgs3,
+                                tower_imgs4, tower_imgs5, tower_imgs6)
+
+# Zdjecia wiez do ekranu pomocy (renderer rysuje je przy bloku wiezy)
+TOWER_SPRITES = {
+    "WoodenTower": tower_imgs1,
+    "MetalTower": tower_imgs2,
+    "GoldenTower": tower_imgs3,
+    "FireTower": tower_imgs4,
+    "BlazeTower": tower_imgs5,
+    "IceTower": tower_imgs6,
+}
 
 _CLASSES = [WoodenTower, MetalTower, IceTower, GoldenTower, FireTower, BlazeTower]  # jak sklep: rosnaco po cenie
 _RATE = 100 / 60.0  # strzalow na sekunde (cooldown 60 tickow przy 100 Hz)
@@ -58,27 +70,32 @@ def pages():
         (t("help.c5"), "text"),
         (t("help.c6"), "text"),
     ]
-    # --- Strona 2: wieze (liczby z klas) ---
-    p2 = [(t("help.h_towers"), "header")]
-    for cls in _CLASSES:
-        name = i18n.tower_name(cls.__name__, cls.display_name)
-        ability = ""
-        akey = i18n.ABILITY_KEYS.get(_SHORT.get(cls.__name__, ""))
-        if akey:
-            ability = t(akey, cls.ability_name)
-        dmgs = [cls.base_damage + cls.upgrade_dmg * lv for lv in range(3)]
-        dpss = [_fmt(d * _RATE) for d in dmgs]
-        p2.append((t("help.tower_line", name=name, price=cls.buy_price,
-                     ability=ability), "tower"))
-        p2.append((t("help.stats_line",
-                     dmg="/".join(str(d) for d in dmgs),
-                     dps="/".join(dpss),
-                     range=125,
-                     upg=f"{cls.upgrade_costs[0]} / {cls.upgrade_costs[1]}"), "sub"))
-        p2.append((t(_ROLE_KEYS[cls.__name__]) + " " +
-                   t(_LINK_KEYS[cls.__name__]), "sub"))
-    p2.append(("", "text"))
-    p2.append((t("help.tower_note"), "dim"))
+    # --- Strony 2-3: wieze, po 3 na strone (liczby z klas; renderer
+    # doklada zdjecie wiezy przy jej bloku - linia "tower" niesie jako
+    # trzeci element nazwe klasy, zeby renderer wiedzial, ktory sprite) ---
+    tower_pages = []
+    for chunk in (_CLASSES[:3], _CLASSES[3:]):
+        p = [(t("help.h_towers"), "header")]
+        for cls in chunk:
+            name = i18n.tower_name(cls.__name__, cls.display_name)
+            ability = ""
+            akey = i18n.ABILITY_KEYS.get(_SHORT.get(cls.__name__, ""))
+            if akey:
+                ability = t(akey, cls.ability_name)
+            dmgs = [cls.base_damage + cls.upgrade_dmg * lv for lv in range(3)]
+            dpss = [_fmt(d * _RATE) for d in dmgs]
+            p.append((t("help.tower_line", name=name, price=cls.buy_price,
+                         ability=ability), "tower", cls.__name__))
+            p.append((t("help.stats_line",
+                         dmg="/".join(str(d) for d in dmgs),
+                         dps="/".join(dpss),
+                         range=125,
+                         upg=f"{cls.upgrade_costs[0]} / {cls.upgrade_costs[1]}"), "sub"))
+            p.append((t(_ROLE_KEYS[cls.__name__]) + " " +
+                       t(_LINK_KEYS[cls.__name__]), "sub"))
+        tower_pages.append(p)
+    tower_pages[1].append(("", "text"))
+    tower_pages[1].append((t("help.tower_note"), "dim"))
     # --- Strona 3: endless i reszta zasad ---
     p3 = [
         (t("help.h_endless"), "header"),
@@ -92,4 +109,4 @@ def pages():
         ("", "text"),
         (t("help.e7"), "dim"),
     ]
-    return [p1, p2, p3]
+    return [p1] + tower_pages + [p3]

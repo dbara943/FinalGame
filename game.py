@@ -73,7 +73,7 @@ BUILDING_UPGRADES = [
     {"id": "docks", "name": "Reinforced Docks", "cost": 2500,
      "desc": "Enemies move 15% slower on the pier."},
     {"id": "storm", "name": "Storm Caller", "cost": 3000,
-     "desc": "Storms last longer and give +25% gold (instead of +15%)."},
+     "desc": "Rain is your ally: storms give +25% gold from kills (instead of +15%)."},
     {"id": "walls", "name": "Reinforced Walls", "cost": 3500,
      "desc": "+5 max lives for the building."},
     {"id": "ammo", "name": "Ammunition Depot", "cost": 4000,
@@ -121,7 +121,7 @@ UPGRADE_L2 = {
     "bounty": {"cost": 2400, "desc": "Level 2: bosses and elites give +100% gold in total."},
     "lucky": {"cost": 3200, "desc": "Level 2: 20% chance to deal 2x critical damage."},
     "docks": {"cost": 4000, "desc": "Level 2: enemies move 30% slower on the pier."},
-    "storm": {"cost": 4800, "desc": "Level 2: storms give +40% gold; Storm Caller lightning is stronger and strikes more often."},
+    "storm": {"cost": 4800, "desc": "Level 2: storm gold grows to +40%, and strange weather may appear: blood moons, ghostly fog, auroras, golden winds and sea storms."},
     "walls": {"cost": 5600, "desc": "Level 2: +10 max lives in total."},
     "ammo": {"cost": 6400, "desc": "Level 2: all towers shoot 30% faster in total."},
     "drones": {"cost": 8000, "desc": "Level 2: heals +1 life every wave; the repair drone works faster."},
@@ -135,7 +135,7 @@ UPGRADE_L2 = {
     "signal": {"cost": 5600, "desc": "Level 2: Bonnie's arrows set enemies on fire, Clyde's arrows poison them."},
     "guerrilla": {"cost": 6400, "desc": "Level 2: +60% damage against slowed enemies in total."},
     "banner": {"cost": 6400, "desc": "Level 2: all towers deal +20% damage in total."},
-    "spikes": {"cost": 7200, "desc": "Level 2: spikes deal +50% damage; their poison is stronger and lasts longer."},
+    "spikes": {"cost": 7200, "desc": "Level 2: spikes deal +50% damage and poison passing enemies."},
     "balloon": {"cost": 8800, "desc": "Level 2: bombs every 2s, 220 damage."},
     "sabotage": {"cost": 9600, "desc": "Level 2: all enemies spawn with -25% HP in total."},
 }
@@ -453,8 +453,6 @@ class Game:
         self._combat_drone = None
         self._facility_rearm = 0
         self._coil_strikes = []  # pioruny walace w cewke Tesli (burza)
-        self._storm_bolts = []  # pioruny Storm Callera walace we wrogow (FX + ttl)
-        self._storm_strike_cd = 0  # odliczanie do kolejnego pioruna Storm Callera
         self._sea_raid_left = 0  # sztorm morski: ilu najezdzcow jeszcze wyjdzie z wody
         self._sea_raid_cd = 0  # sztorm morski: odliczanie do kolejnego najezdzcy
         self._facility_tracers = []
@@ -912,7 +910,7 @@ class Game:
             n = int(self._pause_wave_txt)
         except ValueError:
             return
-        n = max(1, min(999, n))
+        n = max(1, min(99, n))
         self.jump_to_wave(n)
         self._pause_wave_txt = ""
         self._pause_wave_focus = False
@@ -961,6 +959,12 @@ class Game:
         Zwraca True, gdy wylosowano - wtedy fala jest bez deszczu."""
         self._phenomenon = None
         if wave_num % 4 == 0:
+            return False
+        # Zjawiska fantasy TYLKO ze Storm Callerem na poziomie 2 (Daniel):
+        # pogoda sama w sobie daje male buffy (zloto z deszczu), a ciekawe
+        # zjawiska (krwawy ksiezyc, mgla, zorza, zloty wiatr, sztorm
+        # morski) to nagroda za drugi poziom tego upgradu.
+        if self._upg_level(self.building_upgrades, "storm") < 2:
             return False
         if random.random() < 0.18:
             self._phenomenon = random.choice(self._PHENOMENA)
@@ -1542,13 +1546,11 @@ class Game:
                     _sp_lvl = self._upg_level(self.tent_upgrades, "spikes")
                     if _sp_lvl >= 2:
                         dmg *= 1.5  # Spike Barricade L2: glebsze kolce
-                    # Trucizna z kolcow (Daniel): L1 slabsza i krotsza,
-                    # L2 mocniejsza i dluzsza; odswieza sie, poki wrog stoi
+                    # Trucizna z kolcow TYLKO od L2 upgradu (Daniel):
+                    # na L1 kolce tylko rania. Odswieza sie, poki wrog stoi
                     # na kolcach, po zejsciu dziala jeszcze przez swoj czas.
                     if _sp_lvl >= 2:
                         self._apply_status(en, "poison", 6.0, 3.0)
-                    else:
-                        self._apply_status(en, "poison", 3.0, 2.0)
                     was_dying = en.dying
                     try:
                         en.hit(dmg, flash=False)
@@ -1968,7 +1970,7 @@ class Game:
                         self._help_page = max(0, self._help_page - 1)
                         continue
                     if getattr(self, '_show_help', False) and event.key in (pygame.K_RIGHT, pygame.K_d):
-                        self._help_page = min(2, self._help_page + 1)
+                        self._help_page = min(len(help_content.pages()) - 1, self._help_page + 1)
                         continue
                     # ESC = cancel first, pause menu only if nothing to cancel
                     if event.key == pygame.K_ESCAPE:
@@ -2017,7 +2019,7 @@ class Game:
                             self._pause_wave_txt = self._pause_wave_txt[:-1]
                         elif event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
                             self._do_pause_jump()
-                        elif event.unicode and event.unicode.isdigit() and len(self._pause_wave_txt) < 3:
+                        elif event.unicode and event.unicode.isdigit() and len(self._pause_wave_txt) < 2:
                             self._pause_wave_txt += event.unicode
                         continue
                     # Gdy menu otwarte: blokuj wszystkie akcje wiez
@@ -2126,7 +2128,7 @@ class Game:
                             if self._help_prev_rect and self._help_prev_rect.collidepoint(pos):
                                 self._help_page = max(0, self._help_page - 1)
                             elif self._help_next_rect and self._help_next_rect.collidepoint(pos):
-                                self._help_page = min(2, self._help_page + 1)
+                                self._help_page = min(len(help_content.pages()) - 1, self._help_page + 1)
                             else:
                                 self._show_help = False
                         elif self._pause_jump_input and self._pause_jump_input.collidepoint(pos):
@@ -2144,8 +2146,13 @@ class Game:
                     # Faza 12 (poscig) NIE blokuje - statki tylko odplywaja, gracz gra dalej
                     if self.bombard_active and self.bombard_phase != 12:
                         continue
+                    # Otwarte menu upgradow (budynek/namiot): klik NIE moze
+                    # trafic w nic POD nim - dock umiejetnosci na dole,
+                    # panel sklepu, przycisk fali ani predkosci (Daniel:
+                    # klikajac upgrade dało sie niechcacy odpalic zdolnosc).
+                    _upg_open = self._building_menu_open or self._tent_menu_open
                     # Przeciganie sklepu: klik na panel (poza przyciskami) = drag
-                    if self.menu.get_rect().collidepoint(pos):
+                    if not _upg_open and self.menu.get_rect().collidepoint(pos):
                         if not self.menu.get_clicked(pos[0], pos[1]):
                             self.menu_dragging = True
                             self.menu_drag_dx = self.menu.x - pos[0]
@@ -2165,7 +2172,7 @@ class Game:
                         self.selected_spike = None
                         continue
                     # Ability dock - klikniecie aktywuje umiejetnosc
-                    if hasattr(self, 'ability_slots'):
+                    if not _upg_open and hasattr(self, 'ability_slots'):
                         for rect, tname in self.ability_slots:
                             if rect.collidepoint(pos):
                                 # WSZYSTKIE wieze tego typu z gotowym cooldownem aktywuja umiejetnosc
@@ -2185,7 +2192,7 @@ class Game:
                                         snd.play()
                                 continue
                     # R2: przycisk wczesniejszej fali
-                    if self.early_wave_rect and self.early_wave_rect.collidepoint(pos):
+                    if not _upg_open and self.early_wave_rect and self.early_wave_rect.collidepoint(pos):
                         # Nie mozna pominac gdy boss zyje
                         boss_alive = any(isinstance(en, Boss) for en in self.enemies)
                         if boss_alive:
@@ -2203,7 +2210,7 @@ class Game:
                                 self.ship.sail_in()
                         continue
                     # Przycisk predkosci (pauza tylko przez ESC)
-                    if self.speed_btn_rect.collidepoint(pos):
+                    if not _upg_open and self.speed_btn_rect.collidepoint(pos):
                         self.speed = self.speed % 3 + 1  # 1->2->3->1
                         continue
                     # Menu upgradow budynku - klik na budynek lub w otwarte menu
@@ -2466,8 +2473,6 @@ class Game:
         self._combat_drone = None
         self._facility_rearm = 0
         self._coil_strikes = []  # pioruny walace w cewke Tesli (burza)
-        self._storm_bolts = []  # pioruny Storm Callera walace we wrogow (FX + ttl)
-        self._storm_strike_cd = 0  # odliczanie do kolejnego pioruna Storm Callera
         self._sea_raid_left = 0  # sztorm morski: ilu najezdzcow jeszcze wyjdzie z wody
         self._sea_raid_cd = 0  # sztorm morski: odliczanie do kolejnego najezdzcy
         self._facility_tracers = []
@@ -2631,31 +2636,10 @@ class Game:
                 self._sea_raid_cd = random.randint(320, 480)
                 self._sea_raid_left -= 1
                 self._spawn_sea_raider()
-        # Storm Caller: burza walczy po naszej stronie. Podczas deszczu
-        # (albo sztormu morskiego) pioruny wala w losowych wrogow:
-        # L1 co ~2,5 s za 60 dmg, L2 co ~2 s za 90 dmg.
-        if (self.raining or getattr(self, "_phenomenon", None) == "sea_storm") \
-                and "storm" in self.building_upgrades:
-            self._storm_strike_cd -= 1
-            if self._storm_strike_cd <= 0:
-                _slvl = self._upg_level(self.building_upgrades, "storm")
-                self._storm_strike_cd = 200 if _slvl >= 2 else 250
-                _living = [e for e in self.enemies
-                           if not e.dying and not e.dead and not e.reached_end]
-                if _living:
-                    _t = random.choice(_living)
-                    _dmg = 90 if _slvl >= 2 else 60
-                    self._storm_bolts.append([_t, 10])
-                    try:
-                        _t.hit(_dmg)
-                    except Exception:
-                        _t.health -= _dmg
-                        if _t.health <= 0 and not _t.dying:
-                            _t.dying = True
-                    self.stats_damage += _dmg
-                    self.damage_numbers.append([_t.x, _t.y - 55, str(_dmg), 35, (200, 220, 255)])
-                    self.particles.burst(_t.x, _t.y - 25, (190, 215, 255),
-                                         count=10, speed=4, life=25, size=3)
+        # Storm Caller NIE wali juz piorunami we wrogow (Daniel: przesada -
+        # pioruny ofensywne zostaja tylko przy Tesla Coil). Storm Caller
+        # daje buffy pogodowe: zloto z deszczu (logika zabojstw), a na L2
+        # odblokowuje zjawiska fantasy (bramka w _roll_phenomenon).
         # Achievements: max_gold_held = szczyt kasy (nie tylko przy zabojstwach)
         self._ach_stats["max_gold_held"] = max(self._ach_stats.get("max_gold_held", 0), self.money)
         # Achievements: sprawdzanie co 60 tickow + zapis postepu (kumulatywnie)
@@ -2773,11 +2757,6 @@ class Game:
             _bt[4] -= 1
             if _bt[4] <= 0:
                 self._barrage_tracers.remove(_bt)
-        # Pioruny Storm Callera: zanikanie FX
-        for _sb in self._storm_bolts[:]:
-            _sb[1] -= 1
-            if _sb[1] <= 0:
-                self._storm_bolts.remove(_sb)
         # Aktualizacja cooldownow umiejetnosci
         for tw in self.towers:
             if tw.ability_cooldown > 0:
@@ -2961,6 +2940,8 @@ class Game:
             if getattr(proj, "_barrage", False):
                 # Smuga za pociskiem Barrage (segment od poprzedniej pozycji)
                 self._barrage_tracers.append([_px, _py, proj.x, proj.y, 7])
+                if len(self._barrage_tracers) > 600:
+                    del self._barrage_tracers[:300]  # bezpiecznik pamieci
                 if hit_enemy is not None:
                     # Rozblysk trafienia Barrage (karmazyn + iskry)
                     self.particles.burst(hit_enemy.x, hit_enemy.y - 20, (230, 32, 58),
@@ -3527,12 +3508,23 @@ class Game:
             self.ally_ship.draw(self.win, self._anim_s)
         self._draw_cannonballs()
         self._draw_mortars()
-        # Smugi Barrage (karmazynowe, zanikajace) - pod pociskami
-        for _bt in getattr(self, "_barrage_tracers", []):
-            _a = max(0, min(255, int(255 * _bt[4] / 7)))
-            _ts = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-            pygame.draw.line(_ts, (230, 32, 58, _a), (int(_bt[0]), int(_bt[1])), (int(_bt[2]), int(_bt[3])), 3)
-            pygame.draw.line(_ts, (255, 190, 90, _a // 2), (int(_bt[0]), int(_bt[1])), (int(_bt[2]), int(_bt[3])), 1)
+        # Smugi Barrage (karmazynowe, zanikajace) - pod pociskami.
+        # WYDAJNOSC (Daniel: Barrage lagowal gre): wszystkie segmenty ida
+        # na JEDNA wspolna, buforowana powierzchnie i JEDEN blit na klatke.
+        # Wczesniej KAZDY segment tworzyl wlasna powierzchnie na caly
+        # ekran (1124x720) i osobny blit - przy salwach z kilku wiez to
+        # byly dziesiatki ciezkich alokacji na klatke i animacja rwala.
+        _tracers = getattr(self, "_barrage_tracers", [])
+        if _tracers:
+            _ts = getattr(self, "_tracer_surf", None)
+            if _ts is None:
+                _ts = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+                self._tracer_surf = _ts
+            _ts.fill((0, 0, 0, 0))
+            for _bt in _tracers:
+                _a = max(0, min(255, int(255 * _bt[4] / 7)))
+                pygame.draw.line(_ts, (230, 32, 58, _a), (int(_bt[0]), int(_bt[1])), (int(_bt[2]), int(_bt[3])), 3)
+                pygame.draw.line(_ts, (255, 190, 90, _a // 2), (int(_bt[0]), int(_bt[1])), (int(_bt[2]), int(_bt[3])), 1)
             self.win.blit(_ts, (0, 0))
         for proj in self.projectiles:
             proj.draw(self.win)
@@ -3663,20 +3655,6 @@ class Game:
         self.draw_facility()
         self.draw_combat_drone()
         self.draw_tesla_bolts()
-        # Pioruny Storm Callera: postrzepiony piorun z nieba w cel
-        # (poswiata + wlasciwy zygzak; kazda klatka losuje nowy ksztalt -
-        # wyglada jak prawdziwy, migoczacy piorun)
-        for _sb in getattr(self, "_storm_bolts", []):
-            _t = _sb[0]
-            if _t is None or getattr(_t, "dead", False):
-                continue
-            _bx = _t.x
-            _pts = [(_bx + random.randint(-26, 26), 0)]
-            for _j in range(1, 7):
-                _pts.append((_bx + random.randint(-20, 20), int((_t.y - 30) * _j / 6)))
-            _pts.append((int(_t.x), int(_t.y - 30)))
-            pygame.draw.lines(self.win, (170, 200, 255), False, _pts, 5)
-            pygame.draw.lines(self.win, (255, 255, 215), False, _pts, 2)
         self.draw_building_menu()
         self.draw_tent_menu()
         self.draw_achievement_popup()
@@ -4064,36 +4042,58 @@ class Game:
         title = self.font_p36.render(tr("menu.help"), True, (255, 215, 100))
         self.win.blit(title, (hx + (hw - title.get_width()) // 2, hy + 14))
         y = hy + 62
-        for text, style in lines:
+        _tower_subs = 0  # ile linii "sub" zostalo w biezacym bloku wiezy
+        for line in lines:
+            text, style = line[0], line[1]
+            extra = line[2] if len(line) > 2 else None
             if text == "":
                 y += 8
                 continue
+            # Kroki wieksze niz wysokosc fontu - zawiniete linie NIE moga
+            # na siebie nachodzic (wczesniej kontynuacja szla co 18 px
+            # przy foncie ~24 px i tekst sie zlewal; Daniel: How to Play
+            # wygladalo brzydko).
             if style == "header":
-                f, c, step = self.font_btn18, (255, 215, 100), 28
+                f, c, step = self.font_btn18, (255, 215, 100), 30
             elif style == "tower":
-                f, c, step = self.font_btn18, (140, 220, 255), 22
+                f, c, step = self.font_btn18, (140, 220, 255), 25
             elif style == "sub":
-                f, c, step = self.font_btn18, (185, 195, 205), 20
+                f, c, step = self.font_btn18, (185, 195, 205), 23
             elif style == "dim":
-                f, c, step = self.font_btn18, (150, 158, 168), 22
+                f, c, step = self.font_btn18, (150, 158, 168), 24
             else:
-                f, c, step = self.font_btn18, (225, 228, 232), 25
-            # Dlugie linie (notatki) zawijaj do szerokosci panelu
+                f, c, step = self.font_btn18, (225, 228, 232), 27
+            # Blok wiezy: zdjecie po lewej, caly blok przesuniety w prawo
+            _xoff = 36 if style == "sub" else 28
+            if style == "tower":
+                _xoff = 96
+                _spr = help_content.TOWER_SPRITES.get(extra or "")
+                if _spr:
+                    _img = pygame.transform.scale(_spr[0], (56, 56))
+                    self.win.blit(_img, (hx + 28, y - 4))
+                _tower_subs = 2
+            elif style == "sub" and _tower_subs > 0:
+                _xoff = 96
+            # Dlugie linie zawijaj do szerokosci panelu (z wcieciem bloku)
             words = text.split()
             wrapped, cur = [], ""
             for w_ in words:
                 trial = (cur + " " + w_).strip()
-                if f.size(trial)[0] > hw - 60 and cur:
+                if f.size(trial)[0] > hw - _xoff - 30 and cur:
                     wrapped.append(cur)
                     cur = w_
                 else:
                     cur = trial
             if cur:
                 wrapped.append(cur)
-            for wi, wl in enumerate(wrapped):
-                t = f.render(wl, True, c)
-                self.win.blit(t, (hx + (36 if style == "sub" else 28), y))
-                y += step if wi == len(wrapped) - 1 else 18
+            for wl in wrapped:
+                _surf = f.render(wl, True, c)
+                self.win.blit(_surf, (hx + _xoff, y))
+                y += step
+            if style == "sub" and _tower_subs > 0:
+                _tower_subs -= 1
+                if _tower_subs == 0:
+                    y += 12  # odstep miedzy blokami wiez
         # Nawigacja: strzalki + licznik stron
         nav = self.font_btn18.render(
             tr("help.nav", a=page + 1, b=len(all_pages)), True, (160, 168, 178))
@@ -4976,31 +4976,54 @@ class Game:
             return
         t = self._anim_s
         if ph == "blood_moon":
-            # Krwawy ksiezyc (Daniel: ma byc NAPRAWDE krwiscie): mocna
-            # czerwona lawa na cala plansze (pulsujaca), krwawy pas nieba
-            # i wielki ksiezyc z poswiata. Zadnych bonusow dla wrogow -
-            # tylko +10% dmg wiez (w logice trafien).
-            _pulse = int(14 * math.sin(t * 1.6))
-            ov = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-            ov.fill((168, 12, 6, 96 + _pulse))
-            # ciemniejsze, krwawsze niebo u gory
-            pygame.draw.rect(ov, (120, 4, 2, 90), (0, 0, self.width, 190))
-            # winieta: krwawsze brzegi planszy
-            pygame.draw.rect(ov, (140, 6, 4, 70), (0, 0, self.width, self.height), 46)
-            self.win.blit(ov, (0, 0))
-            # Poswiata ksiezyca + sam ksiezyc (wiekszy niz dawniej)
-            _glow = pygame.Surface((220, 220), pygame.SRCALPHA)
-            pygame.draw.circle(_glow, (220, 40, 26, 60), (110, 110), 104)
-            pygame.draw.circle(_glow, (225, 55, 34, 80), (110, 110), 76)
-            self.win.blit(_glow, (850 - 110, 78 - 110))
-            pygame.draw.circle(self.win, (206, 44, 30), (850, 78), 50)
-            pygame.draw.circle(self.win, (172, 30, 22), (832, 64), 13)   # krater
-            pygame.draw.circle(self.win, (180, 36, 26), (866, 92), 9)    # krater
-            pygame.draw.circle(self.win, (178, 34, 24), (856, 52), 6)    # krater
-            # Krew kapiaca z ksiezyca
-            _drip = int((t * 26) % 60)
-            pygame.draw.line(self.win, (190, 30, 20), (842, 124), (842, 124 + _drip), 4)
-            pygame.draw.circle(self.win, (190, 30, 20), (842, 128 + _drip), 4)
+            # Krwawy ksiezyc (Daniel: jak w Wiedzminie 3 "Krew i Wino") -
+            # czerwone NIEBO na CALY ekran: gradient od krwawej czerwieni
+            # u gory przez ciemne wino do przygaszonej czerwieni przy
+            # ziemi, wielki czerwony ksiezyc z poswiata i wolno sunace
+            # ciemne chmury. Bez winiety-ramki i bez kapiacej krwi.
+            # Gradient, poswiata i chmury sa BUFOROWANE (budowane raz) -
+            # wczesniej co klatke powstawały nowe powierzchnie na caly
+            # ekran. Bonus bez zmian: tylko +10% dmg wiez (logika trafien).
+            cache = getattr(self, "_bm_cache", None)
+            if cache is None:
+                grad = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+                _top, _mid, _bot = (130, 10, 10), (96, 8, 14), (70, 8, 12)
+                for yy in range(self.height):
+                    f = yy / max(1, self.height - 1)
+                    if f < 0.45:
+                        k = f / 0.45
+                        col = tuple(int(_top[i] + (_mid[i] - _top[i]) * k) for i in range(3))
+                        al = int(198 - 38 * k)
+                    else:
+                        k = (f - 0.45) / 0.55
+                        col = tuple(int(_mid[i] + (_bot[i] - _mid[i]) * k) for i in range(3))
+                        al = int(160 - 10 * k)
+                    pygame.draw.line(grad, (*col, al), (0, yy), (self.width, yy))
+                glow = pygame.Surface((260, 260), pygame.SRCALPHA)
+                pygame.draw.circle(glow, (216, 44, 30, 46), (130, 130), 126)
+                pygame.draw.circle(glow, (224, 56, 36, 66), (130, 130), 92)
+                pygame.draw.circle(glow, (230, 70, 44, 84), (130, 130), 66)
+                clouds = []
+                for cw, ch, ca in ((340, 34, 52), (260, 26, 44), (420, 40, 40)):
+                    cs = pygame.Surface((cw, ch), pygame.SRCALPHA)
+                    pygame.draw.ellipse(cs, (30, 2, 4, ca), (0, 0, cw, ch))
+                    clouds.append(cs)
+                cache = (grad, glow, clouds)
+                self._bm_cache = cache
+            grad, glow, clouds = cache
+            grad.set_alpha(240 + int(10 * math.sin(t * 1.4)))
+            self.win.blit(grad, (0, 0))
+            # Ciemne chmury suna wolno przez krwawe niebo
+            for i, (cs, cy, sp) in enumerate(zip(clouds, (36, 96, 150), (7, 11, 5))):
+                cx = int((i * 430 + t * sp) % (self.width + 460)) - 430
+                self.win.blit(cs, (cx, cy))
+            # Poswiata + tarcza ksiezyca (krawedz podswietlona od prawej)
+            self.win.blit(glow, (850 - 130, 78 - 130))
+            pygame.draw.circle(self.win, (203, 42, 28), (850, 78), 50)
+            pygame.draw.circle(self.win, (168, 28, 20), (832, 64), 13)   # krater
+            pygame.draw.circle(self.win, (176, 33, 24), (866, 92), 9)    # krater
+            pygame.draw.circle(self.win, (174, 31, 22), (856, 52), 6)    # krater
+            pygame.draw.arc(self.win, (255, 122, 82), (800, 28, 100, 100), -0.9, 0.9, 3)
         elif ph == "fog":
             # Upiorna mgla: dryfujace, polprzezroczyste pasma na roznych
             # wysokosciach (wolny ruch od czasu animacji - pauza je trzyma)

@@ -337,7 +337,7 @@ archer_imgs3 = [_gold_tint(img) for img in archer_imgs3]
 class GoldenTower(WoodenTower):
     buy_price = 750
     display_name = "Gold Tower"
-    base_damage = 5
+    base_damage = 6
     upgrade_dmg = 4
     # Koszty ulepszen (lvl 1->2, 2->3) - rosna z klasa wiezy, nie stale 250/500
     upgrade_costs = [600, 1200]
@@ -508,7 +508,7 @@ archer_imgs6.append(pygame.transform.scale(
 class IceTower(WoodenTower):
     buy_price = 650
     display_name = "Ice Tower"
-    base_damage = 2
+    base_damage = 4
     upgrade_dmg = 2
     upgrade_costs = [500, 1000]
     ability_name = "Frost Nova"
