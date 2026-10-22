@@ -180,7 +180,7 @@ waves = [
     [0,0,0,0,0,0,0,0],  # Fala 20: sam boss finalny
 ]
 pygame.mixer.init()
-music = pygame.mixer.music.load(os.path.join("sounds", "music.wav"))
+music = pygame.mixer.music.load(os.path.join("sounds", "music.ogg"))
 sound_1 = pygame.mixer.Sound("sounds/1.wav")
 sound_glass = pygame.mixer.Sound("sounds/glass_shatter.wav")
 sound_ab_rapid = pygame.mixer.Sound("sounds/ability_rapidfire.wav")
@@ -2737,7 +2737,7 @@ class Game:
             want_intense = boss_alive
             if want_intense != self._music_intense:
                 self._music_intense = want_intense
-                track = "sounds/music_intense.wav" if want_intense else "sounds/music.wav"
+                track = "sounds/music_intense.wav" if want_intense else "sounds/music.ogg"
                 try:
                     pygame.mixer.music.load(track)
                     pygame.mixer.music.play(loops=-1)
@@ -3868,7 +3868,7 @@ class Game:
             # z wylaczonym dzwiekiem z menu) - samo unpause nic nie da,
             # dlatego M "nie dzialalo". Zaladuj biezaca sciezke i graj.
             track = ("sounds/music_intense.wav" if getattr(self, "_music_intense", False)
-                     else "sounds/music.wav")
+                     else "sounds/music.ogg")
             try:
                 pygame.mixer.music.load(track)
                 pygame.mixer.music.play(loops=-1)

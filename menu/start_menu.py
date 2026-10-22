@@ -520,7 +520,7 @@ class StartMenu:
         # Muzyka w menu (jesli dzwiek wlaczony)
         try:
             if self.sound:
-                pygame.mixer.music.load(os.path.join("sounds", "music.wav"))
+                pygame.mixer.music.load(os.path.join("sounds", "music.ogg"))
                 pygame.mixer.music.play(loops=-1)
         except:
             pass
