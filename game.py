@@ -3279,7 +3279,7 @@ class Game:
         # Jasna krawedz
         pygame.draw.rect(win, (255, 255, 255, 170), rect, 2, border_radius=14)
         # Blysk u gory szkla
-        hl = pygame.Surface((rect.w - 20, rect.h // 3), pygame.SRCALPHA)
+        hl = pygame.Surface((max(1, rect.w - 20), max(1, rect.h // 3)), pygame.SRCALPHA)
         pygame.draw.rect(hl, (255, 255, 255, 45), hl.get_rect(), border_radius=9)
         win.blit(hl, (rect.x + 10, rect.y + 7))
         # Tekst z cieniem
@@ -3444,6 +3444,8 @@ class Game:
             buttons.insert(1, (continue_rect, tr("end.endless"), (255, 180, 50)))
         def _draw_buttons(hover_pos=None):
             for rect, label_text, glow_color in buttons:
+                if rect.w < 30 or rect.h < 10:
+                    continue  # zaparkowany przycisk (np. restart przy true victory)
                 hov = hover_pos is not None and rect.collidepoint(hover_pos)
                 self._draw_glass_button(rect, label_text, glow_color, hover=hov,
                                         font=small_font)
