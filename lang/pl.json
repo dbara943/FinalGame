@@ -348,7 +348,7 @@
  "upg.lucky.desc2": "Poziom 2: 20% szansy na trafienie krytyczne x2.",
  "upg.docks.desc2": "Poziom 2: wrogowie idą o 30% wolniej na pomoście.",
  "upg.storm.desc2": "Poziom 2: złoto z burzy rośnie do +40%, a mogą pojawić się dziwne zjawiska pogodowe: krwawe księżyce, upiorna mgła, zorze, złote wiatry i sztormy morskie.",
- "upg.walls.desc2": "Poziom 2: łącznie +10 maksymalnych żyć.",
+ "upg.walls.desc2": "Poziom 2: łącznie +10 maksymalnych żyć, a dwie wieżyczki sufitowe pilnują bramy.",
  "upg.ammo.desc2": "Poziom 2: wszystkie wieże strzelają łącznie o 30% szybciej.",
  "upg.drones.desc2": "Poziom 2: leczy +1 życie co falę; dron naprawczy pracuje szybciej.",
  "upg.tesla.desc2": "Poziom 2: silniejsze zapnięcia (130, burza 160) i większy zasięg.",
@@ -374,5 +374,15 @@
  "help.e8": "Na każdej fali może pojawić się pogoda fantasy: Krwawy Księżyc (szybsi wrogowie, silniejsze wieże), Upiorna Mgła (+25% złota), Zorza (szybsze odnawianie umiejętności), Deszcz Meteorytów, Złoty Wiatr (+3 złota za zabójstwo).",
  "pause.placement": "Pole stawiania",
  "notif.placement_on": "Pole stawiania: WŁ",
- "notif.placement_off": "Pole stawiania: WYŁ"
+ "notif.placement_off": "Pole stawiania: WYŁ",
+ "upg.robot.name": "Projekt TYTAN",
+ "upg.robot.desc": "Kolosalny robot bojowy, który raz na zawsze kończy wojnę. Wymaga kupienia KAŻDEGO innego ulepszenia. Bonnie albo Clyde muszą żyć, żeby go zbudować.",
+ "upg.robot.desc2": "TYTAN jest w budowie. Gdy wyruszy, wojna się skończy.",
+ "upg.robot.secret": "Coś kolosalnego tu drzemie. Kup każde ulepszenie, żeby to obudzić.",
+ "robot.need_guard": "Bonnie albo Clyde muszą żyć, żeby zbudować TYTANA!",
+ "robot.started": "Budowa TYTANA rozpoczęta! Gotowy za {waves} fal.",
+ "banner.robot": "TYTAN SIĘ BUDZI!",
+ "hud.robot": "TYTAN",
+ "end.true_title": "WYSPA WYZWOLONA",
+ "end.true_sub": "TYTAN zatopił piracki okręt flagowy. Wyspa jest wolna - na dobre."
 }

@@ -348,7 +348,7 @@
  "upg.lucky.desc2": "Level 2: 20% chance to deal 2x critical damage.",
  "upg.docks.desc2": "Level 2: enemies move 30% slower on the pier.",
  "upg.storm.desc2": "Level 2: storm gold grows to +40%, and strange weather may appear: blood moons, ghostly fog, auroras, golden winds and sea storms.",
- "upg.walls.desc2": "Level 2: +10 max lives in total.",
+ "upg.walls.desc2": "Level 2: +10 max lives in total, plus two ceiling turrets guard the gate.",
  "upg.ammo.desc2": "Level 2: all towers shoot 30% faster in total.",
  "upg.drones.desc2": "Level 2: heals +1 life every wave; the repair drone works faster.",
  "upg.tesla.desc2": "Level 2: stronger zaps (130, storms 160) and longer range.",
@@ -374,5 +374,15 @@
  "help.e8": "Fantasy weather can appear on any wave: Blood Moon (faster enemies, stronger towers), Ghostly Fog (+25% gold), Aurora (abilities recharge faster), Meteor Shower, Golden Wind (+3 gold per kill).",
  "pause.placement": "Placement area",
  "notif.placement_on": "Placement area: ON",
- "notif.placement_off": "Placement area: OFF"
+ "notif.placement_off": "Placement area: OFF",
+ "upg.robot.name": "Project TYTAN",
+ "upg.robot.desc": "A colossal war robot that ends the war for good. Requires EVERY other upgrade bought first. Bonnie or Clyde must be alive to build it.",
+ "upg.robot.desc2": "The TYTAN is being built. When it marches, the war ends.",
+ "upg.robot.secret": "Something colossal sleeps here. Buy every upgrade to wake it.",
+ "robot.need_guard": "Bonnie or Clyde must be alive to build the TYTAN!",
+ "robot.started": "TYTAN construction started! Ready in {waves} waves.",
+ "banner.robot": "THE TYTAN AWAKENS!",
+ "hud.robot": "TYTAN",
+ "end.true_title": "ISLAND LIBERATED",
+ "end.true_sub": "The TYTAN sank the pirate flagship. The island is free - for good."
 }

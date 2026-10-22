@@ -348,7 +348,7 @@
  "upg.lucky.desc2": "Nivel 2: 20% de probabilidad de daño crítico x2.",
  "upg.docks.desc2": "Nivel 2: los enemigos van un 30% más lentos en el muelle.",
  "upg.storm.desc2": "Nivel 2: el oro de tormenta sube a +40% y pueden aparecer fenómenos extraños: lunas de sangre, niebla fantasmal, auroras, vientos dorados y tormentas marinas.",
- "upg.walls.desc2": "Nivel 2: +10 vidas máx. en total.",
+ "upg.walls.desc2": "Nivel 2: +10 vidas máx. en total, y dos torretas de techo guardan la puerta.",
  "upg.ammo.desc2": "Nivel 2: todas las torres disparan un 30% más rápido en total.",
  "upg.drones.desc2": "Nivel 2: cura +1 vida cada oleada; el dron reparador trabaja más rápido.",
  "upg.tesla.desc2": "Nivel 2: descargas más fuertes (130, tormenta 160) y más alcance.",
@@ -374,5 +374,15 @@
  "help.e8": "El clima fantástico puede aparecer en cualquier oleada: Luna de Sangre (enemigos más rápidos, torres más fuertes), Niebla Fantasma (+25% oro), Aurora (habilidades más rápidas), Lluvia de Meteoros, Viento Dorado (+3 oro por baja).",
  "pause.placement": "Área de construcción",
  "notif.placement_on": "Área de construcción: SÍ",
- "notif.placement_off": "Área de construcción: NO"
+ "notif.placement_off": "Área de construcción: NO",
+ "upg.robot.name": "Proyecto TYTAN",
+ "upg.robot.desc": "Un robot de guerra colosal que pone fin a la guerra para siempre. Requiere haber comprado TODAS las demás mejoras. Bonnie o Clyde deben estar vivos para construirlo.",
+ "upg.robot.desc2": "El TYTAN está en construcción. Cuando marche, la guerra terminará.",
+ "upg.robot.secret": "Algo colosal duerme aquí. Compra todas las mejoras para despertarlo.",
+ "robot.need_guard": "¡Bonnie o Clyde deben estar vivos para construir el TYTAN!",
+ "robot.started": "¡Construcción del TYTAN iniciada! Listo en {waves} oleadas.",
+ "banner.robot": "¡EL TYTAN DESPIERTA!",
+ "hud.robot": "TYTAN",
+ "end.true_title": "ISLA LIBERADA",
+ "end.true_sub": "El TYTAN hundió el buque insignia pirata. La isla es libre, para siempre."
 }

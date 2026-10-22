@@ -348,7 +348,7 @@
  "upg.lucky.desc2": "Niveau 2 : 20 % de chance de dégâts critiques x2.",
  "upg.docks.desc2": "Niveau 2 : les ennemis sont 30 % plus lents sur le ponton.",
  "upg.storm.desc2": "Niveau 2 : l'or de tempête passe à +40 % et d'étranges phénomènes peuvent apparaître : lunes de sang, brouillard fantomatique, aurores, vents dorés et tempêtes marines.",
- "upg.walls.desc2": "Niveau 2 : +10 vies max au total.",
+ "upg.walls.desc2": "Niveau 2 : +10 vies max au total, et deux tourelles de plafond gardent la porte.",
  "upg.ammo.desc2": "Niveau 2 : toutes les tours tirent 30 % plus vite au total.",
  "upg.drones.desc2": "Niveau 2 : soigne +1 vie par vague ; le drone répare plus vite.",
  "upg.tesla.desc2": "Niveau 2 : décharges plus fortes (130, tempête 160) et plus de portée.",
@@ -374,5 +374,15 @@
  "help.e8": "Une météo fantastique peut apparaître à chaque vague : Lune de Sang (ennemis plus rapides, tours plus fortes), Brume Spectrale (+25 % d'or), Aurore (capacités plus rapides), Pluie de Météores, Vent Doré (+3 or par élimination).",
  "pause.placement": "Zone de construction",
  "notif.placement_on": "Zone de construction : OUI",
- "notif.placement_off": "Zone de construction : NON"
+ "notif.placement_off": "Zone de construction : NON",
+ "upg.robot.name": "Projet TYTAN",
+ "upg.robot.desc": "Un robot de guerre colossal qui met fin à la guerre pour de bon. Nécessite d'avoir acheté TOUTES les autres améliorations. Bonnie ou Clyde doivent être en vie pour le construire.",
+ "upg.robot.desc2": "Le TYTAN est en construction. Quand il marchera, la guerre s'achèvera.",
+ "upg.robot.secret": "Quelque chose de colossal sommeille ici. Achète chaque amélioration pour le réveiller.",
+ "robot.need_guard": "Bonnie ou Clyde doivent être en vie pour construire le TYTAN !",
+ "robot.started": "Construction du TYTAN lancée ! Prêt dans {waves} vagues.",
+ "banner.robot": "LE TYTAN S'ÉVEILLE !",
+ "hud.robot": "TYTAN",
+ "end.true_title": "ÎLE LIBÉRÉE",
+ "end.true_sub": "Le TYTAN a coulé le navire amiral pirate. L'île est libre, pour de bon."
 }

@@ -348,7 +348,7 @@
  "upg.lucky.desc2": "Stufe 2: 20% Chance auf 2x kritischen Schaden.",
  "upg.docks.desc2": "Stufe 2: Gegner sind auf dem Steg 30% langsamer.",
  "upg.storm.desc2": "Stufe 2: Sturmgold steigt auf +40%, und seltsame Wetterphänomene können auftreten: Blutmonde, Geisternebel, Polarlichter, goldene Winde und Seestürme.",
- "upg.walls.desc2": "Stufe 2: insgesamt +10 max. Leben.",
+ "upg.walls.desc2": "Stufe 2: insgesamt +10 max. Leben, plus zwei Deckentürme bewachen das Tor.",
  "upg.ammo.desc2": "Stufe 2: alle Türme schießen insgesamt 30% schneller.",
  "upg.drones.desc2": "Stufe 2: heilt +1 Leben pro Welle; Reparaturdrohne arbeitet schneller.",
  "upg.tesla.desc2": "Stufe 2: stärkere Blitze (130, Sturm 160) und mehr Reichweite.",
@@ -374,5 +374,15 @@
  "help.e8": "Fantasy-Wetter kann auf jeder Welle erscheinen: Blutmond (schnellere Gegner, stärkere Türme), Geisternebel (+25% Gold), Polarlicht (Fähigkeiten laden schneller), Meteorregen, Goldwind (+3 Gold pro Kill).",
  "pause.placement": "Baufläche",
  "notif.placement_on": "Baufläche: AN",
- "notif.placement_off": "Baufläche: AUS"
+ "notif.placement_off": "Baufläche: AUS",
+ "upg.robot.name": "Projekt TYTAN",
+ "upg.robot.desc": "Ein kolossaler Kampfroboter, der den Krieg endgültig beendet. Erfordert, dass JEDES andere Upgrade gekauft wurde. Bonnie oder Clyde müssen leben, um ihn zu bauen.",
+ "upg.robot.desc2": "Der TYTAN wird gebaut. Wenn er marschiert, endet der Krieg.",
+ "upg.robot.secret": "Etwas Kolossales schlummert hier. Kaufe jedes Upgrade, um es zu wecken.",
+ "robot.need_guard": "Bonnie oder Clyde müssen leben, um den TYTAN zu bauen!",
+ "robot.started": "TYTAN-Bau gestartet! Fertig in {waves} Wellen.",
+ "banner.robot": "DER TYTAN ERWACHT!",
+ "hud.robot": "TYTAN",
+ "end.true_title": "INSEL BEFREIT",
+ "end.true_sub": "Der TYTAN hat das Piraten-Flaggschiff versenkt. Die Insel ist frei - für immer."
 }

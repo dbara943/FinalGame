@@ -89,6 +89,9 @@ BUILDING_UPGRADES = [
     {"id": "cavalry", "name": "Call the Cavalry", "cost": 10000,
      "desc": "An allied ship cripples the pirate ship, then bombards enemies.",
      "endless_only": True},
+    {"id": "robot", "name": "Project TYTAN", "cost": 100000,
+     "desc": "A colossal war robot that ends the war for good. Requires EVERY other upgrade bought first. Bonnie or Clyde must be alive to build it.",
+     "robot": True},
 ]
 # Upgrady klikalnego namiotu (jednorazowe na run)
 TENT_UPGRADES = [
@@ -123,7 +126,8 @@ UPGRADE_L2 = {
     "lucky": {"cost": 3200, "desc": "Level 2: 20% chance to deal 2x critical damage."},
     "docks": {"cost": 4000, "desc": "Level 2: enemies move 30% slower on the pier."},
     "storm": {"cost": 4800, "desc": "Level 2: storm gold grows to +40%, and strange weather may appear: blood moons, ghostly fog, auroras, golden winds and sea storms."},
-    "walls": {"cost": 5600, "desc": "Level 2: +10 max lives in total."},
+    "walls": {"cost": 5600, "desc": "Level 2: +10 max lives in total, plus two ceiling turrets guard the gate."},
+    "robot": {"cost": 100000, "desc": "The TYTAN is being built. When it marches, the war ends."},
     "ammo": {"cost": 6400, "desc": "Level 2: all towers shoot 30% faster in total."},
     "drones": {"cost": 8000, "desc": "Level 2: heals +1 life every wave; the repair drone works faster."},
     "tesla": {"cost": 10400, "desc": "Level 2: stronger zaps (130, storms 160) and longer range."},
@@ -207,6 +211,13 @@ sound_rocket = pygame.mixer.Sound("sounds/rocket_launch.wav")
 sound_rocket.set_volume(0.5)
 sound_rocket_boom = pygame.mixer.Sound("sounds/rocket_boom.wav")
 sound_rocket_boom.set_volume(0.6)
+sound_turret = pygame.mixer.Sound("sounds/shoot_turret.wav")
+sound_turret.set_volume(0.5)
+sound_robot_zap = pygame.mixer.Sound("sounds/robot_zap.wav")
+sound_robot_zap.set_volume(0.7)
+sound_robot_laser = pygame.mixer.Sound("sounds/robot_laser.wav")
+sound_robot_stomp = pygame.mixer.Sound("sounds/robot_stomp.wav")
+sound_robot_stomp.set_volume(0.8)
 shoot_sounds = {
     "WoodenTower": pygame.mixer.Sound("sounds/shoot_wood.wav"),
     "MetalTower": pygame.mixer.Sound("sounds/shoot_metal.wav"),
@@ -330,10 +341,20 @@ class Game:
         self.building_upgrades = {}  # {id: poziom 1-2} kupionych upgradow
         self._building_menu_open = False
         self._building_menu_buttons = []  # (rect, upgrade_id)
+        # Batch 29: wiezyczki sufitowe (Walls L2) + PROJEKT TYTAN (ukryte zakonczenie)
+        self._turrets = []
+        self._turret_tracers = []
+        self._robot = None
+        self._robot_phase = None
+        self._bot = None
+        self._robot_wave_total = 0
+        self._true_victory = False
+        self._robot_img_cache = {}
+        self._site_surf = None
         self._building_rect = pygame.Rect(110, 158, 353, 231)  # bbox of drawn highlight polygon
         self._building_icons = {}
         for uid in ("walls", "drones", "tesla", "treasury", "bounty",
-                    "ammo", "lucky", "storm", "docks", "cavalry"):
+                    "ammo", "lucky", "storm", "docks", "cavalry", "robot"):
             try:
                 img = pygame.image.load(os.path.join("images", "upgrades", uid + ".webp"))
                 self._building_icons[uid] = pygame.transform.smoothscale(img, (56, 56))
@@ -562,6 +583,7 @@ class Game:
                       tower_sound_4, tower_sound_5, sound_win, sound_lose, sound_roar,
                       sound_levelup, sound_horn, sound_rain, sound_gull, sound_fanfare,
                       sound_minigun, sound_rocket, sound_rocket_boom,
+                      sound_turret, sound_robot_zap, sound_robot_laser, sound_robot_stomp,
                       *shoot_sounds.values(),
                       # Faktyczne dzwieki strzalow wiez zyja w woodenTower
                       # (shoot_snd) - bez nich mute nie lapal strzalow.
@@ -1065,6 +1087,17 @@ class Game:
             # Losowy moment w pierwszej polowie fali (po rozladowanych wrogach)
             self._ally_strike_at = random.randint(1, max(1, total // 2))
             self._ally_unloaded = 0
+        # Batch 29: budowa TYTANA liczy fale od zakupu; po uplynie czasu
+        # budowy bieżąca fala staje sie fala finalu (suma wrogow do wyzwalacza)
+        if getattr(self, "_robot", None):
+            if not self._robot["final_armed"]:
+                self._robot["waves_started"] += 1
+                if self._robot["waves_started"] >= self._robot["duration"]:
+                    self._robot["final_armed"] = True
+                    self._robot_wave_total = sum(self.current_wave) + len(self.pending_bosses)
+            elif not self._robot_phase:
+                # Final uzbrojony, ale fala pominieta/skocznia: przelicz sume
+                self._robot_wave_total = sum(self.current_wave) + len(self.pending_bosses)
 
     def _endless_hp(self, base, endless_wave):
         """HP w endless: 5x bazowo od fali 21, potem +5% co fale (compound).
@@ -2392,7 +2425,7 @@ class Game:
                     run = False
             elif self.won:
                 sound_win.play()
-                result = self.show_end_screen(True)
+                result = self.show_end_screen(True, true_victory=getattr(self, "_true_victory", False))
                 if result == "restart":
                     self.reset_game()
                 elif result == "menu":
@@ -2433,6 +2466,19 @@ class Game:
         self.projectiles = []
         self.cannonballs = []
         self.damage_numbers = []
+        # Batch 29: reset TYTANA i wiezyczek (statek wraca na dok, gdyby
+        # poprzedni run skonczyl sie jego zatopieniem)
+        self._turrets = []
+        self._turret_tracers = []
+        self._robot = None
+        self._robot_phase = None
+        self._bot = None
+        self._robot_wave_total = 0
+        self._true_victory = False
+        try:
+            self.ship.x, self.ship.y = self.ship.dock_x, self.ship.dock_y
+        except Exception:
+            pass
         # Achievements: NIE zeruj _ach_stats - sa skumulowane (plik achievements.json).
         # Zeruj tylko liczniki per-run (Fire/Golden "in one game") i flage wygranej.
         self._run_fire_towers = 0
@@ -2594,6 +2640,11 @@ class Game:
     def update_game_logic(self):
         """Jedna iteracja logiki gry (ruch wrogow, ataki, pociski)."""
         self._logic_tick += 1
+        # Batch 29: final TYTANA przejmuje logike (scena koncowa ma wlasny
+        # przebieg: wrogowie ida, robot maszeruje, reszta gry stoi)
+        if self._robot_phase in ("rise", "march", "laser", "sink"):
+            self._robot_ending_tick()
+            return
         # Spawn wrogow ze statku: w tickach logiki 100Hz, wiec predkosc
         # 2x/3x naprawde przyspiesza rozladunek (wczesniej czas rzeczywisty).
         # Pauza blokuje (update_game_logic nie wywolywane przy pauzie).
@@ -2623,6 +2674,9 @@ class Game:
         self._tick_statuses()
         # Straznicy przy budynku strzelaja z lukow
         self._update_guard_dancers()
+        # Batch 29: wiezyczki sufitowe Walls L2 + budowa TYTANA
+        self._update_wall_turrets()
+        self._robot_tick()
         self._update_guard_arrows()
         # Combat drone (Drone Launch Facility)
         self._update_combat_drone()
@@ -3220,7 +3274,7 @@ class Game:
         win.blit(tsh, (lx + 2, ly + 2))
         win.blit(label, (lx, ly))
 
-    def show_end_screen(self, won, forfeited=False):
+    def show_end_screen(self, won, forfeited=False, true_victory=False):
         # Monety w locie: dolicz od razu, zeby statystyki koncowe byly pelne
         for c in list(getattr(self, "coins", [])):
             amt = getattr(c, "amount", 0) or 0
@@ -3247,7 +3301,7 @@ class Game:
             color = (255, 180, 80)
             title_bg = None
         elif won:
-            title = tr("end.secured")
+            title = tr("end.true_title") if true_victory else tr("end.secured")
             color = (101, 45, 20)  # ciemny braz na pergaminie
             title_bg = None
         else:
@@ -3258,7 +3312,16 @@ class Game:
         bw, bh = 210, 56
         by = self.height // 2 + 200
         gap = 28
-        if won and not forfeited:
+        if won and not forfeited and true_victory:
+            # Batch 29: prawdziwa wygrana (TYTAN) - tylko MENU i QUIT,
+            # bez restartu i bez kontynuacji endless
+            total = 2 * bw + gap
+            x0 = self.width // 2 - total // 2
+            restart_rect = pygame.Rect(-500, -500, 1, 1)
+            continue_rect = None
+            menu_rect = pygame.Rect(x0, by, bw, bh)
+            quit_rect = pygame.Rect(x0 + (bw + gap), by, bw, bh)
+        elif won and not forfeited:
             total = 4 * bw + 3 * gap
             x0 = self.width // 2 - total // 2
             restart_rect = pygame.Rect(x0, by, bw, bh)
@@ -3317,6 +3380,9 @@ class Game:
             # Tytul
             self.win.blit(shadow, (tx + 3, ty + 3))
             self.win.blit(text, (tx, ty))
+            if true_victory:
+                sub = small_font.render(tr("end.true_sub"), True, sub_color)
+                self.win.blit(sub, (self.width // 2 - sub.get_width() // 2, ty + 92))
             # Statystyki: PELNY zestaw na KAZDYM ekranie koncowym (wygrana,
             # porazka i poddanie) - wczesniej poddanie/wygrana mialy tylko
             # 3 linijki. Dwie kolumny: ogolne (lewa) + zabicia wg typu (prawa).
@@ -3410,6 +3476,9 @@ class Game:
             ox = random.randint(-4, 4)
             oy = random.randint(-4, 4)
         self.win.blit(self.bg, (ox, oy))
+        # Batch 29: wiezyczki sufitowe + plac budowy TYTANA (warstwa scenerii)
+        self._draw_wall_turrets()
+        self._draw_robot_site()
         # Wizualne: niebo i woda
         self.draw_sky_effects()
         self.draw_water_effects()
@@ -3503,6 +3572,8 @@ class Game:
             en.draw(self.win)
         # Statek na wierzchu wrogow (nie wyglada dziwnie przy nachodzeniu)
         self.ship.draw(self.win, self._anim_s)
+        # Batch 29: TYTAN w scenie koncowej rysowany nad wszystkim
+        self._draw_robot()
         # Okaleczony pirat: dym i ogien
         if self.pirate_crippled and self.ship.state != Ship.AWAY:
             if random.random() < 0.3:
@@ -4861,6 +4932,25 @@ class Game:
                     d["x"] += vx / dist * 3.5
                     d["y"] += vy / dist * 3.5
                 continue
+            if mode == "working":
+                # Batch 29: straznik-robotnik przy budowie TYTANA. Nie broni
+                # budynku i nic go nie zabija (pojedynek/ofiara go omijaja),
+                # idzie na stanowisko przy rusztowaniu i tam pracuje.
+                tx, ty = d.get("work_x", d["x"]), d.get("work_y", d["y"])
+                vx, vy = tx - d["x"], ty - d["y"]
+                dist = math.hypot(vx, vy)
+                if dist > 2:
+                    step = min(2.2, dist)
+                    d["x"] += vx / dist * step
+                    d["y"] += vy / dist * step
+                    d["deploy_face"] = 1 if vx >= 0 else -1
+                elif random.random() < 0.02:
+                    # Iskry spawania znad rusztowania
+                    sx, sy = self._robot_site()
+                    self.particles.burst(sx + random.randint(-55, 65),
+                                         sy - random.randint(35, 115),
+                                         (255, 200, 90), count=3, speed=2, life=12, size=2)
+                continue
             # mode == "guard": bow shooting
             d["cd"] -= 1
             if d["cd"] <= 0:
@@ -4928,7 +5018,7 @@ class Game:
                     break
         if pick is None:
             for dd in self._dancers:
-                if dd["alive"]:
+                if dd["alive"] and dd.get("mode") != "working":
                     pick = dd
                     break
         if pick is None:
@@ -5316,6 +5406,10 @@ class Game:
         _cur = self._upg_level(owned_set, uid)
         if not upg or _cur >= 2:
             return
+        # Batch 29: TYTAN nie jest zwyklym upgradem poziomowym - osobna sciezka
+        if uid == "robot":
+            self._buy_robot(upg)
+            return
         _new_level = _cur + 1
         # Prerequisite (np. Drone Launch Facility wymaga Repair Drones)
         if upg.get("requires") and upg["requires"] not in owned_set:
@@ -5392,6 +5486,9 @@ class Game:
         if uid == "walls":
             self._start_lives += 5
             self.lives += 5
+            if _new_level == 2:
+                # Batch 29: dwie wiezyczki sufitowe przy wejsciu do budynku
+                self._spawn_wall_turrets()
         elif uid in ("ammo", "lucky"):
             for tw in self.towers:
                 self._apply_tower_upgrade_flags(tw)
@@ -5409,6 +5506,372 @@ class Game:
         elif uid in ("drums", "banner", "signal", "balloon"):
             for tw in self.towers:
                 self._apply_tower_upgrade_flags(tw)
+
+    # ============ Batch 29: wiezyczki Walls L2 + PROJEKT TYTAN ============
+
+    def _robot_site(self):
+        """Plac budowy TYTANA: trawa w luku drogi, na wschod od budynku."""
+        return (700, 545)
+
+    def _robot_unlocked(self):
+        """Odblokowanie TYTANA: KAZDY inny upgrade (budynek + namiot) kupiony
+        przynajmniej na poziom 1 - dopiero wtedy karta przestaje byc '???'."""
+        for u in BUILDING_UPGRADES:
+            if u["id"] != "robot" and self._upg_level(self.building_upgrades, u["id"]) < 1:
+                return False
+        for u in TENT_UPGRADES:
+            if self._upg_level(self.tent_upgrades, u["id"]) < 1:
+                return False
+        return True
+
+    def _buy_robot(self, upg):
+        """Zakup PROJEKTU TYTAN (100 000 zlota): start budowy. Wymaga zywego
+        straznika - zywi straznicy zostaja robotnikami: niezniszczalni, ale
+        przestaja bronic budynku. Oboje zywi = budowa 5 fal, jeden = 10 fal."""
+        if self._robot is not None:
+            return
+        if not self._robot_unlocked():
+            self.gold_notifications.append([tr("upg.robot.secret"), 220])
+            return
+        cost = self._price(upg["cost"])
+        alive = [d for d in self._dancers if d.get("alive")]
+        if not alive:
+            self.gold_notifications.append([tr("robot.need_guard"), 240])
+            return
+        if self.money < cost:
+            self.gold_notifications.append(["Not enough gold!", 150])
+            return
+        self.money -= cost
+        self._add_gold_spent(cost)
+        dur = 5 if len(alive) >= 2 else 10
+        self._robot = {"waves_started": 0, "duration": dur, "final_armed": False}
+        sx, sy = self._robot_site()
+        spots = [(sx - 60, sy + 7), (sx + 70, sy + 7)]
+        for i, d in enumerate(alive):
+            d["mode"] = "working"
+            d["target"] = None
+            d["work_x"], d["work_y"] = spots[i % len(spots)]
+        # Tylko zloty pasek powiadomien: tekst jest za dlugi na wielki banner fali
+        self.gold_notifications.append([tr("robot.started", waves=dur), 260])
+
+    def _spawn_wall_turrets(self):
+        """Dwie wiezyczki sufitowe symetrycznie po obu stronach wejscia
+        (brama 250,351): wisza pod okapem budynku i pilnuje podejscia."""
+        if self._turrets:
+            return
+        self._turrets = [
+            {"x": 196, "y": 252, "cd": 20, "angle": math.pi / 2, "flash": 0, "recoil": 0},
+            {"x": 304, "y": 252, "cd": 45, "angle": math.pi / 2, "flash": 0, "recoil": 0},
+        ]
+
+    def _update_wall_turrets(self):
+        """Wiezyczki: maly zasieg (195), skromne obrazenia (6), szybki ogien.
+        Trafienie natychmiastowe ze smuga (jak zap Tesli) + dzwiek strzalu."""
+        for tr_ in self._turret_tracers:
+            tr_["t"] -= 1
+        self._turret_tracers = [t for t in self._turret_tracers if t["t"] > 0]
+        if not self._turrets:
+            return
+        for t in self._turrets:
+            t["cd"] -= 1
+            t["flash"] = max(0, t["flash"] - 1)
+            t["recoil"] = max(0, t["recoil"] - 1)
+            best, bd = None, 195 ** 2
+            for en in self.enemies:
+                if en.dying or en.dead or en.reached_end:
+                    continue
+                d2 = (en.x - t["x"]) ** 2 + (en.y - t["y"]) ** 2
+                if d2 < bd:
+                    best, bd = en, d2
+            if best is None:
+                continue
+            t["angle"] = math.atan2(best.y - 20 - t["y"], best.x - t["x"])
+            if t["cd"] <= 0:
+                t["cd"] = 55
+                t["flash"] = 5
+                t["recoil"] = 5
+                best.hit(6)
+                self.stats_damage += 6
+                self._turret_tracers.append(
+                    {"x1": t["x"], "y1": t["y"] + 8, "x2": best.x, "y2": best.y - 20, "t": 6})
+                sound_turret.play()
+
+    def _robot_progress(self):
+        """Postep budowy 0..1: pelne fale + (w fali finalu) frakcja wrogow."""
+        if not self._robot:
+            return 0.0
+        d = self._robot["duration"]
+        if self._robot.get("final_armed"):
+            if self._robot_wave_total > 0:
+                rem = sum(self.current_wave) + len(self.enemies) + len(self.pending_bosses)
+                frac = 1.0 - min(1.0, rem / self._robot_wave_total)
+                return min(1.0, (d - 1 + frac) / d)
+            return (d - 1) / d
+        return self._robot["waves_started"] / d
+
+    def _robot_tick(self):
+        """Wyzwalacz finalu: w fali finalu, gdy liczba wrogow (do wy spawnowania
+        + zywi + bossowie w kolejce) spadnie do polowy sumy startowej."""
+        if not self._robot or self._robot_phase:
+            return
+        if self._robot.get("final_armed"):
+            remaining = sum(self.current_wave) + len(self.enemies) + len(self.pending_bosses)
+            if remaining * 2 <= self._robot_wave_total:
+                self._robot_start_ending()
+
+    def _robot_start_ending(self):
+        """Start sceny koncowej: koniec spawnów, robot wstaje z placu budowy
+        i rusza droga w strone portu."""
+        self.current_wave = [0] * len(self.current_wave)
+        self.pending_bosses = []
+        sx, sy = self._robot_site()
+        path = list(self._GUARD_PATH)
+        si = min(range(len(path)),
+                 key=lambda i: (path[i][0] - sx) ** 2 + (path[i][1] - sy) ** 2)
+        route = path[si::-1] + [(430, 655), (520, 640)]
+        self._bot = {"x": sx, "y": sy, "t": 0, "route": route, "ri": 0,
+                     "facing": 1, "step_t": 0, "laser_cd": 80, "beam": None}
+        self._robot_phase = "rise"
+        self.wave_banner_text = tr("banner.robot")
+        self.wave_banner_timer = 300
+
+    def _robot_ending_tick(self):
+        """Scena koncowa TYTANA (zastepuje zwykla logike): rise -> march
+        (deptanie + laser po drodze) -> laser w statek -> toniecie -> wygrana."""
+        b = self._bot
+        b["t"] += 1
+        self.particles.update()
+        # Wrogowie ida dalej; ci, ktorzy dojda do bramy, znikaja w kurzu
+        # (final juz rozstrzygniety - zycia nie spadaja)
+        for en in list(self.enemies):
+            en.update()
+            if en.reached_end and not en.dead:
+                self.particles.burst(en.x, en.y - 20, (200, 190, 160),
+                                      count=8, speed=2, life=20, size=3)
+                en.dead = True
+        self.enemies = [e for e in self.enemies if not e.dead]
+        self.ship.update()
+        if b.get("beam"):
+            b["beam"]["t"] -= 1
+            if b["beam"]["t"] <= 0:
+                b["beam"] = None
+        phase = self._robot_phase
+        if phase == "rise":
+            if b["t"] % 8 == 0:
+                self.particles.burst(b["x"] + random.randint(-70, 70), b["y"],
+                                     (190, 180, 150), count=6, speed=2, life=25, size=3)
+            if b["t"] >= 50:
+                self._robot_phase = "march"
+                b["t"] = 0
+            return
+        if phase == "march":
+            route = b["route"]
+            if b["ri"] < len(route):
+                tx, ty = route[b["ri"]]
+                vx, vy = tx - b["x"], ty - b["y"]
+                dist = math.hypot(vx, vy)
+                if dist < 2:
+                    b["ri"] += 1
+                else:
+                    step = min(1.7, dist)
+                    b["x"] += vx / dist * step
+                    b["y"] += vy / dist * step
+                    if vx != 0:
+                        b["facing"] = 1 if vx > 0 else -1
+            else:
+                self._robot_phase = "laser"
+                b["t"] = 0
+                b["facing"] = -1
+                return
+            # Deptanie: stopa co 24 ticki miazdzy wszystko w promieniu 70
+            b["step_t"] += 1
+            if b["step_t"] >= 24:
+                b["step_t"] = 0
+                sound_robot_stomp.play()
+                self.particles.burst(b["x"], b["y"], (170, 160, 140),
+                                      count=10, speed=3, life=20, size=3)
+                for en in list(self.enemies):
+                    if not en.dying and not en.dead and \
+                            (en.x - b["x"]) ** 2 + (en.y - b["y"]) ** 2 < 70 ** 2:
+                        hp = max(0, int(getattr(en, "health", 0)))
+                        en.hit(999999)
+                        self.stats_damage += hp
+            # Laser po drodze: najblizszy wrog w promieniu 540
+            b["laser_cd"] -= 1
+            if b["laser_cd"] <= 0:
+                best, bd = None, 540 ** 2
+                for en in self.enemies:
+                    if en.dying or en.dead or en.reached_end:
+                        continue
+                    d2 = (en.x - b["x"]) ** 2 + (en.y - b["y"]) ** 2
+                    if d2 < bd:
+                        best, bd = en, d2
+                if best:
+                    hp = max(0, int(getattr(best, "health", 0)))
+                    best.hit(999999)
+                    self.stats_damage += hp
+                    mx = b["x"] + b["facing"] * 138
+                    my = b["y"] - 148
+                    b["beam"] = {"x1": mx, "y1": my, "x2": best.x, "y2": best.y - 20, "t": 20}
+                    self.particles.burst(best.x, best.y - 20, (255, 150, 80),
+                                          count=10, speed=3, life=20, size=3)
+                    sound_robot_zap.play()
+                    b["laser_cd"] = 100
+                else:
+                    b["laser_cd"] = 20
+            return
+        if phase == "laser":
+            if b["t"] == 1:
+                sound_robot_laser.play()
+            if b["t"] >= 45:
+                # Wiazka w statek: drzenie kadluba + ogien w punkcie trafienia
+                self.ship.x = self.ship.dock_x + random.randint(-2, 2)
+                if b["t"] % 4 == 0:
+                    self.particles.burst(self.ship.x - 20, self.ship.y - 30,
+                                         random.choice([(255, 150, 60), (255, 90, 40), (120, 120, 120)]),
+                                         count=8, speed=3, life=30, size=4)
+            if b["t"] >= 200:
+                self.ship.x = self.ship.dock_x
+                self._robot_phase = "sink"
+                b["t"] = 0
+            return
+        if phase == "sink":
+            self.ship.y += 0.55
+            if b["t"] % 6 == 0:
+                self.particles.burst(self.ship.x + random.randint(-90, 90),
+                                     self.ship.y + 40, (170, 220, 255),
+                                     count=5, speed=2, life=25, size=3)
+            if b["t"] >= 250:
+                self._robot_phase = "done"
+                self._true_victory = True
+                self.stats_highest_wave_beaten = max(
+                    getattr(self, "stats_highest_wave_beaten", 0), self.wave + 1)
+                self.won = True
+            return
+
+    def _robot_sprite(self, flipped):
+        key = "f" if flipped else "n"
+        if key not in self._robot_img_cache:
+            img = pygame.image.load(os.path.join("images", "robot.png"))
+            if flipped:
+                img = pygame.transform.flip(img, True, False)
+            self._robot_img_cache[key] = img
+        return self._robot_img_cache[key]
+
+    def _draw_beam(self, x1, y1, x2, y2):
+        """Gruba wiazka lasera: 3 warstwy + drzenie koncowki."""
+        jx, jy = random.randint(-3, 3), random.randint(-3, 3)
+        pygame.draw.line(self.win, (200, 50, 30), (x1, y1), (x2 + jx, y2 + jy), 15)
+        pygame.draw.line(self.win, (255, 110, 50), (x1, y1), (x2 + jx, y2 + jy), 9)
+        pygame.draw.line(self.win, (255, 240, 215), (x1, y1), (x2 + jx, y2 + jy), 4)
+        pygame.draw.circle(self.win, (255, 200, 120), (x2 + jx, y2 + jy), 10)
+
+    def _draw_wall_turrets(self):
+        """Wiezyczki sufitowe: plyta montazowa pod okapem, pret, kopula,
+        obracana lufa z odrzutem i blysk wylotowy; smugi strzalow."""
+        for t in self._turrets:
+            x, y = t["x"], t["y"]
+            pygame.draw.rect(self.win, (84, 78, 70), (x - 14, y - 40, 28, 9), border_radius=3)
+            pygame.draw.line(self.win, (56, 52, 48), (x, y - 32), (x, y - 8), 5)
+            pygame.draw.circle(self.win, (122, 114, 102), (x, y), 14)
+            pygame.draw.circle(self.win, (70, 66, 60), (x, y), 14, 2)
+            pygame.draw.circle(self.win, (176, 144, 84), (x, y - 9), 4)
+            a = t["angle"]
+            back = t["recoil"] * 0.7
+            bx = x + math.cos(a) * (12 - back)
+            by = y + math.sin(a) * (12 - back)
+            ex = x + math.cos(a) * 26
+            ey = y + math.sin(a) * 26
+            pygame.draw.line(self.win, (38, 36, 34), (bx, by), (ex, ey), 6)
+            pygame.draw.circle(self.win, (52, 50, 46), (int(ex), int(ey)), 4)
+            if t["flash"] > 0:
+                pygame.draw.circle(self.win, (255, 220, 110), (int(ex), int(ey)), 6 + t["flash"])
+                pygame.draw.circle(self.win, (255, 250, 230), (int(ex), int(ey)), 3)
+        for tr_ in self._turret_tracers:
+            col = (255, 230, 150) if tr_["t"] > 3 else (200, 170, 110)
+            pygame.draw.line(self.win, col, (tr_["x1"], tr_["y1"]), (tr_["x2"], tr_["y2"]), 2)
+
+    def _site_surface(self):
+        """Rusztowanie z plandeka (rysowane raz): slupy, pomosty, plandeka,
+        skrzynie - plac budowy, spod ktorego robot rosnie fala za fala."""
+        if self._site_surf is not None:
+            return self._site_surf
+        s = pygame.Surface((250, 175), pygame.SRCALPHA)
+        # Slupy i pomosty
+        for px in (10, 122, 234):
+            pygame.draw.rect(s, (110, 78, 45), (px, 18, 8, 157))
+        for py in (22, 92):
+            pygame.draw.rect(s, (128, 92, 52), (4, py, 242, 7))
+        pygame.draw.line(s, (100, 72, 42), (14, 92), (122, 24), 4)
+        pygame.draw.line(s, (100, 72, 42), (130, 92), (238, 24), 4)
+        # Plandeka na gornej czesci
+        pygame.draw.rect(s, (94, 104, 120), (16, 28, 218, 66), border_radius=10)
+        pygame.draw.rect(s, (110, 120, 136), (16, 28, 218, 20), border_radius=10)
+        for fx in (60, 105, 150, 195):
+            pygame.draw.line(s, (76, 86, 102), (fx, 32), (fx - 4, 90), 3)
+        pygame.draw.line(s, (60, 52, 40), (10, 96), (240, 96), 3)
+        # Skrzynie i beczka u podstawy
+        pygame.draw.rect(s, (146, 106, 58), (22, 138, 40, 32))
+        pygame.draw.rect(s, (120, 86, 46), (22, 138, 40, 32), 2)
+        pygame.draw.rect(s, (146, 106, 58), (188, 142, 36, 28))
+        pygame.draw.rect(s, (120, 86, 46), (188, 142, 36, 28), 2)
+        pygame.draw.ellipse(s, (86, 92, 104), (96, 140, 26, 30))
+        self._site_surf = s
+        return s
+
+    def _draw_robot_site(self):
+        """Plac budowy w trakcie gry: robot rosnie spod rusztowania
+        (przyciety do wysokosci postepu), nad nim etykieta z postepem."""
+        if not self._robot or self._robot_phase:
+            return
+        sx, sy = self._robot_site()
+        p = self._robot_progress()
+        img = self._robot_sprite(False)
+        reveal = int(380 * p)
+        if reveal > 4:
+            prev = self.win.get_clip()
+            self.win.set_clip(pygame.Rect(sx - 200, sy - reveal, 400, reveal))
+            self.win.blit(img, (sx - 192, sy - 380))
+            self.win.set_clip(prev)
+        self.win.blit(self._site_surface(), (sx - 125, sy - 168))
+        # Etykieta + pasek postepu nad rusztowaniem
+        lbl = self.font_btn18.render(
+            f"{tr('hud.robot')}: {self._robot['waves_started']}/{self._robot['duration']}",
+            True, (255, 232, 170))
+        bx, by = sx - 62, sy - 196
+        pygame.draw.rect(self.win, (20, 24, 30), (bx - 6, by - 4, 136, 34), border_radius=6)
+        self.win.blit(lbl, (sx - lbl.get_width() // 2, by))
+        pygame.draw.rect(self.win, (52, 56, 64), (bx, by + 22, 124, 6), border_radius=3)
+        pygame.draw.rect(self.win, (255, 190, 70), (bx, by + 22, int(124 * p), 6), border_radius=3)
+
+    def _draw_robot(self):
+        """TYTAN w scenie koncowej: wielki sprite (lustro wg kierunku),
+        pulsujacy wizjer, wiazki lasera (marsz + final w statek)."""
+        if self._robot_phase not in ("rise", "march", "laser", "sink"):
+            return
+        b = self._bot
+        img = self._robot_sprite(b["facing"] < 0)
+        bob = math.sin(b["t"] * 0.25) * 2 if self._robot_phase == "march" else 0
+        yoff = (1 - min(1, b["t"] / 50)) * 55 if self._robot_phase == "rise" else 0
+        self.win.blit(img, (b["x"] - 192, b["y"] - 380 + bob + yoff))
+        # Pulsujacy czerwony wizjer
+        vx = b["x"] + b["facing"] * 108
+        vy = b["y"] - 285 + bob + yoff
+        r = 5 + int(2 * math.sin(b["t"] * 0.2))
+        pygame.draw.circle(self.win, (255, 60, 50), (int(vx), int(vy)), r)
+        # Wiazka marszowa (krotka)
+        if b.get("beam"):
+            bm = b["beam"]
+            self._draw_beam(bm["x1"], bm["y1"] + bob, bm["x2"], bm["y2"])
+        # Final: ladowanie wizjera-dziala, potem stala wiazka w statek
+        if self._robot_phase == "laser":
+            mx = b["x"] + b["facing"] * 138
+            my = b["y"] - 148
+            if b["t"] < 45:
+                pygame.draw.circle(self.win, (255, 120, 60), (int(mx), int(my)), 3 + b["t"] // 3)
+                pygame.draw.circle(self.win, (255, 240, 220), (int(mx), int(my)), 2 + b["t"] // 6)
+            else:
+                self._draw_beam(mx, my, self.ship.x - 20, self.ship.y - 25)
 
     def _upg_level(self, container, uid):
         """Poziom upgrade'a (0 = niekupiony). Kontenery upgradow to dict
@@ -5518,12 +5981,15 @@ class Game:
             rect = pygame.Rect(sx, sy, col_w, row_h)
             # Poziomy: 0 = niekupiony, 1 = L1 (mozna dokupic L2), 2 = MAX
             _lvl = self._upg_level(owned_set, upg["id"])
+            if upg["id"] == "robot" and getattr(self, "_robot", None) is not None:
+                _lvl = 2  # TYTAN kupiony: karta jak MAX (projekt nie ma poziomow)
             owned = _lvl >= 1
             maxed = _lvl >= 2
             _l2 = UPGRADE_L2.get(upg["id"], {})
             _next_cost = upg["cost"] if _lvl == 0 else _l2.get("cost", upg["cost"])
             # Easter egg: cavalry ukryte w normalnej grze
-            mystery = upg.get("endless_only") and not self.endless
+            mystery = (upg.get("endless_only") and not self.endless) or \
+                (upg.get("robot") and not self._robot_unlocked())
             # Locked: wymaga innego upgradu (zapasowy mechanizm - chain pokazuje
             # dziecko w slocie rodzica dopiero po kupieniu rodzica, wiec LOCKED
             # w praktyce sie nie pojawia)
@@ -5553,7 +6019,7 @@ class Game:
                 q_bg.blit(q, (28 - q.get_width() // 2, 28 - q.get_height() // 2))
                 self.win.blit(q_bg, (sx + 10, sy + (row_h - 56) // 2))
                 name = "???"
-                desc = tr("upg.mystery_desc")
+                desc = tr("upg.robot.secret") if upg.get("robot") else tr("upg.mystery_desc")
                 price_txt = "???"
             else:
                 # Ikona nastepnego poziomu: L1 -> zwykla, L2 -> zlota z "II"
@@ -5564,7 +6030,7 @@ class Game:
                 if icon:
                     self.win.blit(icon, (sx + 10, sy + (row_h - 56) // 2))
                 name = tr(f"upg.{upg['id']}.name", upg["name"])
-                if _lvl >= 1:
+                if _lvl >= 1 and upg["id"] != "robot":
                     name += " II"
                 if locked:
                     desc = tr("upg.requires", name=_req_name)
