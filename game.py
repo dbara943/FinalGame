@@ -6744,7 +6744,7 @@ class Game:
 if __name__ == "__main__":
     from menu.start_menu import StartMenu
     while True:
-        start_menu = StartMenu(1124, 720, pygame.image.load(os.path.join("images", "bg.png")))
+        start_menu = StartMenu(1124, 720, pygame.image.load(os.path.join("images", "bg_noship.png")))
         settings = start_menu.run()
         if settings is None:
             break
