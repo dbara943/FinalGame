@@ -108,5 +108,9 @@ def pages():
         (t("help.e8"), "text"),
         ("", "text"),
         (t("help.e7"), "dim"),
+        ("", "text"),
+        (t("help.h_credits"), "header"),
+        (t("help.credits_craftpix"), "dim"),
+        (t("help.credits_tozan"), "dim"),
     ]
     return [p1] + tower_pages + [p3]
