@@ -24,7 +24,7 @@ jobs:
 
       - name: Build binary with PyInstaller
         run: |
-          pyinstaller --onefile --windowed --name "IslandDefenders" \
+          pyinstaller --onedir --windowed --name "IslandDefenders" \
             --add-data "images:images" \
             --add-data "sounds:sounds" \
             --add-data "lang:lang" \
