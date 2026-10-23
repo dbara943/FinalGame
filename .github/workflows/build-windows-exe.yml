@@ -21,6 +21,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install pygame pyinstaller
 
+      - name: Build PyInstaller bootloader from source
+        shell: pwsh
+        run: |
+          git clone --depth 1 https://github.com/pyinstaller/pyinstaller.git pyinstaller-src
+          cd pyinstaller-src/bootloader
+          python ./waf configure all
+          cd ..
+          pip install .
+
       - name: Build EXE with PyInstaller
         run: |
           pyinstaller --onedir --windowed --name "IslandDefenders" `
