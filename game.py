@@ -121,14 +121,14 @@ TENT_UPGRADES = [
 # Kontenery upgradow to teraz dict {id: poziom}; efekty czytaja poziom
 # przez Game._upg_level(). Ikony L2: pliki *_2.webp (zlota ramka + "II").
 UPGRADE_L2 = {
-    "treasury": {"cost": 1900, "desc": "Level 2: +50% gold from all kills in total."},
-    "bounty": {"cost": 2400, "desc": "Level 2: bosses and elites give +100% gold in total."},
-    "lucky": {"cost": 3200, "desc": "Level 2: 20% chance to deal 2x critical damage."},
+    "treasury": {"cost": 1900, "desc": "Level 2: +25% gold from all kills in total."},
+    "bounty": {"cost": 2400, "desc": "Level 2: bosses and elites give +50% gold in total."},
+    "lucky": {"cost": 3200, "desc": "Level 2: 10% chance to deal 2x critical damage."},
     "docks": {"cost": 4000, "desc": "Level 2: enemies move 30% slower on the pier."},
     "storm": {"cost": 4800, "desc": "Level 2: storm gold grows to +40%, and strange weather may appear: blood moons, ghostly fog, auroras, golden winds and sea storms."},
     "walls": {"cost": 5600, "desc": "Level 2: +10 max lives in total, plus two ceiling turrets guard the gate."},
     "robot": {"cost": 100000, "desc": "The TYTAN is being built. When it marches, the war ends."},
-    "ammo": {"cost": 6400, "desc": "Level 2: all towers shoot 30% faster in total."},
+    "ammo": {"cost": 6400, "desc": "Level 2: all towers shoot 15% faster in total."},
     "drones": {"cost": 7200, "desc": "Level 2: heals +1 life every wave; the repair drone works faster."},
     "tesla": {"cost": 10400, "desc": "Level 2: stronger zaps (130, storms 160) and longer range."},
     "facility": {"cost": 12800, "desc": "Level 2: drone rearms in 2 min; minigun +50%, kamikaze 600 dmg."},
@@ -138,11 +138,11 @@ UPGRADE_L2 = {
     "supply": {"cost": 4000, "desc": "Level 2: towers cost 25% less in total."},
     "drums": {"cost": 4800, "desc": "Level 2: tower abilities recharge 50% faster in total."},
     "signal": {"cost": 5600, "desc": "Level 2: Bonnie's arrows set enemies on fire, Clyde's arrows poison them. Fire and Blaze towers shoot 15% faster in total."},
-    "guerrilla": {"cost": 6400, "desc": "Level 2: +60% damage against slowed enemies in total."},
-    "banner": {"cost": 6400, "desc": "Level 2: all towers deal +20% damage in total."},
+    "guerrilla": {"cost": 6400, "desc": "Level 2: +30% damage against slowed enemies in total."},
+    "banner": {"cost": 6400, "desc": "Level 2: all towers deal +10% damage in total."},
     "spikes": {"cost": 7200, "desc": "Level 2: spikes deal +50% damage and poison passing enemies."},
     "balloon": {"cost": 8800, "desc": "Level 2: bombs every 2s, 220 damage."},
-    "sabotage": {"cost": 9600, "desc": "Level 2: all enemies spawn with -25% HP in total."},
+    "sabotage": {"cost": 9600, "desc": "Level 2: all enemies spawn with -10% HP in total."},
 }
 # Balans trudnosci: EASY ma byc naprawde latwy, NORMAL bazowy, HARD naprawde trudny.
 # price_mult: ceny WSZYSTKIEGO (sklep, ulepszenia wiez, upgrady budynku/namiotu).
@@ -731,7 +731,7 @@ class Game:
             for _b in self.pending_bosses:
                 # Sabotage: boss tez z -15% HP (widoczne na pasku)
                 if "sabotage" in self.tent_upgrades:
-                    _b.health = int(_b.health * (0.75 if self._upg_level(self.tent_upgrades, "sabotage") >= 2 else 0.85))
+                    _b.health = int(_b.health * (0.90 if self._upg_level(self.tent_upgrades, "sabotage") >= 2 else 0.95))
                 _b._spawn_tick = self._logic_tick
                 self.enemies.append(_b)
             # A10: intro bossa - dramatyczne wejscie (raz na cala paczke)
@@ -823,7 +823,7 @@ class Game:
             # byc po naszej stronie) - zostaje tylko +10% dmg wiez.
             if "sabotage" in self.tent_upgrades:
                 # Tylko aktualne HP (widoczne na pasku), max zostaje
-                en.health = max(1, int(en.health * (0.75 if self._upg_level(self.tent_upgrades, "sabotage") >= 2 else 0.85)))
+                en.health = max(1, int(en.health * (0.90 if self._upg_level(self.tent_upgrades, "sabotage") >= 2 else 0.95)))
             if "docks" in self.building_upgrades:
                 en._docks_slow = True
                 en._docks_factor = 0.70 if self._upg_level(self.building_upgrades, "docks") >= 2 else 0.85
@@ -989,7 +989,7 @@ class Game:
             en.health = max(1, int(en.health * _hp_mult))
         en.velocity *= self._diff("enemy_speed_mult")
         if "sabotage" in self.tent_upgrades:
-            en.health = max(1, int(en.health * (0.75 if self._upg_level(self.tent_upgrades, "sabotage") >= 2 else 0.85)))
+            en.health = max(1, int(en.health * (0.90 if self._upg_level(self.tent_upgrades, "sabotage") >= 2 else 0.95)))
         en._spawn_tick = self._logic_tick
         en._sea_raider = True
         en.update()  # inicjalizuj img, zeby byl widoczny od pierwszej klatki
@@ -1482,11 +1482,11 @@ class Game:
             _window = 600 if _scout >= 2 else 400
             if self._logic_tick - getattr(en, "_spawn_tick", 0) < _window:
                 mult *= 1 + 0.25 * _scout
-        # Guerrilla Training: +35% vs spowolnionych (L2: +60%)
+        # Guerrilla Training: +17,5% vs spowolnionych (L2: +30%) [nerf batch 31]
         _grr = self._upg_level(self.tent_upgrades, "guerrilla")
         if _grr:
             if getattr(en, "slow_timer", 0) > 0:
-                mult *= 1.60 if _grr >= 2 else 1.35
+                mult *= 1.30 if _grr >= 2 else 1.175
         return mult
 
     def draw_tesla_coil(self):
@@ -2934,7 +2934,7 @@ class Game:
                     _mult *= 1.5
                 # Bounty Board: bossowie i elity +50% zlota za poziom
                 if "bounty" in self.building_upgrades and (isinstance(d, Boss) or d.elite):
-                    _mult *= 1 + 0.5 * self._upg_level(self.building_upgrades, "bounty")
+                    _mult *= 1 + 0.25 * self._upg_level(self.building_upgrades, "bounty")
                 # U8: RICH - +50% zlota
                 if self.wave_modifier == "rich":
                     _mult *= 1.5
@@ -2947,7 +2947,7 @@ class Game:
                     _mult *= 1.25
                 # War Treasury: +25% zlota za poziom
                 if "treasury" in self.building_upgrades:
-                    _mult *= 1 + 0.25 * self._upg_level(self.building_upgrades, "treasury")
+                    _mult *= 1 + 0.125 * self._upg_level(self.building_upgrades, "treasury")
                 # Trudnosc: mnoznik zlota za zabojstwa (EASY +25%, HARD -15%)
                 _mult *= self._diff("gold_mult")
                 reward = max(1, math.ceil(d.money * _mult))
@@ -3049,7 +3049,7 @@ class Game:
                 # Lucky Charm: 10% szansy na 2x obrazen krytycznych.
                 # Bez Lucky NIE ma krytow (wczesniej: stale 15% dla wszystkich
                 # + osobny rzut 10% w wiezy = podwojne krytyki do 4x).
-                is_crit = ("lucky" in self.building_upgrades) and random.random() < 0.10 * self._upg_level(self.building_upgrades, "lucky")
+                is_crit = ("lucky" in self.building_upgrades) and random.random() < 0.05 * self._upg_level(self.building_upgrades, "lucky")
                 if is_crit:
                     self._ach_stats["crits"] = self._ach_stats.get("crits", 0) + 1
                 crit_mult = 2.0 if is_crit else 1.0
@@ -3242,8 +3242,10 @@ class Game:
             edge = pygame.Surface((w, h), pygame.SRCALPHA)
             pygame.draw.rect(edge, (0, 0, 0, alpha), (i, i, w - 2*i, h - 2*i), 2)
             self.win.blit(edge, (0, 0))
-        # Cienka linia pod tytulem (tytul jest na h//2 - 160)
-        pygame.draw.line(self.win, (80, 30, 30), (w//2 - 200, h//2 - 70), (w//2 + 200, h//2 - 70), 2)
+        # Cienka linia pod tytulem: Y z pomiaru wysokosci tytulu (batch 31),
+        # ustawiane w show_end_screen; fallback = dawna pozycja h//2 - 70
+        _ly = getattr(self, "_end_line_y", h // 2 - 70)
+        pygame.draw.line(self.win, (80, 30, 30), (w//2 - 200, _ly), (w//2 + 200, _ly), 2)
 
     def _end_stats_list(self):
         """Rozszerzone statystyki koncowe: ogolne + zabicia wg typu wroga."""
@@ -3349,6 +3351,7 @@ class Game:
             color = (150, 60, 60)  # przygaszona czerwien na ciemnym tle
             title_bg = None
         # Przyciski - szersze + wiekszy odstep (wczesniej 170x52, gap 20: ciasno + ENDLESS MODE wylewal sie)
+        # by to tylko wartosc wstepna: finalne Y ustawia uklad mierzony nizej (batch 31)
         bw, bh = 210, 56
         by = self.height // 2 + 200
         gap = 28
@@ -3375,14 +3378,17 @@ class Game:
             menu_rect = pygame.Rect(x0 + (bw + gap), by, bw, bh)
             quit_rect = pygame.Rect(x0 + 2 * (bw + gap), by, bw, bh)
             continue_rect = None
+        # Tytul renderowany WCZESNIEJ: uklad ekranu (batch 31) liczymy z
+        # rzeczywistych wysokosci tekstu, nie stalych offsetow - na Windows
+        # Segoe UI ma inne metryki niz fonty VM i bloki nachodzily na siebie.
+        text = big_font.render(title, 1, color)
+        shadow = big_font.render(title, 1, (0, 0, 0))
+        tx = self.width // 2 - text.get_width() // 2
+        ty = self.height // 2 - 160
+        title_h = text.get_height()
+        self._end_line_y = ty + title_h + 12  # linia dekoracyjna ekranu porazki
         # Tlo: mapa skarbow (win) / minimalistyczna porazka (lose) / ciemne (forfeit)
         is_defeat = not won and not forfeited
-        if is_defeat:
-            # Island Lost: przyciski nizej (Daniel 2026-10-21) - motto
-            # "the island still needs you" zostaje na miejscu, a RESTART /
-            # MAIN MENU / QUIT nie wchodza juz w statystyki i motto.
-            for _r in (restart_rect, menu_rect, quit_rect):
-                _r.y += 36
         if won and not forfeited:
             self._draw_victory_map()
             stat_color = (80, 50, 25)
@@ -3398,14 +3404,96 @@ class Game:
             self.win.blit(overlay, (0, 0))
             stat_color = (200, 200, 200)
             sub_color = (255, 255, 255)
-        text = big_font.render(title, 1, color)
-        # Cien pod tytulem dla czytelnosci
-        shadow = big_font.render(title, 1, (0, 0, 0))
-        tx = self.width // 2 - text.get_width() // 2
-        ty = self.height // 2 - 160
-        self.win.blit(shadow, (tx + 3, ty + 3))
-        self.win.blit(text, (tx, ty))
+        # --- Uklad mierzony (batch 31): kazdy blok zaczyna sie pod
+        # poprzednim + odstep, na bazie RZECZYWISTYCH wysokosci
+        # wyrenderowanych powierzchni tekstu. Zadnych stalych offsetow
+        # typu ty+92 / linie co 28px / przyciski h//2+200 - to one
+        # nachodzily na siebie przy metrykach Segoe UI (Windows). ---
         stats_font = self.font_stats24
+        left_x = self.width // 2 - 330
+        right_x = self.width // 2 + 30
+        sub_surf = None
+        sub_y = None
+        if true_victory:
+            # Shrink-to-fit: podtytul w DE/PT/ES przekraczal szerokosc ekranu
+            _sub_f = self._font_fit(tr("end.true_sub"), self.width - 64,
+                                    (30, 26, 22, 18))
+            sub_surf = _sub_f.render(tr("end.true_sub"), True, sub_color)
+            sub_y = ty + title_h + 10
+            stats_y = sub_y + sub_surf.get_height() + 16
+        else:
+            stats_y = ty + title_h + 28
+        if self.endless:
+            wave_line = tr("end.wave_endless", a=getattr(self, "stats_highest_wave_beaten", 0))
+        else:
+            wave_line = tr("end.wave_reached", a=getattr(self, "stats_highest_wave_beaten", 0), b=len(waves))
+        general = [
+            wave_line,
+            tr("end.monsters", n=self.stats_kills),
+            tr("end.damage", n=int(round(self.stats_damage))),
+            tr("end.gold_earned", n=self.stats_gold),
+            tr("end.gold_spent", n=self.stats_gold_spent),
+            tr("end.towers", a=self.stats_towers_built, b=self.stats_towers_lost),
+            tr("end.abilities", n=self.stats_abilities_used),
+        ]
+        # Lewa kolumna: shrink-to-fit per linia (linie RU/DE/FR/ES byly
+        # dluzsze niz ~348px do prawej kolumny) + kumulowane Y z pomiarow
+        left_surfs = []
+        _ly = stats_y
+        for s in general:
+            _lf = self._font_fit(s, right_x - left_x - 12, (24, 21, 19, 17, 15))
+            _s = _lf.render(s, True, stat_color)
+            left_surfs.append((_s, _ly))
+            _ly += _s.get_height() + 6
+        stats_bottom = _ly - 6
+        # Prawa kolumna: naglowek + zabicia wg typu, tez kumulowane Y
+        right_surfs = []
+        by_type = sorted(self.stats_kills_by_type.items(), key=lambda kv: -kv[1])[:7]
+        if by_type:
+            _hf = self._font_fit(tr("end.kills_by_type"),
+                                 self.width - right_x - 40, (24, 21, 19, 17, 15))
+            _hs = _hf.render(tr("end.kills_by_type"), True, sub_color)
+            right_surfs.append((_hs, stats_y))
+            _ry = stats_y + _hs.get_height() + 6
+            for etype, count in by_type:
+                nice = "".join(" " + c if c.isupper() and j else c
+                               for j, c in enumerate(etype)).strip()
+                _s = stats_font.render(f"{nice}: {count}", True, stat_color)
+                right_surfs.append((_s, _ry))
+                _ry += _s.get_height() + 6
+            stats_bottom = max(stats_bottom, _ry - 6)
+        # Motto porazki pod statystykami; przyciski pod cala trescia
+        motto_surf = None
+        motto_y = None
+        if is_defeat:
+            motto_surf = small_font.render(tr("end.motto"), True, (100, 110, 125))
+            motto_y = stats_bottom + 14
+            buttons_y = motto_y + motto_surf.get_height() + 24
+        else:
+            buttons_y = stats_bottom + 26
+        # Gdy cala tresc jest za wysoka (duze metryki fontu), przesun caly
+        # lancuch w gore zamiast pozwolic przyciskom spasc pod statystyki;
+        # tytul nie wyjezdza wyzej niz y=96 (ramka mapy). Ostateczny clamp
+        # i tak trzyma przyciski na ekranie.
+        _overflow = buttons_y + bh - (self.height - 16)
+        if _overflow > 0:
+            _shift = min(_overflow, ty - 96)
+            if _shift > 0:
+                ty -= _shift
+                self._end_line_y -= _shift
+                if sub_y is not None:
+                    sub_y -= _shift
+                left_surfs = [(_s, _sy - _shift) for _s, _sy in left_surfs]
+                right_surfs = [(_s, _sy - _shift) for _s, _sy in right_surfs]
+                if motto_y is not None:
+                    motto_y -= _shift
+                buttons_y -= _shift
+        buttons_y = min(buttons_y, self.height - 16 - bh)
+        for _r in (restart_rect, menu_rect, quit_rect):
+            _r.y = buttons_y
+        if continue_rect:
+            continue_rect.y = buttons_y
+
         def _draw_static():
             # Tlo
             if won and not forfeited:
@@ -3420,55 +3508,16 @@ class Game:
             # Tytul
             self.win.blit(shadow, (tx + 3, ty + 3))
             self.win.blit(text, (tx, ty))
-            if true_victory:
-                # Shrink-to-fit: podtytul w DE/PT/ES przekraczal szerokosc ekranu
-                _sub_f = self._font_fit(tr("end.true_sub"), self.width - 64,
-                                        (30, 26, 22, 18))
-                sub = _sub_f.render(tr("end.true_sub"), True, sub_color)
-                self.win.blit(sub, (self.width // 2 - sub.get_width() // 2, ty + 92))
+            if sub_surf is not None:
+                self.win.blit(sub_surf, (self.width // 2 - sub_surf.get_width() // 2, sub_y))
             # Statystyki: PELNY zestaw na KAZDYM ekranie koncowym (wygrana,
-            # porazka i poddanie) - wczesniej poddanie/wygrana mialy tylko
-            # 3 linijki. Dwie kolumny: ogolne (lewa) + zabicia wg typu (prawa).
-            col_y = self.height // 2 - 60
-            if true_victory:
-                # Podtytul zajmuje pas ty+92..+122 - statystyki nizej, inaczej
-                # pierwsza linia wchodzila w podtytul (widoczne tez w EN)
-                col_y += 36
-            left_x = self.width // 2 - 330
-            right_x = self.width // 2 + 30
-            if self.endless:
-                wave_line = tr("end.wave_endless", a=getattr(self, "stats_highest_wave_beaten", 0))
-            else:
-                wave_line = tr("end.wave_reached", a=getattr(self, "stats_highest_wave_beaten", 0), b=len(waves))
-            general = [
-                wave_line,
-                tr("end.monsters", n=self.stats_kills),
-                tr("end.damage", n=int(round(self.stats_damage))),
-                tr("end.gold_earned", n=self.stats_gold),
-                tr("end.gold_spent", n=self.stats_gold_spent),
-                tr("end.towers", a=self.stats_towers_built, b=self.stats_towers_lost),
-                tr("end.abilities", n=self.stats_abilities_used),
-            ]
-            # Shrink-to-fit per linia: lewa kolumna ma tylko ~348px do prawej,
-            # a linie RU/DE/FR/ES byly dluzsze i wchodzily w prawa kolumne
-            for i, s in enumerate(general):
-                _lf = self._font_fit(s, right_x - left_x - 12, (24, 21, 19, 17, 15))
-                label = _lf.render(s, True, stat_color)
-                self.win.blit(label, (left_x, col_y + i * 28))
-            by_type = sorted(self.stats_kills_by_type.items(), key=lambda kv: -kv[1])[:7]
-            if by_type:
-                _hf = self._font_fit(tr("end.kills_by_type"),
-                                     self.width - right_x - 40, (24, 21, 19, 17, 15))
-                hdr = _hf.render(tr("end.kills_by_type"), True, sub_color)
-                self.win.blit(hdr, (right_x, col_y))
-                for i, (etype, count) in enumerate(by_type):
-                    nice = "".join(" " + c if c.isupper() and j else c
-                                   for j, c in enumerate(etype)).strip()
-                    label = stats_font.render(f"{nice}: {count}", True, stat_color)
-                    self.win.blit(label, (right_x, col_y + (i + 1) * 28))
-            if is_defeat:
-                motto = small_font.render(tr("end.motto"), True, (100, 110, 125))
-                self.win.blit(motto, (self.width // 2 - motto.get_width() // 2, col_y + 8 * 28))
+            # porazka i poddanie). Dwie kolumny: ogolne + zabicia wg typu.
+            for _s, _sy in left_surfs:
+                self.win.blit(_s, (left_x, _sy))
+            for _s, _sy in right_surfs:
+                self.win.blit(_s, (right_x, _sy))
+            if motto_surf is not None:
+                self.win.blit(motto_surf, (self.width // 2 - motto_surf.get_width() // 2, motto_y))
         _draw_static()
         # Przyciski - szklane (glassmorphism), z hover w petli
         buttons = [
@@ -3950,7 +3999,7 @@ class Game:
         # Sklep: DMG na zywo (nie statyczny z init) - bazowe x Honor Banner.
         # Wczesniej sklep pokazywal stare 8/10 dla Fire/Blaze mimo rebalansu
         # (9/12) i nie uwzglednial Bannera.
-        _dmgm = 1.1 if "banner" in self.tent_upgrades else 1.0
+        _dmgm = 1 + 0.05 * self._upg_level(self.tent_upgrades, "banner")
         for _btn, _cls in zip(self.menu.buttons,
                               (WoodenTower, MetalTower, IceTower, GoldenTower, FireTower, BlazeTower)):
             _btn.damage = math.ceil(_cls.base_damage * _dmgm)
@@ -5865,7 +5914,7 @@ class Game:
             if self.pending_bosses:
                 for _b in self.pending_bosses:
                     if "sabotage" in self.tent_upgrades:
-                        _b.health = int(_b.health * (0.75 if self._upg_level(self.tent_upgrades, "sabotage") >= 2 else 0.85))
+                        _b.health = int(_b.health * (0.90 if self._upg_level(self.tent_upgrades, "sabotage") >= 2 else 0.95))
                     _b._spawn_tick = self._logic_tick
                     self.enemies.append(_b)
                 self.pending_bosses = []
@@ -6152,7 +6201,7 @@ class Game:
         straznikow na L2, Banner +10%/poz., Drums 0.7 / 0.5."""
         tw._fire_rate_mult = 1.0
         if "ammo" in self.building_upgrades:
-            tw._fire_rate_mult *= 1 + 0.15 * self._upg_level(self.building_upgrades, "ammo")
+            tw._fire_rate_mult *= 1 + 0.075 * self._upg_level(self.building_upgrades, "ammo")
         # Signal Fire: tempo strzalow wiez Fire/Blaze (globalnie, bez
         # zasiegu ogniska): L1 = +12%, L2 = +15% W SUMIE (Daniel, batch
         # 28) - a oprocz tego L2 daje straznikom zywiolowe strzaly
@@ -6161,7 +6210,7 @@ class Game:
             tw._fire_rate_mult *= 1.15 if self._upg_level(self.tent_upgrades, "signal") >= 2 else 1.12
         tw._dmg_mult = 1.0
         if "banner" in self.tent_upgrades:
-            tw._dmg_mult *= 1 + 0.10 * self._upg_level(self.tent_upgrades, "banner")
+            tw._dmg_mult *= 1 + 0.05 * self._upg_level(self.tent_upgrades, "banner")
         _drums = self._upg_level(self.tent_upgrades, "drums")
         tw._ability_cd_mult = ({0: 1.0, 1: 0.7, 2: 0.5}[_drums]) * self._diff("ability_cd_mult")
 
