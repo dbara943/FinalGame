@@ -33,6 +33,8 @@ jobs:
       - name: Build EXE with PyInstaller
         run: |
           pyinstaller --onedir --windowed --name "IslandDefenders" `
+            --icon "icon.ico" `
+            --version-file "version_info.txt" `
             --add-data "images;images" `
             --add-data "sounds;sounds" `
             --add-data "lang;lang" `
