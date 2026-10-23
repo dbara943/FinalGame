@@ -5,6 +5,7 @@ pygame.font.init()
 
 import i18n
 from i18n import t as _t
+import gui_theme as theme
 
 money_img = pygame.transform.scale(pygame.image.load(os.path.join("images", "coin.png")), (20, 20))
 _coin_icon = pygame.transform.scale(money_img, (15, 15))  # mala moneta przy cenach (zamiast $)
@@ -97,9 +98,11 @@ class Menu():
         # Panel rect (razem z paskiem TOWER.EXE nad panelem) - klik w panel
         # (nie tylko w przyciski) zjada klik, nie otwiera budynku/namiotu spod menu.
         self.panel_rect = pygame.Rect(px, py - 10, panel_w, panel_h + 10)
-        bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-        pygame.draw.rect(bg, (16, 26, 40, 235), bg.get_rect(), border_radius=8)
-        pygame.draw.rect(bg, (*bright, 255), bg.get_rect(), 2, border_radius=8)
+        # Panel w stylu A: ciemne drewno + mosiadzna ramka; narozne kreski
+        # zostaja w kolorze wiezy (akcent informacyjny typu)
+        bg = theme.wood_panel(panel_w, panel_h, radius=8,
+                              base=theme.WOOD_PANEL_DARK, corners=False).copy()
+        bg.set_alpha(244)
         c = 12
         for cx, cy in [(0, 0), (panel_w, 0), (0, panel_h), (panel_w, panel_h)]:
             dx = -1 if cx == 0 else 1
@@ -109,7 +112,7 @@ class Menu():
         win.blit(bg, (px, py))
         tag_font = pygame.font.SysFont("consolas, monospace", 11)
         tag = tag_font.render("TOWER.EXE", True, bright)
-        pygame.draw.rect(win, (8, 14, 22), (px + 8, py - 10, tag.get_width() + 8, 14))
+        pygame.draw.rect(win, theme.WOOD_INSET, (px + 8, py - 10, tag.get_width() + 8, 14))
         win.blit(tag, (px + 12, py - 8))
         name_font = pygame.font.SysFont("consolas, monospace", 15, bold=True)
         # Nazwa wyswietlana w biezacym jezyku (Wood Tower / Gold Tower...)
@@ -119,7 +122,7 @@ class Menu():
         win.blit(label, (px + 14, py + 14))
         lvl, maxlvl = tw.level, tw.max_level
         bar_x, bar_y, bar_w, bar_h = px + 14, py + 36, panel_w - 28, 8
-        pygame.draw.rect(win, (50, 62, 80), (bar_x, bar_y, bar_w, bar_h), border_radius=4)
+        pygame.draw.rect(win, (70, 52, 32), (bar_x, bar_y, bar_w, bar_h), border_radius=4)
         fill_w = int(bar_w * lvl / maxlvl)
         pygame.draw.rect(win, bright, (bar_x, bar_y, fill_w, bar_h), border_radius=4)
         lvl_txt = tag_font.render(f"LV.{lvl}/{maxlvl}", True, bright)
@@ -201,23 +204,24 @@ class Menu():
             self.buttons[1].width, self.buttons[1].height = 106, btn_h
 
     def _draw_holo_btn(self, win, x, y, w, h, title, sub, color, disabled, sub_color=None):
-        # Zywsze przyciski: mocniejsze wypelnienie, grubsza ramka, jasniejszy tekst
+        # Przyciski w stylu A: drewniany korpus + mosiadzna ramka; kolor
+        # wiezy zostaje w tekscie (akcent informacyjny typu)
         br = tuple(min(255, int(c * 1.4 + 45)) for c in color)
         btn = pygame.Surface((w, h), pygame.SRCALPHA)
         r, g, b = br[0], br[1], br[2]
         if disabled:
-            pygame.draw.rect(btn, (50, 58, 70, 200), btn.get_rect(), border_radius=6)
-            pygame.draw.rect(btn, (110, 120, 135, 160), btn.get_rect(), 1, border_radius=6)
+            pygame.draw.rect(btn, (56, 46, 36, 210), btn.get_rect(), border_radius=6)
+            pygame.draw.rect(btn, (150, 128, 92, 170), btn.get_rect(), 1, border_radius=6)
         else:
-            pygame.draw.rect(btn, (r, g, b, 120), btn.get_rect(), border_radius=6)
-            pygame.draw.rect(btn, (r, g, b, 255), btn.get_rect(), 3, border_radius=6)
+            theme.wood_fill(btn, btn.get_rect(), radius=6, base=theme.WOOD_BTN,
+                            border=theme.BRASS, border_w=2)
         win.blit(btn, (x, y))
         tfont = pygame.font.SysFont("consolas, monospace", 13, bold=True)
         # Shrink-to-fit tytulu (RU "МАКС. УРОВЕНЬ" ~104px w przycisku 106px)
         if tfont.size(title)[0] > w - 6:
             tfont = pygame.font.SysFont("consolas, monospace", 11, bold=True)
         sfont = pygame.font.SysFont("consolas, monospace", 12)
-        tcol = (155, 165, 175) if disabled else (r, g, b)
+        tcol = (172, 158, 136) if disabled else (r, g, b)
         t = tfont.render(title, True, tcol)
         win.blit(t, (x + w//2 - t.get_width()//2, y + 8))
         if sub:
@@ -237,16 +241,16 @@ class Menu():
         btn = pygame.Surface((w, h), pygame.SRCALPHA)
         r, g, b = br[0], br[1], br[2]
         if disabled:
-            pygame.draw.rect(btn, (50, 58, 70, 200), btn.get_rect(), border_radius=6)
+            pygame.draw.rect(btn, (56, 46, 36, 210), btn.get_rect(), border_radius=6)
         else:
-            pygame.draw.rect(btn, (r, g, b, 120), btn.get_rect(), border_radius=6)
-            pygame.draw.rect(btn, (r, g, b, 255), btn.get_rect(), 3, border_radius=6)
+            theme.wood_fill(btn, btn.get_rect(), radius=6, base=theme.WOOD_BTN,
+                            border=theme.BRASS, border_w=2)
         win.blit(btn, (x, y))
         tfont = pygame.font.SysFont("consolas, monospace", 13, bold=True)
         if tfont.size(title)[0] > w - 6:
             tfont = pygame.font.SysFont("consolas, monospace", 11, bold=True)
         sfont = pygame.font.SysFont("consolas, monospace", 11)
-        tcol = (155, 165, 175) if disabled else (r, g, b)
+        tcol = (172, 158, 136) if disabled else (r, g, b)
         t = tfont.render(title, True, tcol)
         win.blit(t, (x + w//2 - t.get_width()//2, y + 6))
         # Przekreslona oryginalna (z ikona monety)
@@ -354,27 +358,27 @@ class VerticalMenu(Menu):
         # Rysuj wszystko na osobnej powierzchni, potem naloz z alfa
         surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
         # (panel_w liczony dynamicznie w _panel_w - patrz wyzej)
-        bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-        pygame.draw.rect(bg, (10, 16, 28, 240), bg.get_rect(), border_radius=16)
-        pygame.draw.rect(bg, (80, 120, 180, 100), bg.get_rect(), 2, border_radius=16)
+        # Panel w stylu A: drewno + mosiadzne narozniki
+        bg = theme.wood_panel(panel_w, panel_h, radius=16).copy()
+        bg.set_alpha(246)
         surf.blit(bg, (0, 0))
 
         # Naglowek sklepu
         hfont = pygame.font.SysFont("segoe ui, calibri, arial", 18, bold=True)
-        ht = hfont.render(_t("shop.title"), True, (200, 220, 240))
+        ht = hfont.render(_t("shop.title"), True, theme.BRASS_BRIGHT)
         surf.blit(ht, (panel_w//2 - ht.get_width()//2, 10))
         
         for idx, item in enumerate(self.buttons):
             bx = px + 12
             by = py + 38 + idx * 66
-            # Tlo przycisku
-            btn_bg = pygame.Surface((panel_w - 24, 58), pygame.SRCALPHA)
             # Hover efekt
             hovering = bx <= mx <= bx + panel_w - 24 and by <= my <= by + 58
-            if hovering:
-                pygame.draw.rect(btn_bg, (35, 50, 75, 255), btn_bg.get_rect(), border_radius=10)
-            else:
-                pygame.draw.rect(btn_bg, (22, 32, 50, 255), btn_bg.get_rect(), border_radius=10)
+            # Tlo przycisku: jasniejsze drewno po najechaniu
+            btn_bg = pygame.Surface((panel_w - 24, 58), pygame.SRCALPHA)
+            theme.wood_fill(btn_bg, btn_bg.get_rect(), radius=10,
+                            base=theme.WOOD_CARD_HOVER if hovering else theme.WOOD_CARD,
+                            border=theme.BRASS if hovering else theme.BRASS_DARK,
+                            border_w=2 if hovering else 1)
             surf.blit(btn_bg, (bx - px, by - py))
             # Ikona: grafika wiezy z pociskiem (kompozyt 46x46, bez skalowania)
             surf.blit(item.img, (bx + 6 - px, by + 6 - py))
@@ -385,9 +389,9 @@ class VerticalMenu(Menu):
             names = [_t("tower.wood"), _t("tower.metal"), _t("tower.ice"),
                      _t("tower.gold"), _t("tower.fire"), _t("tower.blaze")]
             tx = bx + 58 - px  # wspolna lewa krawedz tekstu
-            nm = nfont.render(names[idx] if idx < len(names) else item.name, True, (230, 235, 240))
+            nm = nfont.render(names[idx] if idx < len(names) else item.name, True, theme.CREAM)
             surf.blit(nm, (tx, by + 4 - py))
-            dm = dfont.render(_t("shop.dmg", dmg=item.damage), True, (170, 180, 190))
+            dm = dfont.render(_t("shop.dmg", dmg=item.damage), True, theme.WARM_GRAY)
             surf.blit(dm, (tx, by + 22 - py))
             # Cena: z discountem pokazuje przekreslona oryginalna + nowa (Costco style)
             if discount < 1.0:

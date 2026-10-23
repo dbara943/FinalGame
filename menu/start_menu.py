@@ -4,6 +4,7 @@ import json
 
 import i18n
 from i18n import t
+import gui_theme as theme
 
 DIFFICULTIES = [
     ("EASY", 30, 300),
@@ -110,15 +111,15 @@ class StartMenu:
         return scaled.subsurface((x, y, tw, th)).copy()
 
     def draw_button(self, rect, text, hover):
-        color = (46, 134, 193) if hover else (28, 90, 135)
-        pygame.draw.rect(self.win, color, rect, border_radius=14)
-        pygame.draw.rect(self.win, (255, 255, 255), rect, 2, border_radius=14)
+        # Styl A: drewniany przycisk z mosiadzna ramka, kremowy tekst
+        self.win.blit(theme.wood_button(rect.w, rect.h, radius=14, hover=hover),
+                      rect.topleft)
         # Dopasuj czcionke do szerokosci przycisku - kurcz do dopasowania (30/26/22/18)
         # (wczesniej tylko jeden fallback do 22, dlugie etykiety nadal mogly sie przycinas na Windows/Arial)
         label = None
         for size in (30, 26, 22, 18):
             font = pygame.font.SysFont("arial", size, bold=True)
-            label = font.render(text, True, (255, 255, 255))
+            label = font.render(text, True, theme.CREAM)
             if label.get_width() <= rect.w - 24 and label.get_height() <= rect.h - 10:
                 break
         self.win.blit(label, (rect.centerx - label.get_width() // 2,
@@ -166,13 +167,13 @@ class StartMenu:
     def draw(self, mouse):
         self.win.blit(self.bg, (0, 0))
         shade = pygame.Surface((self.rw, self.rh), pygame.SRCALPHA)
-        shade.fill((5, 10, 25, 150))
+        shade.fill((16, 9, 4, 150))
         self.win.blit(shade, (0, 0))
 
         # Animowany tytul - fala jak w filmach
         self.draw_title_wave()
         sub = self.small_font.render(t("menu.subtitle"),
-                                      True, (220, 230, 240))
+                                      True, (238, 228, 200))
         self.win.blit(sub, (self.rw // 2 - sub.get_width() // 2, self.rh // 2 - 160))
 
         diff_name = DIFFICULTIES[self.diff_idx][0]
@@ -197,7 +198,7 @@ class StartMenu:
         # Opis wybranej trudnosci (stopka - co zmienia EASY / NORMAL / HARD)
         diff_desc = t("diff." + diff_name.lower() + ".desc")
         if diff_desc:
-            dtxt = self.small_font.render(diff_desc, True, (170, 180, 190))
+            dtxt = self.small_font.render(diff_desc, True, theme.WARM_GRAY)
             self.win.blit(dtxt, (self.rw // 2 - dtxt.get_width() // 2, self.rh - 30))
 
         if self.show_help:
@@ -217,7 +218,7 @@ class StartMenu:
         x1 = self._flag_rects[-1][1].right
         y0 = self._flag_rects[0][1].y
         pill = pygame.Surface((x1 - x0 + 16, 30 + 12), pygame.SRCALPHA)
-        pygame.draw.rect(pill, (5, 10, 25, 130), pill.get_rect(), border_radius=10)
+        pygame.draw.rect(pill, (24, 15, 8, 150), pill.get_rect(), border_radius=10)
         self.win.blit(pill, (x0 - 8, y0 - 6))
         hovered_name = None
         for code, rect in self._flag_rects:
@@ -397,9 +398,9 @@ class StartMenu:
         self.win.blit(dim, (0, 0))
         pw, ph = 500, 400
         px, py = (self.rw - pw) // 2, (self.rh - ph) // 2
-        pygame.draw.rect(self.win, (25, 30, 40), (px, py, pw, ph), border_radius=15)
-        pygame.draw.rect(self.win, (100, 200, 255), (px, py, pw, ph), 2, border_radius=15)
-        title = self.btn_font.render(t("res.title"), True, (100, 200, 255))
+        self.win.blit(theme.wood_panel(pw, ph, radius=15,
+                                       base=theme.WOOD_PANEL_DARK), (px, py))
+        title = self.btn_font.render(t("res.title"), True, theme.BRASS_BRIGHT)
         self.win.blit(title, (px + (pw - title.get_width()) // 2, py + 20))
         # Opcje
         self._res_buttons = []
@@ -409,7 +410,7 @@ class StartMenu:
             bx, by = px + (pw - bw) // 2, py + 80 + i * 56
             rect = pygame.Rect(bx, by, bw, bh)
             self._res_buttons.append((rect, i))
-            col = (255, 215, 100) if i == self.res_idx else (80, 90, 100)
+            col = (255, 215, 100) if i == self.res_idx else theme.BRASS_DARK
             pygame.draw.rect(self.win, col, rect, 3 if i == self.res_idx else 1, border_radius=8)
             # Shrink-to-fit: "PANTALLA COMPLETA NATIVA" (ES) i odpowiedniki
             # RU przy 22px wychodzily poza przycisk 320px z obu stron
@@ -419,10 +420,10 @@ class StartMenu:
                     lbl_font = pygame.font.SysFont("arial", _sz, bold=True)
                     if lbl_font.size(name)[0] <= bw - 16:
                         break
-            lbl = lbl_font.render(name, True, (255, 255, 255))
+            lbl = lbl_font.render(name, True, theme.CREAM)
             self.win.blit(lbl, (bx + (bw - lbl.get_width()) // 2,
                                 by + (bh - lbl.get_height()) // 2))
-        hint = self.small_font.render(t("res.applies"), True, (150, 150, 150))
+        hint = self.small_font.render(t("res.applies"), True, (172, 156, 126))
         self.win.blit(hint, (px + (pw - hint.get_width()) // 2, py + ph - 35))
 
     def draw_help(self):
@@ -481,8 +482,8 @@ class StartMenu:
         _total = 58 + sum(_steps.get(s, 12) if s != "spacer" else 12 for _, s, _e, _x in lines) + 52
         pw = 780
         panel = pygame.Rect(self.rw // 2 - pw // 2, self.rh // 2 - _total // 2, pw, _total)
-        pygame.draw.rect(self.win, (12, 24, 44), panel, border_radius=16)
-        pygame.draw.rect(self.win, (255, 255, 255), panel, 2, border_radius=16)
+        self.win.blit(theme.wood_panel(panel.w, panel.h, radius=16,
+                                       base=theme.WOOD_PANEL_DARK), panel.topleft)
         title = self.btn_font.render(t("sm.help.title"), True, (255, 210, 63))
         self.win.blit(title, (panel.centerx - title.get_width() // 2, panel.y + 14))
         y = panel.y + 58
@@ -495,11 +496,11 @@ class StartMenu:
             elif style == "tower":
                 f, c = self._help_font_b, (140, 220, 255)
             elif style == "sub":
-                f, c = self._help_font, (185, 195, 205)
+                f, c = self._help_font, (208, 195, 170)
             elif style == "dim":
-                f, c = self._help_font, (140, 150, 160)
+                f, c = self._help_font, theme.WARM_DIM
             else:
-                f, c = self._help_font, (225, 232, 240)
+                f, c = self._help_font, (233, 225, 205)
             if style == "tower":
                 _spr = help_content.TOWER_SPRITES.get(extra or "")
                 if _spr:
@@ -510,17 +511,18 @@ class StartMenu:
             y += _steps.get(style, 25)
         # Nawigacja: strzalki + licznik stron + podpowiedz zamkniecia
         nav = self._help_font.render(
-            t("help.nav", a=page + 1, b=len(all_pages)), True, (150, 158, 168))
+            t("help.nav", a=page + 1, b=len(all_pages)), True, theme.WARM_GRAY)
         self.win.blit(nav, (panel.centerx - nav.get_width() // 2, panel.bottom - 34))
         self._help_prev_rect = pygame.Rect(panel.x + 14, panel.bottom - 46, 44, 34)
         self._help_next_rect = pygame.Rect(panel.right - 58, panel.bottom - 46, 44, 34)
         for rect, glyph, enabled in (
                 (self._help_prev_rect, "<", page > 0),
                 (self._help_next_rect, ">", page < len(all_pages) - 1)):
-            pygame.draw.rect(self.win, (35, 55, 80) if enabled else (22, 34, 50),
-                             rect, border_radius=8)
+            theme.wood_fill(self.win, rect, radius=8,
+                            base=theme.WOOD_BTN if enabled else (40, 28, 16),
+                            border=theme.BRASS if enabled else theme.BRASS_DARK)
             g = self._help_font.render(glyph, True,
-                                       (255, 255, 255) if enabled else (90, 98, 108))
+                                       theme.CREAM if enabled else (120, 108, 88))
             self.win.blit(g, (rect.x + (rect.w - g.get_width()) // 2,
                               rect.y + (rect.h - g.get_height()) // 2))
 

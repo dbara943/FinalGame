@@ -15,9 +15,9 @@ try:
     _info = pygame.display.Info()
     _lw, _lh = _info.current_w, _info.current_h
     _load_win = pygame.display.set_mode((_lw, _lh), pygame.FULLSCREEN)
-    _load_win.fill((20, 25, 35))
+    _load_win.fill((26, 17, 9))
     _lf = pygame.font.SysFont("arial", 36)
-    _lt = _lf.render(i18n.t("loading"), True, (255, 255, 255))
+    _lt = _lf.render(i18n.t("loading"), True, (245, 236, 214))
     _load_win.blit(_lt, (_lw//2 - _lt.get_width()//2, _lh//2 - 20))
     pygame.display.flip()
 except Exception:
@@ -45,6 +45,7 @@ from menu.menu import VerticalMenu, Menu
 from towers.tower import menu_bg as _tower_menu_bg, upgrade_btn as _upgrade_btn, sell_btn as _sell_btn
 from effects.particles import ParticleSystem, FloatingCoin, Shockwave
 import help_content
+import gui_theme as theme
 import time
 import random
 
@@ -639,9 +640,10 @@ class Game:
         self._pill_h = 44
         self._pills = []
         for _w in (180, 130, 150):
-            _s = pygame.Surface((_w, self._pill_h), pygame.SRCALPHA)
-            pygame.draw.rect(_s, (8, 18, 38, 190), _s.get_rect(), border_radius=self._pill_h // 2)
-            pygame.draw.rect(_s, (255, 255, 255, 70), _s.get_rect(), 2, border_radius=self._pill_h // 2)
+            # Styl A: drewniana pigulka z mosiadzna ramka (lekko przezroczysta)
+            _s = theme.wood_panel(_w, self._pill_h, radius=self._pill_h // 2,
+                                  corners=False).copy()
+            _s.set_alpha(222)
             self._pills.append(_s)
         self._lives_icon = pygame.transform.scale(lives_img, (28, 28))
         self._money_icon = pygame.transform.scale(money_img, (28, 28))
@@ -1624,10 +1626,10 @@ class Game:
         pw, ph = 320, 80
         px = self.width - pw - 20
         py = 90
-        # Tlo
-        s = pygame.Surface((pw, ph), pygame.SRCALPHA)
-        s.fill((20, 25, 35, 220))
-        pygame.draw.rect(s, (255, 215, 100, 200), s.get_rect(), 2, border_radius=10)
+        # Tlo: drewno + zloty/mosiadzny obrys (styl A)
+        s = theme.wood_panel(pw, ph, radius=10, base=theme.WOOD_PANEL_DARK,
+                             border=theme.BRASS_BRIGHT, corners=False).copy()
+        s.set_alpha(232)
         self.win.blit(s, (px, py))
         # Ikona
         icon = self.ach_mgr.icons.get(icon_cat)
@@ -1639,7 +1641,7 @@ class Game:
         _hf = self._font_fit(tr("ach.unlocked"), pw - 68 - 10, (18, 16, 14), bold=True)
         _nf = self._font_fit(name, pw - 68 - 10, (30, 26, 22, 18))
         t1 = _hf.render(tr("ach.unlocked"), True, (255, 215, 100))
-        t2 = _nf.render(name, True, (255, 255, 255))
+        t2 = _nf.render(name, True, theme.CREAM)
         self.win.blit(t1, (px + 68, py + 10))
         self.win.blit(t2, (px + 68, py + 35))
 
@@ -3285,7 +3287,9 @@ class Game:
         return chosen
 
     def _draw_glass_button(self, rect, label_text, glow_color, hover=False, font=None):
-        """Szklany przycisk (glassmorphism): poswiata, matowe szklo, jasna krawedz, blysk u gory."""
+        """Przycisk w stylu A (drewno + mosiadz, gui_theme): poswiata,
+        drewniany korpus z mosiadzna ramka, kremowy tekst z cieniem.
+        (Nazwa metody zostaje - wolana z ekranow koncowych.)"""
         win = self.win
         # Tekst MUSI miescic sie w przycisku: kurcz czcionke az wejdzie.
         # Poprawka i18n: wczesniejszy fallback zostawial font 30px, gdy zaden
@@ -3299,23 +3303,11 @@ class Game:
             a = alpha + (20 if hover else 0)
             pygame.draw.rect(glow, (*glow_color, a), glow.get_rect(), border_radius=18)
             win.blit(glow, (rect.x - pad, rect.y - pad))
-        # Matowe szklo
-        glass = pygame.Surface((rect.w, rect.h), pygame.SRCALPHA)
-        pygame.draw.rect(glass, (235, 240, 250, 95 if not hover else 125),
-                         glass.get_rect(), border_radius=14)
-        # Kolorowy tint
-        tint = pygame.Surface((rect.w, rect.h), pygame.SRCALPHA)
-        tint.fill((*glow_color, 50 if not hover else 70))
-        glass.blit(tint, (0, 0))
-        win.blit(glass, rect.topleft)
-        # Jasna krawedz
-        pygame.draw.rect(win, (255, 255, 255, 170), rect, 2, border_radius=14)
-        # Blysk u gory szkla
-        hl = pygame.Surface((max(1, rect.w - 20), max(1, rect.h // 3)), pygame.SRCALPHA)
-        pygame.draw.rect(hl, (255, 255, 255, 45), hl.get_rect(), border_radius=9)
-        win.blit(hl, (rect.x + 10, rect.y + 7))
+        # Drewniany korpus z mosiadzna ramka (cachowany w gui_theme)
+        win.blit(theme.wood_button(rect.w, rect.h, radius=14, hover=hover),
+                 rect.topleft)
         # Tekst z cieniem
-        label = font.render(label_text, True, (255, 255, 255))
+        label = font.render(label_text, True, theme.CREAM)
         tsh = font.render(label_text, True, (0, 0, 0))
         lx = rect.x + rect.width // 2 - label.get_width() // 2
         ly = rect.y + rect.height // 2 - label.get_height() // 2
@@ -4093,9 +4085,9 @@ class Game:
         pw = 340
         ph = 70 + (len(_items) - 1) * 54 + 44 + 16 + (78 if self.endless else 0)  # tytul + przyciski + ew. wiersz skoku (tylko endless) + margines
         px, py = (self.width - pw) // 2, (self.height - ph) // 2
-        pygame.draw.rect(self.win, (25, 30, 38), (px, py, pw, ph), border_radius=16)
-        pygame.draw.rect(self.win, (70, 80, 95), (px, py, pw, ph), 2, border_radius=16)
-        title = self.font_p36.render(tr("hud.paused"), True, (255, 255, 255))
+        self.win.blit(theme.wood_panel(pw, ph, radius=16,
+                                       base=theme.WOOD_PANEL_DARK), (px, py))
+        title = self.font_p36.render(tr("hud.paused"), True, theme.CREAM)
         self.win.blit(title, (px + (pw - title.get_width()) // 2, py + 22))
         # Przyciski
         self._menu_buttons = []
@@ -4112,15 +4104,16 @@ class Game:
                 checked = False
             rect = pygame.Rect(px + 40, by, pw - 80, 44)
             hover = rect.collidepoint(mx, my)
-            col = (55, 65, 80) if not hover else (75, 90, 110)
-            pygame.draw.rect(self.win, col, rect, border_radius=10)
+            theme.wood_fill(self.win, rect, radius=10,
+                            base=theme.WOOD_BTN_HOVER if hover else theme.WOOD_BTN,
+                            border=theme.BRASS)
             if action == "quit":
-                pygame.draw.rect(self.win, (120, 50, 50), rect, 2, border_radius=10)
+                pygame.draw.rect(self.win, (150, 60, 60), rect, 2, border_radius=10)
             if has_check:
                 # Checkmark box
                 cb = pygame.Rect(rect.x + 16, rect.y + 12, 20, 20)
-                pygame.draw.rect(self.win, (30, 35, 45), cb, border_radius=4)
-                pygame.draw.rect(self.win, (120, 130, 145), cb, 2, border_radius=4)
+                pygame.draw.rect(self.win, theme.WOOD_INSET, cb, border_radius=4)
+                pygame.draw.rect(self.win, theme.BRASS_DARK, cb, 2, border_radius=4)
                 if checked:
                     # Zielony ptaszek
                     pygame.draw.line(self.win, (80, 220, 100), (cb.x + 4, cb.y + 10), (cb.x + 9, cb.y + 15), 3)
@@ -4128,13 +4121,13 @@ class Game:
                 # Shrink-to-fit: etykiety z checkboxem maja tylko ~200px
                 # (ES "Pantalla completa" wychodzila poza przycisk)
                 _tf = self._font_fit(label, rect.w - 44 - 10, (18, 16, 15, 14, 13), bold=True)
-                txt = _tf.render(label, True, (240, 240, 240))
+                txt = _tf.render(label, True, theme.CREAM)
                 self.win.blit(txt, (cb.x + 28, rect.y + (rect.h - txt.get_height()) // 2))
             else:
                 # Shrink-to-fit: zwykle przyciski (PT "Sair para a área de
                 # trabalho" przy 18px byly szersze niz przycisk 260px)
                 _tf = self._font_fit(label, rect.w - 16, (18, 16, 15, 14, 13), bold=True)
-                txt = _tf.render(label, True, (240, 240, 240))
+                txt = _tf.render(label, True, theme.CREAM)
                 self.win.blit(txt, (rect.x + (rect.w - txt.get_width()) // 2,
                                     rect.y + (rect.h - txt.get_height()) // 2))
             self._menu_buttons.append((rect, action))
@@ -4156,22 +4149,23 @@ class Game:
             self._pause_jump_input = pygame.Rect(px + 40, jy + 26, 120, 38)
             self._pause_jump_btn = pygame.Rect(px + 168, jy + 26, pw - 208, 38)
             r = self._pause_jump_input
-            pygame.draw.rect(self.win, (10, 16, 28), r, border_radius=8)
-            pygame.draw.rect(self.win, (255, 215, 100) if self._pause_wave_focus else (120, 135, 155),
+            pygame.draw.rect(self.win, theme.WOOD_INSET, r, border_radius=8)
+            pygame.draw.rect(self.win, (255, 215, 100) if self._pause_wave_focus else theme.BRASS_DARK,
                              r, 2, border_radius=8)
             txt = self._pause_wave_txt if self._pause_wave_txt else str(self.wave + 1)
-            col = (240, 244, 248) if self._pause_wave_txt else (110, 120, 135)
+            col = theme.CREAM if self._pause_wave_txt else theme.WARM_DIM
             tv = self.font_btn18.render(txt, True, col)
             self.win.blit(tv, (r.x + 10, r.y + r.h // 2 - tv.get_height() // 2))
             if self._pause_wave_focus and (pygame.time.get_ticks() // 500) % 2 == 0:
                 cx = r.x + 10 + tv.get_width() + 3
                 pygame.draw.line(self.win, (255, 215, 100), (cx, r.y + 8), (cx, r.bottom - 8), 2)
             jb = self._pause_jump_btn
-            pygame.draw.rect(self.win, (75, 90, 110) if jb.collidepoint(mx, my) else (55, 65, 80),
-                             jb, border_radius=10)
+            theme.wood_fill(self.win, jb, radius=10,
+                            base=theme.WOOD_BTN_HOVER if jb.collidepoint(mx, my) else theme.WOOD_BTN,
+                            border=theme.BRASS)
             _jf = self._font_fit(tr("menu.endless_go"), jb.w - 10,
                                  (18, 16, 15, 14), bold=True)
-            jt = _jf.render(tr("menu.endless_go"), True, (240, 240, 240))
+            jt = _jf.render(tr("menu.endless_go"), True, theme.CREAM)
             self.win.blit(jt, (jb.x + (jb.w - jt.get_width()) // 2,
                                jb.y + (jb.h - jt.get_height()) // 2))
         else:
@@ -4190,8 +4184,8 @@ class Game:
         lines = all_pages[page]
         hw, hh = 800, 640
         hx, hy = (self.width - hw) // 2, (self.height - hh) // 2
-        pygame.draw.rect(self.win, (20, 25, 32), (hx, hy, hw, hh), border_radius=16)
-        pygame.draw.rect(self.win, (70, 80, 95), (hx, hy, hw, hh), 2, border_radius=16)
+        self.win.blit(theme.wood_panel(hw, hh, radius=16,
+                                       base=theme.WOOD_PANEL_DARK), (hx, hy))
         title = self.font_p36.render(tr("menu.help"), True, (255, 215, 100))
         self.win.blit(title, (hx + (hw - title.get_width()) // 2, hy + 14))
         y = hy + 62
@@ -4211,11 +4205,11 @@ class Game:
             elif style == "tower":
                 f, c, step = self.font_btn18, (140, 220, 255), 25
             elif style == "sub":
-                f, c, step = self.font_btn18, (185, 195, 205), 23
+                f, c, step = self.font_btn18, (208, 195, 170), 23
             elif style == "dim":
-                f, c, step = self.font_btn18, (150, 158, 168), 24
+                f, c, step = self.font_btn18, theme.WARM_DIM, 24
             else:
-                f, c, step = self.font_btn18, (225, 228, 232), 27
+                f, c, step = self.font_btn18, (233, 225, 205), 27
             # Blok wiezy: zdjecie po lewej, caly blok przesuniety w prawo
             _xoff = 36 if style == "sub" else 28
             if style == "tower":
@@ -4249,17 +4243,18 @@ class Game:
                     y += 12  # odstep miedzy blokami wiez
         # Nawigacja: strzalki + licznik stron
         nav = self.font_btn18.render(
-            tr("help.nav", a=page + 1, b=len(all_pages)), True, (160, 168, 178))
+            tr("help.nav", a=page + 1, b=len(all_pages)), True, theme.WARM_GRAY)
         self.win.blit(nav, (hx + (hw - nav.get_width()) // 2, hy + hh - 40))
         self._help_prev_rect = pygame.Rect(hx + 14, hy + hh - 52, 44, 36)
         self._help_next_rect = pygame.Rect(hx + hw - 58, hy + hh - 52, 44, 36)
         for rect, glyph, enabled in (
                 (self._help_prev_rect, "<", page > 0),
                 (self._help_next_rect, ">", page < len(all_pages) - 1)):
-            pygame.draw.rect(self.win, (45, 55, 68) if enabled else (30, 36, 44),
-                             rect, border_radius=8)
+            theme.wood_fill(self.win, rect, radius=8,
+                            base=theme.WOOD_BTN if enabled else (40, 28, 16),
+                            border=theme.BRASS if enabled else theme.BRASS_DARK)
             g = self.font_btn18.render(glyph, True,
-                                       (255, 255, 255) if enabled else (90, 98, 108))
+                                       theme.CREAM if enabled else (120, 108, 88))
             self.win.blit(g, (rect.x + (rect.w - g.get_width()) // 2,
                               rect.y + (rect.h - g.get_height()) // 2))
 
@@ -6219,8 +6214,8 @@ class Game:
         rows = (len(ordered) + 1) // 2
         pw, ph = 820, 620 if rows <= 5 else 660
         px, py = (self.width - pw) // 2, (self.height - ph) // 2
-        pygame.draw.rect(self.win, (22, 28, 38), (px, py, pw, ph), border_radius=16)
-        pygame.draw.rect(self.win, (90, 110, 140), (px, py, pw, ph), 2, border_radius=16)
+        self.win.blit(theme.wood_panel(pw, ph, radius=16,
+                                       base=theme.WOOD_PANEL_DARK), (px, py))
         title = self.font_p36.render(title_text, True, (255, 215, 100))
         self.win.blit(title, (px + (pw - title.get_width()) // 2, py + 18))
         # Przycisk zamkniecia
@@ -6267,25 +6262,27 @@ class Game:
             locked = bool(_req_id) and _req_id not in owned_set
             _req_name = next((tr(f"upg.{u['id']}.name", u["name"]) for u in upg_list if u["id"] == _req_id), _req_id) if _req_id else ""
             hover = rect.collidepoint(mx, my) and not maxed and not locked
-            bg_col = (35, 45, 60) if not hover else (50, 65, 90)
             # L1 (poziom 1 kupiony, L2 wciaz do kupienia): karta wyglada jak
             # ZWYKLA karta do kupienia - bez zielonego tla i ramki "juz
             # kupione" (Daniel: zielen dawala bledne odczucie, ze upgrade
             # jest juz w calosci zakupiony). Zieleń zostaje tylko na MAX.
             if maxed:
-                bg_col = (30, 60, 40)
-            if locked:
-                bg_col = (28, 30, 38)
-            pygame.draw.rect(self.win, bg_col, rect, border_radius=10)
-            pygame.draw.rect(self.win, (80, 200, 120) if maxed else (100, 120, 150),
-                             rect, 2, border_radius=10)
+                pygame.draw.rect(self.win, (30, 60, 40), rect, border_radius=10)
+                pygame.draw.rect(self.win, (80, 200, 120), rect, 2, border_radius=10)
+            elif locked:
+                theme.wood_fill(self.win, rect, radius=10, base=(34, 25, 17),
+                                border=theme.BRASS_DARK)
+            else:
+                theme.wood_fill(self.win, rect, radius=10,
+                                base=theme.WOOD_CARD_HOVER if hover else theme.WOOD_CARD,
+                                border=theme.BRASS)
             # Ikonka
             if mystery:
                 # Ciemna sylwetka ze znakiem zapytania
                 q_bg = pygame.Surface((56, 56), pygame.SRCALPHA)
-                pygame.draw.circle(q_bg, (15, 18, 25), (28, 28), 26)
-                pygame.draw.circle(q_bg, (80, 90, 110), (28, 28), 26, 2)
-                q = self.font_p36.render("?", True, (120, 130, 150))
+                pygame.draw.circle(q_bg, theme.WOOD_INSET, (28, 28), 26)
+                pygame.draw.circle(q_bg, theme.BRASS_DARK, (28, 28), 26, 2)
+                q = self.font_p36.render("?", True, theme.WARM_DIM)
                 q_bg.blit(q, (28 - q.get_width() // 2, 28 - q.get_height() // 2))
                 self.win.blit(q_bg, (sx + 10, sy + (row_h - 56) // 2))
                 name = "???"
@@ -6318,7 +6315,7 @@ class Game:
                     desc = tr(f"upg.{upg['id']}.desc", upg["desc"])
                 price_txt = tr("upg.locked") if locked else f"{self._price(_next_cost):,}"
             # Opis: wrap po szerokosci w pikselach (nie po liczbie znakow) - nic nie ucina
-            desc_col = (110, 115, 125) if mystery else (170, 180, 190)
+            desc_col = (140, 128, 106) if mystery else theme.WARM_GRAY
             desc_font = self._building_desc_font
             max_desc_w = col_w - 76 - 12 - 4  # tekst od sx+76 do prawej krawedzi karty
             words = desc.split()
@@ -6369,9 +6366,9 @@ class Game:
             if maxed:
                 st = self.font_btn18.render(tr("upg.max"), True, (100, 220, 130))
             elif mystery:
-                st = self.font_btn18.render("???", True, (120, 130, 150))
+                st = self.font_btn18.render("???", True, theme.WARM_DIM)
             elif locked:
-                st = self.font_btn18.render(tr("upg.locked"), True, (130, 130, 140))
+                st = self.font_btn18.render(tr("upg.locked"), True, (150, 138, 118))
             else:
                 afford = self.money >= self._price(_next_cost)
                 st = self.font_btn18.render(price_txt,
@@ -6394,7 +6391,7 @@ class Game:
                         break
                 if name_font is None:
                     name_font = self._fit_fonts[12]
-            name_col = (150, 150, 160) if mystery else (240, 240, 240)
+            name_col = (168, 154, 128) if mystery else theme.CREAM
             name_lbl = name_font.render(name, True, name_col)
             self.win.blit(name_lbl, (sx + 76,
                                      block_top + (name_h - name_lbl.get_height()) // 2))
@@ -7115,15 +7112,15 @@ class Game:
                 pygame.draw.rect(bg, (255, 255, 255, 70), (0, 0, draw_w, 24), border_radius=14)
                 pygame.draw.rect(bg, (255, 255, 255, 230), bg.get_rect(), 3 if is_hover else 2, border_radius=14)
             elif cooling:
-                pygame.draw.rect(bg, (40, 48, 62, 245), bg.get_rect(), border_radius=14)
+                pygame.draw.rect(bg, (54, 39, 24, 245), bg.get_rect(), border_radius=14)
                 pygame.draw.rect(bg, (*color, 120), bg.get_rect(), 2, border_radius=14)
                 # Pasek cooldownu na dole
                 cd_ratio = cooling.ability_cooldown / cooling.ability_max_cooldown
                 bar_w = int((draw_w - 20) * (1 - cd_ratio))
-                pygame.draw.rect(bg, (100, 110, 125, 100), (10, draw_h - 12, draw_w - 20, 5), border_radius=3)
+                pygame.draw.rect(bg, (148, 128, 98, 110), (10, draw_h - 12, draw_w - 20, 5), border_radius=3)
                 pygame.draw.rect(bg, (*color, 220), (10, draw_h - 12, bar_w, 5), border_radius=3)
             else:
-                pygame.draw.rect(bg, (28, 33, 44, 180), bg.get_rect(), border_radius=14)
+                pygame.draw.rect(bg, (38, 27, 17, 190), bg.get_rect(), border_radius=14)
             self.win.blit(bg, (draw_x, draw_y))
 
             # Teksty - wieksze i czytelniejsze
@@ -7408,7 +7405,7 @@ class Game:
         for x, pi, icon, text in items:
             self.win.blit(self._pills[pi], (x, y))
             w = self._pills[pi].get_width()
-            label = self.hud_font.render(text, True, (255, 255, 255))
+            label = self.hud_font.render(text, True, theme.CREAM)
             cy = y + pill_h // 2 - label.get_height() // 2
             if icon is None:
                 self.win.blit(label, (x + w // 2 - label.get_width() // 2, cy))
@@ -7421,11 +7418,10 @@ class Game:
         # Przycisk predkosci (prawy gorny rog) - pauza tylko przez ESC
         # Predkosc
         sr = self.speed_btn_rect
-        s2 = pygame.Surface((sr.width, sr.height), pygame.SRCALPHA)
-        pygame.draw.rect(s2, (8, 18, 38, 190), s2.get_rect(), border_radius=10)
-        pygame.draw.rect(s2, (255, 255, 255, 70), s2.get_rect(), 2, border_radius=10)
+        s2 = theme.wood_panel(sr.width, sr.height, radius=10, corners=False).copy()
+        s2.set_alpha(222)
         self.win.blit(s2, sr)
-        label = self.hud_font.render(f"{self.speed}x", True, (255, 255, 255))
+        label = self.hud_font.render(f"{self.speed}x", True, theme.CREAM)
         self.win.blit(label, (sr.x + sr.width//2 - label.get_width()//2,
                               sr.y + sr.height//2 - label.get_height()//2))
         # Licznik wrogow biezacej fali (nowoczesny, dynamiczny)
@@ -7479,14 +7475,13 @@ class Game:
             # Z powrotem po lewej, pod wave/lives/cash
             preview_x = 10
             preview_y = 65
-            # Nowoczesne tlo - glassmorphism
-            s = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-            pygame.draw.rect(s, (15, 25, 45, 180), s.get_rect(), border_radius=14)
-            pygame.draw.rect(s, (100, 150, 200, 60), s.get_rect(), 2, border_radius=14)
+            # Tlo w stylu A: drewno + mosiadz (lekko przezroczyste)
+            s = theme.wood_panel(panel_w, panel_h, radius=14, corners=False).copy()
+            s.set_alpha(225)
             self.win.blit(s, (preview_x, preview_y))
             # Naglowek "Enemies" - wycentrowany
             font_head = pygame.font.SysFont("arial", 14, bold=True)
-            label = font_head.render(tr("hud.enemies"), True, (200, 220, 255))
+            label = font_head.render(tr("hud.enemies"), True, theme.BRASS_BRIGHT)
             self.win.blit(label, (preview_x + panel_w//2 - label.get_width()//2, preview_y + 5))
             # Ikony - liczba OBOK sprite'a, wycentrowana w pionie
             x_off = preview_x + 10
