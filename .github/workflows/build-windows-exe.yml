@@ -26,6 +26,7 @@ jobs:
           pyinstaller --onefile --windowed --name "IslandDefenders" `
             --add-data "images;images" `
             --add-data "sounds;sounds" `
+            --add-data "lang;lang" `
             --add-data "towers;towers" `
             --add-data "enemies;enemies" `
             --add-data "ships;ships" `
