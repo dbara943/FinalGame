@@ -1,2 +1,7 @@
 __pycache__/
 *.pyc
+# lokalny stan gry - nie commitowac
+achievements.json
+language.json
+wave_debug.log
+*.log
