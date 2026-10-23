@@ -135,6 +135,7 @@
  "upg.locked": "BLOQUEADO",
  "upg.requires": "Requiere {name}.",
  "upg.mystery_desc": "Información bloqueada.",
+ "upg.cavalry_teaser": "Algo aguarda en el modo Infinito...",
  "upg.treasury.name": "Tesoro de Guerra",
  "upg.treasury.desc": "+25% de oro por todas las bajas, permanentemente.",
  "upg.bounty.name": "Tablón de Recompensas",

@@ -135,6 +135,7 @@
  "upg.locked": "VERROUILLÉ",
  "upg.requires": "Requiert {name}.",
  "upg.mystery_desc": "Infos verrouillées.",
+ "upg.cavalry_teaser": "Quelque chose attend en mode Infini...",
  "upg.treasury.name": "Trésor de Guerre",
  "upg.treasury.desc": "+25 % d'or pour toutes les éliminations, définitivement.",
  "upg.bounty.name": "Tableau des Primes",

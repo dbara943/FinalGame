@@ -135,6 +135,7 @@
  "upg.locked": "LOCKED",
  "upg.requires": "Requires {name}.",
  "upg.mystery_desc": "Intel locked.",
+ "upg.cavalry_teaser": "Something awaits in Endless mode...",
  "upg.treasury.name": "War Treasury",
  "upg.treasury.desc": "+25% gold from all kills, permanently.",
  "upg.bounty.name": "Bounty Board",

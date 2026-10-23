@@ -135,6 +135,7 @@
  "upg.locked": "GESPERRT",
  "upg.requires": "Benötigt {name}.",
  "upg.mystery_desc": "Infos gesperrt.",
+ "upg.cavalry_teaser": "Etwas wartet im Endlos-Modus...",
  "upg.treasury.name": "Kriegskasse",
  "upg.treasury.desc": "+25% Gold für alle Kills, dauerhaft.",
  "upg.bounty.name": "Kopfgeldtafel",

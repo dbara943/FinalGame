@@ -135,6 +135,7 @@
  "upg.locked": "ЗАКРЫТО",
  "upg.requires": "Требуется: {name}.",
  "upg.mystery_desc": "Нет разведданных.",
+ "upg.cavalry_teaser": "Что-то ждёт в бесконечном режиме...",
  "upg.treasury.name": "Военная Казна",
  "upg.treasury.desc": "+25% золота за все убийства, навсегда.",
  "upg.bounty.name": "Доска Наград",

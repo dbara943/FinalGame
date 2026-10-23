@@ -290,11 +290,35 @@ class VerticalMenu(Menu):
                 return btn.cost
         return -1
 
+    def _panel_w(self):
+        """Szerokosc panelu sklepu: rosnie wraz z dlugoscia napisow w
+        biezacym jezyku (Batch 30 - wczesniej sztywne 164 px ucinalo
+        nazwy wiez np. po rosyjsku i polsku). Minimum 164 jak dawniej."""
+        hfont = pygame.font.SysFont("segoe ui, calibri, arial", 18, bold=True)
+        nfont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
+        dfont = pygame.font.SysFont("segoe ui, calibri, arial", 12)
+        pfont = pygame.font.SysFont("segoe ui, calibri, arial", 14, bold=True)
+        names = [_t("tower.wood"), _t("tower.metal"), _t("tower.ice"),
+                 _t("tower.gold"), _t("tower.fire"), _t("tower.blaze")]
+        w = max(164, hfont.size(_t("shop.title"))[0] + 24)
+        for idx, item in enumerate(self.buttons):
+            nm = names[idx] if idx < len(names) else item.name
+            text_w = max(nfont.size(nm)[0],
+                         dfont.size(_t("shop.dmg", dmg=item.damage))[0])
+            # Cena: zwykla oraz wariant ze znizka (przekreslona + nowa obok)
+            price_w = 19 + pfont.size(f"{item.cost}")[0]
+            price_w = max(price_w, 19 + pfont.size(f"{item.cost}")[0] + 8
+                          + pfont.size(f"{int(item.cost * 0.85)}")[0])
+            # Tekst zaczyna sie 70 px od lewej krawedzi panelu + zapas
+            w = max(w, 70 + max(text_w, price_w) + 16)
+        return w
+
     def get_rect(self):
         """Prostokat panelu sklepu (do przecigania i hover)."""
-        panel_w = 164
+        panel_w = self._panel_w()
         panel_h = len(self.buttons) * 66 + 46
-        return pygame.Rect(self.x - panel_w // 2, self.y - 140, panel_w, panel_h)
+        px = max(0, self.x - panel_w // 2)
+        return pygame.Rect(px, self.y - 140, panel_w, panel_h)
 
     def draw(self, win, mouse_pos=None, discount=1.0):
         """Rysuje sklep. discount: mnoznik ceny (Supply Lines: 0.85) - pokazuje przekreslenie."""
@@ -302,9 +326,9 @@ class VerticalMenu(Menu):
         # mouse_pos w wspolrzednych gry (po przeskalowaniu) - do hovera
         if mouse_pos is None:
             mouse_pos = pygame.mouse.get_pos()
-        panel_w = 164
+        panel_w = self._panel_w()
         panel_h = len(self.buttons) * 66 + 46
-        px = self.x - panel_w // 2
+        px = max(0, self.x - panel_w // 2)
         py = self.y - 140
 
         # Przezroczystosc gdy mysz nie jest nad panelem
@@ -314,6 +338,7 @@ class VerticalMenu(Menu):
 
         # Rysuj wszystko na osobnej powierzchni, potem naloz z alfa
         surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        # (panel_w liczony dynamicznie w _panel_w - patrz wyzej)
         bg = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
         pygame.draw.rect(bg, (10, 16, 28, 240), bg.get_rect(), border_radius=16)
         pygame.draw.rect(bg, (80, 120, 180, 100), bg.get_rect(), 2, border_radius=16)

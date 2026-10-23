@@ -135,6 +135,7 @@
  "upg.locked": "ZABLOKOWANE",
  "upg.requires": "Wymaga: {name}.",
  "upg.mystery_desc": "Brak danych wywiadu.",
+ "upg.cavalry_teaser": "Coś czeka w trybie endless...",
  "upg.treasury.name": "Skarbiec Wojenny",
  "upg.treasury.desc": "+25% złota za wszystkie zabójstwa, na stałe.",
  "upg.bounty.name": "Tablica Nagród",
