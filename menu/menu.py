@@ -150,7 +150,13 @@ class Menu():
             # w batchu 27 bylo pomylka - chodzilo o hover w sklepie).
             dlabel = stat_font.render(_t("tm.stats2", dps=f"{dps:.1f}"), True, bright)
             win.blit(dlabel, (px + 14, py + 68))
-            klabel = stat_font.render(_t("tm.kills", n=tw.kills), True, bright)
+            # Shrink-to-fit: linia KILLS startuje w polowie panelu (budzet
+            # ~104px), a FR "ÉLIMINATIONS 999" ma ~112px i wychodzila poza panel
+            _ktxt = _t("tm.kills", n=tw.kills)
+            _kfont = stat_font
+            if _kfont.size(_ktxt)[0] > panel_w - 122 - 14:
+                _kfont = pygame.font.SysFont("consolas, monospace", 10)
+            klabel = _kfont.render(_ktxt, True, bright)
             win.blit(klabel, (px + 122, py + 68))
         if tname == "SpikeCluster":
             klabel = stat_font.render(_t("tm.kills", n=tw.kills), True, bright)
@@ -178,7 +184,11 @@ class Menu():
         _link = getattr(tw, '_link', None) if tname != "SpikeCluster" else None
         if _link:
             link_font = pygame.font.SysFont("consolas, monospace", 11, bold=True)
-            ltxt = link_font.render(_t(f"link.{_link}"), True, (255, 215, 100))
+            _ltxt = _t(f"link.{_link}")
+            # Shrink-to-fit: DE link.metal (~245px) wychodzil poza panel 240px
+            if link_font.size(_ltxt)[0] > panel_w - 8:
+                link_font = pygame.font.SysFont("consolas, monospace", 9, bold=True)
+            ltxt = link_font.render(_ltxt, True, (255, 215, 100))
             win.blit(ltxt, (px + (panel_w - ltxt.get_width()) // 2, py + 152))
         if len(self.buttons) >= 2:
             if not is_max:
@@ -203,6 +213,9 @@ class Menu():
             pygame.draw.rect(btn, (r, g, b, 255), btn.get_rect(), 3, border_radius=6)
         win.blit(btn, (x, y))
         tfont = pygame.font.SysFont("consolas, monospace", 13, bold=True)
+        # Shrink-to-fit tytulu (RU "МАКС. УРОВЕНЬ" ~104px w przycisku 106px)
+        if tfont.size(title)[0] > w - 6:
+            tfont = pygame.font.SysFont("consolas, monospace", 11, bold=True)
         sfont = pygame.font.SysFont("consolas, monospace", 12)
         tcol = (155, 165, 175) if disabled else (r, g, b)
         t = tfont.render(title, True, tcol)
@@ -230,6 +243,8 @@ class Menu():
             pygame.draw.rect(btn, (r, g, b, 255), btn.get_rect(), 3, border_radius=6)
         win.blit(btn, (x, y))
         tfont = pygame.font.SysFont("consolas, monospace", 13, bold=True)
+        if tfont.size(title)[0] > w - 6:
+            tfont = pygame.font.SysFont("consolas, monospace", 11, bold=True)
         sfont = pygame.font.SysFont("consolas, monospace", 11)
         tcol = (155, 165, 175) if disabled else (r, g, b)
         t = tfont.render(title, True, tcol)

@@ -411,8 +411,17 @@ class StartMenu:
             self._res_buttons.append((rect, i))
             col = (255, 215, 100) if i == self.res_idx else (80, 90, 100)
             pygame.draw.rect(self.win, col, rect, 3 if i == self.res_idx else 1, border_radius=8)
-            lbl = self.btn_font_small.render(name, True, (255, 255, 255))
-            self.win.blit(lbl, (bx + (bw - lbl.get_width()) // 2, by + 12))
+            # Shrink-to-fit: "PANTALLA COMPLETA NATIVA" (ES) i odpowiedniki
+            # RU przy 22px wychodzily poza przycisk 320px z obu stron
+            lbl_font = self.btn_font_small
+            if lbl_font.size(name)[0] > bw - 16:
+                for _sz in (18, 16):
+                    lbl_font = pygame.font.SysFont("arial", _sz, bold=True)
+                    if lbl_font.size(name)[0] <= bw - 16:
+                        break
+            lbl = lbl_font.render(name, True, (255, 255, 255))
+            self.win.blit(lbl, (bx + (bw - lbl.get_width()) // 2,
+                                by + (bh - lbl.get_height()) // 2))
         hint = self.small_font.render(t("res.applies"), True, (150, 150, 150))
         self.win.blit(hint, (px + (pw - hint.get_width()) // 2, py + ph - 35))
 

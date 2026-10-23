@@ -1633,9 +1633,13 @@ class Game:
         icon = self.ach_mgr.icons.get(icon_cat)
         if icon:
             self.win.blit(icon, (px + 10, py + 16))
-        # Tekst
-        t1 = self.font_btn18.render(tr("ach.unlocked"), True, (255, 215, 100))
-        t2 = self.font_small30.render(name, True, (255, 255, 255))
+        # Tekst - shrink-to-fit: pudelko ma 320px, tekst startuje na +68,
+        # wiec budzet to 242px; naglowek i dlugie nazwy osiagniec (FR/PT/RU/PL)
+        # przy stalych fontach wychodzily poza pudelko i ekran
+        _hf = self._font_fit(tr("ach.unlocked"), pw - 68 - 10, (18, 16, 14), bold=True)
+        _nf = self._font_fit(name, pw - 68 - 10, (30, 26, 22, 18))
+        t1 = _hf.render(tr("ach.unlocked"), True, (255, 215, 100))
+        t2 = _nf.render(name, True, (255, 255, 255))
         self.win.blit(t1, (px + 68, py + 10))
         self.win.blit(t2, (px + 68, py + 35))
 
@@ -3263,17 +3267,31 @@ class Game:
                 lines.append(f"  {nice}: {count}")
         return lines
 
+    def _font_fit(self, text, max_w, sizes, bold=False,
+                  family="segoe ui, calibri, arial"):
+        """Shrink-to-fit: pierwszy font z listy rozmiarow (malejaco), przy
+        ktorym tekst miesci sie w max_w; gdy zaden nie pasuje - najmniejszy.
+        Wzor jak _fit_fonts w menu ulepszen (Batch 30), cache na self."""
+        if not hasattr(self, "_fit_cache"):
+            self._fit_cache = {}
+        chosen = None
+        for sz in sizes:
+            key = (family, sz, bold)
+            if key not in self._fit_cache:
+                self._fit_cache[key] = pygame.font.SysFont(family, sz, bold=bold)
+            chosen = self._fit_cache[key]
+            if chosen.size(text)[0] <= max_w:
+                break
+        return chosen
+
     def _draw_glass_button(self, rect, label_text, glow_color, hover=False, font=None):
         """Szklany przycisk (glassmorphism): poswiata, matowe szklo, jasna krawedz, blysk u gory."""
         win = self.win
-        # Tekst MUSI miescic sie w przycisku: kurcz czcionke (30/26/22/18) az wejdzie
-        # (wczesniej ENDLESS MODE przy 30px byl szerszy niz przycisk 170px i wylewal sie poza)
-        _cands = [font or self.font_small30, self.font_small26, self.font_small22, self.font_small18]
-        font = _cands[0]
-        for _f in _cands:
-            if _f.size(label_text)[0] <= rect.w - 16 and _f.size(label_text)[1] <= rect.h - 10:
-                font = _f
-                break
+        # Tekst MUSI miescic sie w przycisku: kurcz czcionke az wejdzie.
+        # Poprawka i18n: wczesniejszy fallback zostawial font 30px, gdy zaden
+        # kandydat nie pasowal (RU "БЕСКОНЕЧНЫЙ РЕЖИМ" wylewal sie na sasiadow);
+        # teraz drabina schodzi do 13px i zawsze konczy na najmniejszym.
+        font = self._font_fit(label_text, rect.w - 16, (30, 26, 22, 18, 15, 13))
         # Miekka poswiata za przyciskiem (kilka warstw = przyblizony blur)
         # Pady mniejsze (14/9/4 zamiast 22/14/7): przy gap 28 poswiaty sie tylko stykaja, nie zlewaja
         for pad, alpha in ((14, 18), (9, 30), (4, 45)):
@@ -3411,12 +3429,19 @@ class Game:
             self.win.blit(shadow, (tx + 3, ty + 3))
             self.win.blit(text, (tx, ty))
             if true_victory:
-                sub = small_font.render(tr("end.true_sub"), True, sub_color)
+                # Shrink-to-fit: podtytul w DE/PT/ES przekraczal szerokosc ekranu
+                _sub_f = self._font_fit(tr("end.true_sub"), self.width - 64,
+                                        (30, 26, 22, 18))
+                sub = _sub_f.render(tr("end.true_sub"), True, sub_color)
                 self.win.blit(sub, (self.width // 2 - sub.get_width() // 2, ty + 92))
             # Statystyki: PELNY zestaw na KAZDYM ekranie koncowym (wygrana,
             # porazka i poddanie) - wczesniej poddanie/wygrana mialy tylko
             # 3 linijki. Dwie kolumny: ogolne (lewa) + zabicia wg typu (prawa).
             col_y = self.height // 2 - 60
+            if true_victory:
+                # Podtytul zajmuje pas ty+92..+122 - statystyki nizej, inaczej
+                # pierwsza linia wchodzila w podtytul (widoczne tez w EN)
+                col_y += 36
             left_x = self.width // 2 - 330
             right_x = self.width // 2 + 30
             if self.endless:
@@ -3432,12 +3457,17 @@ class Game:
                 tr("end.towers", a=self.stats_towers_built, b=self.stats_towers_lost),
                 tr("end.abilities", n=self.stats_abilities_used),
             ]
+            # Shrink-to-fit per linia: lewa kolumna ma tylko ~348px do prawej,
+            # a linie RU/DE/FR/ES byly dluzsze i wchodzily w prawa kolumne
             for i, s in enumerate(general):
-                label = stats_font.render(s, True, stat_color)
+                _lf = self._font_fit(s, right_x - left_x - 12, (24, 21, 19, 17, 15))
+                label = _lf.render(s, True, stat_color)
                 self.win.blit(label, (left_x, col_y + i * 28))
             by_type = sorted(self.stats_kills_by_type.items(), key=lambda kv: -kv[1])[:7]
             if by_type:
-                hdr = stats_font.render(tr("end.kills_by_type"), True, sub_color)
+                _hf = self._font_fit(tr("end.kills_by_type"),
+                                     self.width - right_x - 40, (24, 21, 19, 17, 15))
+                hdr = _hf.render(tr("end.kills_by_type"), True, sub_color)
                 self.win.blit(hdr, (right_x, col_y))
                 for i, (etype, count) in enumerate(by_type):
                     nice = "".join(" " + c if c.isupper() and j else c
@@ -3659,7 +3689,11 @@ class Game:
         # V3: banner fali
         if self.wave_banner_timer > 0:
             alpha = min(255, self.wave_banner_timer * 3)
-            banner_font = self.font_banner64
+            # Shrink-to-fit: dlugie bannery (RU/PL/FR/DE: crippled, warning,
+            # ally) przy 64px przekraczaly szerokosc ekranu i uciete ladowaly
+            # poza plansza - zmniejszaj font, az tekst wejdzie w ekran
+            banner_font = self._font_fit(self.wave_banner_text, self.width - 24,
+                                         (64, 56, 48, 40, 34, 28), bold=True)
             label = banner_font.render(self.wave_banner_text, True, (255, 255, 255))
             # Cien pod napisem
             shadow = banner_font.render(self.wave_banner_text, True, (0, 0, 0))
@@ -4091,10 +4125,16 @@ class Game:
                     # Zielony ptaszek
                     pygame.draw.line(self.win, (80, 220, 100), (cb.x + 4, cb.y + 10), (cb.x + 9, cb.y + 15), 3)
                     pygame.draw.line(self.win, (80, 220, 100), (cb.x + 9, cb.y + 15), (cb.x + 16, cb.y + 5), 3)
-                txt = self.font_btn18.render(label, True, (240, 240, 240))
+                # Shrink-to-fit: etykiety z checkboxem maja tylko ~200px
+                # (ES "Pantalla completa" wychodzila poza przycisk)
+                _tf = self._font_fit(label, rect.w - 44 - 10, (18, 16, 15, 14, 13), bold=True)
+                txt = _tf.render(label, True, (240, 240, 240))
                 self.win.blit(txt, (cb.x + 28, rect.y + (rect.h - txt.get_height()) // 2))
             else:
-                txt = self.font_btn18.render(label, True, (240, 240, 240))
+                # Shrink-to-fit: zwykle przyciski (PT "Sair para a área de
+                # trabalho" przy 18px byly szersze niz przycisk 260px)
+                _tf = self._font_fit(label, rect.w - 16, (18, 16, 15, 14, 13), bold=True)
+                txt = _tf.render(label, True, (240, 240, 240))
                 self.win.blit(txt, (rect.x + (rect.w - txt.get_width()) // 2,
                                     rect.y + (rect.h - txt.get_height()) // 2))
             self._menu_buttons.append((rect, action))
@@ -4107,7 +4147,11 @@ class Game:
             # z numerem fali i przycisk SKOCZ. Skok czysci plansze i zachowuje
             # setup; skoczona fala nie placi bonusu startowego.
             jy = by + 6
-            lbl = self.font_btn18.render(tr("menu.endless_title"), True, (255, 215, 100))
+            # Shrink-to-fit: tytul wiersza skoku przy 18px wychodzil poza
+            # panel 340px we WSZYSTKICH jezykach (nawet EN 284px > 260px)
+            _lf = self._font_fit(tr("menu.endless_title"), pw - 80,
+                                 (18, 16, 15, 14, 13, 12), bold=True)
+            lbl = _lf.render(tr("menu.endless_title"), True, (255, 215, 100))
             self.win.blit(lbl, (px + 40, jy))
             self._pause_jump_input = pygame.Rect(px + 40, jy + 26, 120, 38)
             self._pause_jump_btn = pygame.Rect(px + 168, jy + 26, pw - 208, 38)
@@ -4125,7 +4169,9 @@ class Game:
             jb = self._pause_jump_btn
             pygame.draw.rect(self.win, (75, 90, 110) if jb.collidepoint(mx, my) else (55, 65, 80),
                              jb, border_radius=10)
-            jt = self.font_btn18.render(tr("menu.endless_go"), True, (240, 240, 240))
+            _jf = self._font_fit(tr("menu.endless_go"), jb.w - 10,
+                                 (18, 16, 15, 14), bold=True)
+            jt = _jf.render(tr("menu.endless_go"), True, (240, 240, 240))
             self.win.blit(jt, (jb.x + (jb.w - jt.get_width()) // 2,
                                jb.y + (jb.h - jt.get_height()) // 2))
         else:
@@ -7082,9 +7128,14 @@ class Game:
 
             # Teksty - wieksze i czytelniejsze
             cx = draw_x + draw_w // 2
-            t1 = f_name.render(tr(i18n.ABILITY_KEYS[tname]) if tname in i18n.ABILITY_KEYS else aname, True, (255, 255, 255))
+            _aname = tr(i18n.ABILITY_KEYS[tname]) if tname in i18n.ABILITY_KEYS else aname
+            # Shrink-to-fit: slot ma 130px, a nazwy RU/DE/PT (np.
+            # "Скорострельность", "Goldene Berührung") sa szersze od slotu
+            _nf = self._font_fit(_aname, draw_w - 8, (16, 14, 13, 12, 11),
+                                 bold=True, family="arial")
+            t1 = _nf.render(_aname, True, (255, 255, 255))
             # Cien pod tekstem dla czytelnosci
-            shadow = f_name.render(tr(i18n.ABILITY_KEYS[tname]) if tname in i18n.ABILITY_KEYS else aname, True, (0, 0, 0))
+            shadow = _nf.render(_aname, True, (0, 0, 0))
             self.win.blit(shadow, (cx - t1.get_width()//2 + 1, draw_y + 9))
             self.win.blit(t1, (cx - t1.get_width()//2, draw_y + 8))
             if ready_count > 0:
