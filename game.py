@@ -3060,7 +3060,7 @@ class Game:
                         if en.dying or en.dead or en.reached_end:
                             continue
                         if en.hitbox_in_radius(hit_enemy.x, hit_enemy.y, 150):
-                            en.apply_slow(240)
+                            en.apply_slow(240, 0.5)  # Nova: dawna sila slow x0.5 (bez zmian)
                             en.hit(5)
                     self.damage_numbers.append([hit_enemy.x, hit_enemy.y - 50, "FROST NOVA!", 40, (150, 220, 255)])
                 elif proj.special == "meteor":
@@ -3177,7 +3177,8 @@ class Game:
                 if proj.slow_on_hit:
                     _base_slow = getattr(proj.source_tower, 'slow_duration', 90)
                     _slow_dur = int(_base_slow * 1.8) if getattr(proj.source_tower, '_link', None) == 'ice' else _base_slow
-                    hit_enemy.apply_slow(_slow_dur)
+                    hit_enemy.apply_slow(_slow_dur,
+                                         getattr(proj.source_tower, 'slow_factor', 0.5))
             if proj.done:
                 self.projectiles.remove(proj)
         # Aktualizacja latajacych liczb obrazen
@@ -4953,8 +4954,28 @@ class Game:
             d["deploy_idx"] = 0
             d["deploy_face"] = 1
 
+    def _guard_arrow_damage(self):
+        """Obrazenia strzaly straznika (batch 32, decyzja Daniela) =
+        wyswietlany numer biezacej fali: fala 1 -> 1, 10 -> 10, 20 -> 20,
+        w endless rosnie dalej (21, 22, ...). Zastepuje dawne stale 25."""
+        return max(1, self.wave + 1)
+
+    def _apply_guard_status(self, en, kind, dps, seconds):
+        """Status ze strzal straznikow (batch 32): ponowne trafienie tym
+        samym efektem RESETUJE licznik do pelnego czasu i ustawia DPS
+        z nowego strzalu - bez zasady 'silniejszy wygrywa' z _apply_status
+        (ta zostaje dla kolcow/wiez). Ogien i trucizna to osobne pola,
+        wiec moga dzialac na wrogu jednoczesnie."""
+        ticks = int(seconds * 100)
+        if kind == "poison":
+            en._poison_dps = float(dps)
+            en._poison_t = ticks
+        elif kind == "burn":
+            en._burn_dps = float(dps)
+            en._burn_t = ticks
+
     def _update_guard_arrows(self):
-        """Strzaly straznikow: leca do celu, przy trafieniu 25 dmg (hit)."""
+        """Strzaly straznikow: leca do celu, przy trafieniu dmg = numer fali."""
         for a in list(getattr(self, "_guard_arrows", [])):
             tgt = a.get("target")
             if tgt is None or getattr(tgt, "dying", False) or getattr(tgt, "dead", False) or getattr(tgt, "reached_end", False):
@@ -4968,10 +4989,11 @@ class Game:
             if dist <= 14:
                 # Trafienie
                 if tgt is not None and not getattr(tgt, "dying", False) and not getattr(tgt, "dead", False):
+                    _dmg = a.get("dmg", 25)
                     try:
-                        killed = bool(tgt.hit(25))
+                        killed = bool(tgt.hit(_dmg))
                     except Exception:
-                        tgt.health -= 25
+                        tgt.health -= _dmg
                         if tgt.health <= 0 and not tgt.dying:
                             tgt.dying = True
                             killed = True
@@ -4982,15 +5004,17 @@ class Game:
                         _g = a.get("guard")
                         if _g is not None:
                             _g["kills"] = _g.get("kills", 0) + 1
-                    self.stats_damage += 25
-                    self.damage_numbers.append([tgt.x, tgt.y - 40, "25", 40])
+                    self.stats_damage += _dmg
+                    self.damage_numbers.append([tgt.x, tgt.y - 40, f"{_dmg}", 40])
                     self.particles.burst(a["x"], a["y"], (200, 180, 150), count=3, speed=3, life=15, size=2)
-                    # Zywiol strzaly (Signal Fire L2): status + kolorowy rozblysk
+                    # Zywiol strzaly (Signal Fire L2): status + kolorowy rozblysk.
+                    # DPS = 0.25 x obrazenia strzaly (batch 32); czasy bez zmian
+                    # (ogien 3 s, trucizna 4 s); reset licznika przy ponownym trafieniu.
                     if a.get("kind") == "burn":
-                        self._apply_status(tgt, "burn", 3.0, 3.0)
+                        self._apply_guard_status(tgt, "burn", 0.25 * _dmg, 3.0)
                         self.particles.burst(a["x"], a["y"], (255, 140, 50), count=6, speed=3, life=20, size=3)
                     elif a.get("kind") == "poison":
-                        self._apply_status(tgt, "poison", 2.5, 4.0)
+                        self._apply_guard_status(tgt, "poison", 0.25 * _dmg, 4.0)
                         self.particles.burst(a["x"], a["y"], (120, 240, 100), count=6, speed=3, life=20, size=3)
                 if a in self._guard_arrows:
                     self._guard_arrows.remove(a)
@@ -5134,7 +5158,7 @@ class Game:
                     _kind = None
                     if self._upg_level(self.tent_upgrades, "signal") >= 2:
                         _kind = "burn" if d.get("name") == "Bonnie" else "poison"
-                    self._guard_arrows.append({"x": d["x"], "y": d["y"] - 20, "tx": best.x, "ty": best.y - 20, "target": best, "guard": d, "kind": _kind})
+                    self._guard_arrows.append({"x": d["x"], "y": d["y"] - 20, "tx": best.x, "ty": best.y - 20, "target": best, "guard": d, "kind": _kind, "dmg": self._guard_arrow_damage()})
                     self.particles.burst(d["x"], d["y"] - 25, (200, 180, 150), count=3, speed=3, life=15, size=2)
                     d["cd"] = 120  # 2s
                 else:
@@ -6230,6 +6254,18 @@ class Game:
                                 "_tent_menu_close_rect",
                                 icons2=self._tent_icons2)
 
+    def _render_shadowed(self, font, text, color):
+        """Napis z ciemnym cienem 1 px wypalonym w powierzchnie (batch 32:
+        czytelnosc kremowych liter na drewnianych kartach ulepszen).
+        Powierzchnia jest +1 px szersza/wyzsza przez cien - kod menu
+        mierzy powierzchnie, wiec uklad przelicza sie sam."""
+        main = font.render(text, True, color)
+        s = pygame.Surface((main.get_width() + 1, main.get_height() + 1),
+                           pygame.SRCALPHA)
+        s.blit(font.render(text, True, (10, 6, 3)), (1, 1))
+        s.blit(main, (0, 0))
+        return s
+
     def _draw_upgrade_menu(self, title_text, upg_list, owned_set, icons,
                            open_attr, buttons_attr, close_attr, icons2=None):
         """Generyczne menu upgradow (2 kolumny)."""
@@ -6265,7 +6301,7 @@ class Game:
         px, py = (self.width - pw) // 2, (self.height - ph) // 2
         self.win.blit(theme.wood_panel(pw, ph, radius=16,
                                        base=theme.WOOD_PANEL_DARK), (px, py))
-        title = self.font_p36.render(title_text, True, (255, 215, 100))
+        title = self._render_shadowed(self.font_p36, title_text, (255, 215, 100))
         self.win.blit(title, (px + (pw - title.get_width()) // 2, py + 18))
         # Przycisk zamkniecia
         setattr(self, close_attr, pygame.Rect(px + pw - 46, py + 12, 34, 34))
@@ -6364,7 +6400,7 @@ class Game:
                     desc = tr(f"upg.{upg['id']}.desc", upg["desc"])
                 price_txt = tr("upg.locked") if locked else f"{self._price(_next_cost):,}"
             # Opis: wrap po szerokosci w pikselach (nie po liczbie znakow) - nic nie ucina
-            desc_col = (140, 128, 106) if mystery else theme.WARM_GRAY
+            desc_col = (170, 158, 134) if mystery else theme.WARM_GRAY
             desc_font = self._building_desc_font
             max_desc_w = col_w - 76 - 12 - 4  # tekst od sx+76 do prawej krawedzi karty
             words = desc.split()
@@ -6413,15 +6449,15 @@ class Game:
             block_top = icon_cy - block_h // 2
             # Cena / status liczona PRZED nazwa (nazwa dopasowuje sie do niej)
             if maxed:
-                st = self.font_btn18.render(tr("upg.max"), True, (100, 220, 130))
+                st = self._render_shadowed(self.font_btn18, tr("upg.max"), (100, 220, 130))
             elif mystery:
-                st = self.font_btn18.render("???", True, theme.WARM_DIM)
+                st = self._render_shadowed(self.font_btn18, "???", theme.WARM_DIM)
             elif locked:
-                st = self.font_btn18.render(tr("upg.locked"), True, (150, 138, 118))
+                st = self._render_shadowed(self.font_btn18, tr("upg.locked"), (172, 160, 140))
             else:
                 afford = self.money >= self._price(_next_cost)
-                st = self.font_btn18.render(price_txt,
-                                            True, (255, 215, 100) if afford else (200, 100, 100))
+                st = self._render_shadowed(self.font_btn18, price_txt,
+                                           (255, 215, 100) if afford else (215, 110, 110))
             # Nazwa: shrink-to-fit (Batch 30) - dlugie nazwy (RU/ES/PT/FR)
             # wchodzily pod cene w prawym gornym rogu karty.
             _coin_w = 19 if (not mystery and not locked and not maxed) else 0
@@ -6440,8 +6476,8 @@ class Game:
                         break
                 if name_font is None:
                     name_font = self._fit_fonts[12]
-            name_col = (168, 154, 128) if mystery else theme.CREAM
-            name_lbl = name_font.render(name, True, name_col)
+            name_col = (188, 174, 150) if mystery else theme.CREAM
+            name_lbl = self._render_shadowed(name_font, name, name_col)
             self.win.blit(name_lbl, (sx + 76,
                                      block_top + (name_h - name_lbl.get_height()) // 2))
             if scroll_off > 0:
@@ -6454,12 +6490,12 @@ class Game:
                     ly = block_top + name_h + 4 + li * desc_step - int(scroll_off)
                     if ly + desc_step < _clip.top or ly > _clip.bottom:
                         continue
-                    d_lbl = desc_font.render(ln, True, desc_col)
+                    d_lbl = self._render_shadowed(desc_font, ln, desc_col)
                     self.win.blit(d_lbl, (sx + 76, ly))
                 self.win.set_clip(_prev_clip)
             else:
                 for li, ln in enumerate(lines[:2]):
-                    d_lbl = desc_font.render(ln, True, desc_col)
+                    d_lbl = self._render_shadowed(desc_font, ln, desc_col)
                     self.win.blit(d_lbl, (sx + 76, block_top + name_h + 4 + li * desc_step))
             # Cena / status (prawy GORNY rog, w wierszu tytulu - nie koliduje z opisem)
             # (powierzchnia `st` policzona wyzej, przed nazwa)
@@ -7118,10 +7154,13 @@ class Game:
         y = self.height - slot_h - 12
         t_now = pygame.time.get_ticks() / 1000.0
         mouse_pos = self._mouse_pos()
-        # Wieksze czcionki
-        f_name = pygame.font.SysFont("arial", 16, bold=True)
-        f_status = pygame.font.SysFont("arial", 14, bold=True)
-        f_type = pygame.font.SysFont("arial", 12)
+        # Wieksze czcionki (cachowane na self - batch 32: SysFont co klatke
+        # oznaczal ponowne wczytanie pliku fontu przy kazdym rysowaniu doku)
+        if getattr(self, "_dock_fonts", None) is None:
+            self._dock_fonts = (pygame.font.SysFont("arial", 16, bold=True),
+                                pygame.font.SysFont("arial", 14, bold=True),
+                                pygame.font.SysFont("arial", 12))
+        f_name, f_status, f_type = self._dock_fonts
 
         for i, (tname, aname, color) in enumerate(owned_types):
             x = start_x + i * (slot_w + gap)

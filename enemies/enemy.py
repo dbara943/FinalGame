@@ -67,6 +67,7 @@ class Enemy:
         self.die_count = 0
         self.hurt_timer = 0
         self.slow_timer = 0
+        self._slow_factor = 0.5  # mnoznik predkosci przy slow (per zrodlo)
         # Statusy DoT (paczka 26): trucizna (kolce / strzaly Clyde'a)
         # i podpalenie (strzaly Bonnie). Tickowanie w game.py
         # (Game._tick_statuses) - tu tylko stan + grafika.
@@ -381,10 +382,11 @@ class Enemy:
 
        # Predkosc wroga (kiedys atrybut velocity byl ignorowany).
        # Dzielimy przez 3, zeby zachowac dotychczasowe tempo gry.
-       # Spowolnienie (slow) zmniejsza predkosc o polowe.
+       # Spowolnienie (slow): mnoznik per zrodlo - trafienia Ice x0.75
+       # (batch 32: oslabione z x0.5), Frost Nova nadal x0.5.
        current_vel = self.velocity
        if self.slow_timer > 0:
-           current_vel = self.velocity * 0.5
+           current_vel = self.velocity * getattr(self, "_slow_factor", 0.5)
            self.slow_timer -= 1
        # Reinforced Docks: 15% wolniej, ale TYLKO na pomoście (x 240-580,
        # y 600-720 - drewniany pomost przy statku). Po zejsciu z pomostu
@@ -432,13 +434,17 @@ class Enemy:
             return True
         return False
 
-    def apply_slow(self, duration=60):
-        """Naklada spowolnienie na wroga (duration w klatkach)."""
+    def apply_slow(self, duration=60, factor=None):
+        """Naklada spowolnienie na wroga (duration w klatkach).
+        factor: mnoznik predkosci zrodla (None = zostawia biezacy;
+        domyslnie 0.5 dla starych wywolan, np. Frost Nova)."""
         if not self.dying and not self.dead:
             # Impostor jest odporny na spowolnienie
             if getattr(self, 'slow_immune', False):
                 return
             self.slow_timer = duration
+            if factor is not None:
+                self._slow_factor = factor
 
     def get_damage_mult(self, damage_type):
         """Mnoznik obrazen uwzgledniajacy opornosci (R13)."""

@@ -14,15 +14,15 @@ WOOD_PANEL = (46, 30, 17)        # ciemny orzech - tla paneli
 WOOD_PANEL_DARK = (36, 23, 13)   # ciemniejszy wariant (pauza, pomoc)
 WOOD_BTN = (74, 50, 27)          # przyciski
 WOOD_BTN_HOVER = (94, 64, 35)    # przyciski po najechaniu
-WOOD_CARD = (60, 41, 24)         # karty w menu ulepszen
-WOOD_CARD_HOVER = (78, 54, 31)
+WOOD_CARD = (50, 33, 20)         # karty (batch 32: ciemniejsze - kontrast tekstu)
+WOOD_CARD_HOVER = (64, 43, 25)
 WOOD_INSET = (24, 15, 8)         # wglebienia (pole tekstowe, tag)
 BRASS = (196, 154, 74)           # mosiadz - ramki
 BRASS_BRIGHT = (238, 200, 105)   # jasny mosiadz - narozniki, akcenty
 BRASS_DARK = (138, 106, 50)      # ciemny mosiadz - ramki drugorzedne
-CREAM = (245, 236, 214)          # kremowa biel napisow
-WARM_GRAY = (198, 182, 152)      # ciepla szarosc opisow
-WARM_DIM = (150, 133, 108)       # przygaszony cieply tekst
+CREAM = (252, 245, 226)          # kremowa biel napisow (batch 32: jasniejsza)
+WARM_GRAY = (218, 204, 174)      # ciepla szarosc opisow (batch 32: jasniejsza)
+WARM_DIM = (176, 158, 130)       # przygaszony cieply tekst (batch 32: jasniejszy)
 GOLD_TEXT = (255, 215, 100)      # zloto cen / tytulow (jak dawniej)
 
 _cache = {}
@@ -53,14 +53,16 @@ def _wood_raw(w, h, base, plank_h=26):
         if y > 0:
             pygame.draw.line(surf, (12, 7, 3, 200), (0, y), (w, y), 2)
             if y + 2 < h:
-                pygame.draw.line(surf, (255, 224, 168, 26), (0, y + 2), (w, y + 2), 1)
+                # Jasna linia pod spoina slabsza od batcha 32 - pod tekstem
+                # drobnych napisow robila szum obnizajacy czytelnosc.
+                pygame.draw.line(surf, (255, 224, 168, 16), (0, y + 2), (w, y + 2), 1)
         # Sloje: faliste poziome linie wewnatrz deski
         for _ in range(3):
             gy = y + rng.randint(4, max(4, ph - 4))
             phase = rng.uniform(0, 6.28)
             amp = rng.uniform(0.6, 1.6)
             dark = rng.random() < 0.7
-            col = (16, 9, 4, 46) if dark else (255, 222, 168, 20)
+            col = (16, 9, 4, 46) if dark else (255, 222, 168, 13)
             pts = [(x, gy + amp * math.sin(x * 0.018 + phase))
                    for x in range(0, w + 1, 14)]
             if len(pts) > 1:

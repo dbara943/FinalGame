@@ -525,6 +525,7 @@ class IceTower(WoodenTower):
         self.damage = self.base_damage
         self.slow_on_hit = True   # kazde trafienie spowalnia
         self.slow_duration = 150  # 1,5 s (link: x1.8)
+        self.slow_factor = 0.75   # batch 32: sila slow x0.75 (bylo x0.5)
         self._setup_menu()
         self.name = "iceTower"
 

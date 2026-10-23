@@ -51,13 +51,16 @@ class StartMenu:
         self.help_page = 0
         self.show_achievements = False
         self.show_resolution = False
+        self.show_credits = False
         self.clock = pygame.time.Clock()
         # Rozdzielczosc (zapisywana)
         self.resolutions = [(1124, 720), (1280, 720), (1600, 900), (1920, 1080), ("Native", "Fullscreen")]
         self.res_idx = 4  # domyslnie natywny fullscreen
         self._load_resolution()
 
-        bw, bh, gap = 360, 54, 10
+        # 8 przyciskow (batch 32: doszedl CREDITS) - nieco nizsze przyciski
+        # i mniejsze odstepy, zeby cala kolumna nadal miescila sie na 720p
+        bw, bh, gap = 360, 48, 8
         x = self.rw // 2 - bw // 2
         y0 = self.rh // 2 - 120  # wczesniej -80: QUIT byl 2px od dolu przy 720p (przycinanie)
         self.buttons = {
@@ -67,7 +70,8 @@ class StartMenu:
             "achievements": pygame.Rect(x, y0 + 3 * (bh + gap), bw, bh),
             "resolution": pygame.Rect(x, y0 + 4 * (bh + gap), bw, bh),
             "help": pygame.Rect(x, y0 + 5 * (bh + gap), bw, bh),
-            "quit": pygame.Rect(x, y0 + 6 * (bh + gap), bw, bh),
+            "credits": pygame.Rect(x, y0 + 6 * (bh + gap), bw, bh),
+            "quit": pygame.Rect(x, y0 + 7 * (bh + gap), bw, bh),
         }
         # Wybor jezyka: rzad flag w prawym gornym rogu (male ikonki panstw)
         self._flag_imgs = {}
@@ -186,13 +190,15 @@ class StartMenu:
             "achievements": t("menu.achievements"),
             "resolution": t("menu.resolution", name=res_name),
             "help": t("menu.help"),
+            "credits": t("menu.credits"),
             "quit": t("menu.quit"),
         }
         for key, rect in self.buttons.items():
             self.draw_button(rect, labels[key], rect.collidepoint(mouse))
 
         # Rzad flag wyboru jezyka (prawy gorny rog) - nie gdy otwarty jest panel
-        if not (self.show_help or self.show_achievements or self.show_resolution):
+        if not (self.show_help or self.show_achievements or self.show_resolution
+                or self.show_credits):
             self._draw_flags(mouse)
 
         # Opis wybranej trudnosci (stopka - co zmienia EASY / NORMAL / HARD)
@@ -207,6 +213,8 @@ class StartMenu:
             self.draw_achievements()
         if self.show_resolution:
             self.draw_resolution()
+        if self.show_credits:
+            self.draw_credits()
         pygame.display.update()
 
     def _draw_flags(self, mouse):
@@ -426,6 +434,49 @@ class StartMenu:
         hint = self.small_font.render(t("res.applies"), True, (172, 156, 126))
         self.win.blit(hint, (px + (pw - hint.get_width()) // 2, py + ph - 35))
 
+    def draw_credits(self):
+        """Krotki ekran credits (batch 32) - osobny ekran z menu glownego.
+        Uklad liczony z rzeczywistych wysokosci i szerokosci wyrenderowanych
+        linii (jak ekran konca gry po batchu 31) - panel dopasowuje sie
+        do tresci w kazdym jezyku, nic nie nachodzi i nie wychodzi poza ekran."""
+        dim = pygame.Surface((self.rw, self.rh), pygame.SRCALPHA)
+        dim.fill((0, 0, 0, 180))
+        self.win.blit(dim, (0, 0))
+        title_font = pygame.font.SysFont("arial", 38, bold=True)
+        head_font = pygame.font.SysFont("arial", 25, bold=True)
+        body_font = pygame.font.SysFont("arial", 20)
+        hint_font = pygame.font.SysFont("arial", 16)
+        # (tekst, font, kolor, odstep po linii)
+        lines = [
+            (t("menu.credits"), title_font, theme.BRASS_BRIGHT, 6),
+            ("ISLAND DEFENDERS", head_font, theme.GOLD_TEXT, 20),
+            (t("credits.by"), body_font, theme.CREAM, 16),
+            (t("credits.art"), body_font, theme.CREAM, 8),
+            (t("credits.music"), body_font, theme.CREAM, 8),
+            (t("credits.sfx"), body_font, theme.WARM_GRAY, 8),
+            (t("credits.built"), body_font, theme.WARM_GRAY, 16),
+            (t("credits.thanks"), body_font, theme.CREAM, 0),
+        ]
+        rendered = []
+        max_w = 0
+        total_h = 0
+        for txt, font, col, gap_after in lines:
+            surf = font.render(txt, True, col)
+            rendered.append((surf, gap_after))
+            max_w = max(max_w, surf.get_width())
+            total_h += surf.get_height() + gap_after
+        hint = hint_font.render(t("sm.help.back"), True, theme.WARM_DIM)
+        pw = min(max(max_w + 90, 480), self.rw - 24)
+        ph = total_h + 44 + hint.get_height() + 34
+        px, py = (self.rw - pw) // 2, (self.rh - ph) // 2
+        self.win.blit(theme.wood_panel(pw, ph, radius=15,
+                                       base=theme.WOOD_PANEL_DARK), (px, py))
+        y = py + 30
+        for surf, gap_after in rendered:
+            self.win.blit(surf, (px + (pw - surf.get_width()) // 2, y))
+            y += surf.get_height() + gap_after
+        self.win.blit(hint, (px + (pw - hint.get_width()) // 2, py + ph - hint.get_height() - 16))
+
     def draw_help(self):
         # Pomoc: strony wspoldzielone z gra (help_content - liczby wiez
         # liczone z klas). Uklad jak w pomocy w grze: tekst do lewej,
@@ -543,6 +594,11 @@ class StartMenu:
                 if event.type == pygame.QUIT:
                     pygame.mixer.music.stop()
                     return None
+                # Credits: ESC zamyka (klik gdziekolwiek tez - nizej)
+                if event.type == pygame.KEYDOWN and self.show_credits:
+                    if event.key == pygame.K_ESCAPE:
+                        self.show_credits = False
+                    continue
                 # Pomoc: strzalki / A,D zmieniaja strone, ESC zamyka
                 # (wczesniej klawiatura w ogole nie dzialala w menu
                 # startowym - obslugiwane byly tylko kliki w strzalki).
@@ -595,6 +651,10 @@ class StartMenu:
                         else:
                             self.show_help = False
                         clicked_something = True
+                    elif self.show_credits:
+                        # Credits: klik gdziekolwiek zamyka
+                        self.show_credits = False
+                        clicked_something = True
                     elif self.show_resolution:
                         self.show_resolution = False
                         clicked_something = True
@@ -642,6 +702,9 @@ class StartMenu:
                         elif self.buttons["help"].collidepoint(pos):
                             self.show_help = True
                             self.help_page = 0
+                            clicked_something = True
+                        elif self.buttons["credits"].collidepoint(pos):
+                            self.show_credits = True
                             clicked_something = True
                         elif self.buttons["quit"].collidepoint(pos):
                             clicked_something = True
