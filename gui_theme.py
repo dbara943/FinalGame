@@ -27,6 +27,20 @@ GOLD_TEXT = (255, 215, 100)      # zloto cen / tytulow (jak dawniej)
 
 _cache = {}
 
+# Zewnetrzne cache powierzchni (np. cache napisow z menu/menu.py)
+# rejestruja sie tutaj, zeby JEDNO wywolanie clear_cache() po
+# (od)tworzeniu displaya czyscilo wszystko naraz. Powierzchnie
+# zbudowane pod poprzedni display potrafia wrocic z popsuta alfa
+# na macOS (runda 2 napraw, 24.10.2026 - napisy i trupy).
+_extra_clearers = []
+
+
+def register_cache_clearer(fn):
+    """Rejestruje funkcje czyszczaca zewnetrzny cache powierzchni.
+    Wywolywana z clear_cache() po kazdym (od)tworzeniu displaya."""
+    if fn not in _extra_clearers:
+        _extra_clearers.append(fn)
+
 
 def clear_cache():
     """Czysci cache powierzchni GUI. Powierzchnie z cache'u sa po
@@ -35,6 +49,11 @@ def clear_cache():
     trzeba je zbudowac od nowa, inaczej potrafia wrocic z popsuta
     alfa (przezroczysty sklep przy pierwszym otwarciu na macOS)."""
     _cache.clear()
+    for _fn in list(_extra_clearers):
+        try:
+            _fn()
+        except Exception:
+            pass
 
 
 def _wood_raw(w, h, base, plank_h=26):

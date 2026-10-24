@@ -59,6 +59,13 @@ class ParticleSystem:
                 a = int(255 * alpha_bucket / 15)
                 c = (*color[:3], a)
                 pygame.draw.circle(s, c, (size, size), size)
+                # Format aktywnego displaya, jak reszta grafik
+                # (naprawa macOS, runda 2 - spojny format powierzchni)
+                try:
+                    if pygame.display.get_surface() is not None:
+                        s = s.convert_alpha()
+                except Exception:
+                    pass
                 self._circle_cache[key] = s
                 # Ogranicz rozmiar cache
                 if len(self._circle_cache) > 64:

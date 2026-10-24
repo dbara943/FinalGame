@@ -50,8 +50,31 @@ def render_text(font, text, color):
         if len(_TEXT_CACHE) >= _TEXT_CACHE_MAX:
             _TEXT_CACHE.clear()
         s = font.render(text, True, color)
+        # Normalizacja jak przy grafikach (naprawa macOS, runda 2):
+        # powierzchnia z font.render ma RGB = jednolity kolor czcionki,
+        # a ksztalt liter niesie WYLACZNIE kanal alfa - gdy taka
+        # powierzchnia wroci z cache po odtworzeniu displaya i alfa
+        # zgubi sie przy blicie, napis renderuje sie jako prostokat
+        # w kolorze czcionki. Konwersja do formatu aktywnego displaya
+        # (raz, przy tworzeniu wpisu) + czyszczenie cache przy kazdym
+        # odtworzeniu displaya (rejestracja nizej) trzymaja napisy
+        # w tym samym formacie co reszta gry.
+        try:
+            if pygame.display.get_surface() is not None:
+                s = s.convert_alpha()
+        except Exception:
+            pass
         _TEXT_CACHE[key] = s
     return s
+
+
+def clear_text_cache():
+    """Czysci cache powierzchni napisow. Wywolywane przez
+    gui_theme.clear_cache() po kazdym (od)tworzeniu displaya."""
+    _TEXT_CACHE.clear()
+
+
+theme.register_cache_clearer(clear_text_cache)
 
 
 class Button():

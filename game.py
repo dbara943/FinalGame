@@ -314,8 +314,17 @@ class Game:
         # Display powstal na nowo (po StartMenu) - powierzchnie GUI z
         # cache'a byly konwertowane pod poprzedni display; przebuduj je.
         theme.clear_cache()
-        # Bufor gry 1124x720 - cala logika bez zmian
-        self.win = pygame.Surface((self.width, self.height))
+        # Bufor gry 1124x720 - cala logika bez zmian. Konwersja do
+        # formatu aktywnego displaya (naprawa macOS, runda 2): bufor
+        # w domyslnym formacie pygame wymuszal konwersje formatu przy
+        # kazdym blicie na niego i z niego; trzymanie calego lancucha
+        # rysowania w jednym formacie displaya usuwa klase bledow
+        # z gubieniem alfy (napisy, trupy). Wizualnie bez zmian -
+        # bufor jest kompozytem koncowym, sam nie niesie alfy.
+        try:
+            self.win = pygame.Surface((self.width, self.height)).convert()
+        except Exception:
+            self.win = pygame.Surface((self.width, self.height))
         self._fullscreen = True
         self.show_menu = False  # menu ESC
         self._show_help = False  # pod-ekran "How to Play"
@@ -2135,6 +2144,11 @@ class Game:
                             # caly ekran z czarnym tlem i gra 1:1 na srodku)
                             self._screen = pygame.display.set_mode((self.width, self.height))
                         theme.clear_cache()  # nowy display = przebuduj cache GUI
+                        # Cache powierzchni tej instancji tez pod stary
+                        # display (gradient Blood Moon, sprite robota)
+                        self._bm_cache = None
+                        if hasattr(self, "_robot_img_cache"):
+                            self._robot_img_cache.clear()
                     if event.key == pygame.K_F3:
                         self._debug_show = not getattr(self, '_debug_show', False)
                     # G: zamazanie pola stawiania wl/wyl
@@ -3674,7 +3688,16 @@ class Game:
         # Trupy pod wrogami (znikaja stopniowo)
         for img, x, y, timer in self.corpses:
             alpha = min(255, timer * 2)
-            corpse = img.copy()
+            # Swieza powierzchnia w formacie AKTUALNEGO displaya, nie
+            # copy() klatki skonwertowanej pod wczesniejszy display -
+            # na macOS copy()+set_alpha wracalo z czarnym tlem trupa
+            # (naprawa macOS, runda 2). convert_alpha() zawsze daje
+            # nowa powierzchnie (wspoldzielona klatka smierci nietknieta),
+            # a set_alpha na niej to ten sam fade co wczesniej.
+            try:
+                corpse = img.convert_alpha()
+            except Exception:
+                corpse = img.copy()
             corpse.set_alpha(alpha)
             self.win.blit(corpse, (x - corpse.get_width()/2, y - corpse.get_height()/2 - 35))
         # 1: Uszkodzenia zamku (baza na koncu sciezki)
@@ -4141,6 +4164,14 @@ class Game:
             else:
                 # Zwykle okno w rozmiarze gry 1124x720 (jak F11)
                 self._screen = pygame.display.set_mode((self.width, self.height))
+            # Nowy display = przebuduj cache powierzchni (jak F11) -
+            # wczesniej ta sciezka odtwarzala display BEZ czyszczenia
+            # i powierzchnie spod poprzedniego displaya wracaly
+            # z popsuta alfa (naprawa macOS, runda 2)
+            theme.clear_cache()
+            self._bm_cache = None
+            if hasattr(self, "_robot_img_cache"):
+                self._robot_img_cache.clear()
         elif action == "speed":
             self.speed = {1: 2, 2: 3, 3: 1}[self.speed]
         elif action == "quit":
