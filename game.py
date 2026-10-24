@@ -5875,9 +5875,11 @@ class Game:
                 self._robot_start_ending()
 
     def _robot_start_ending(self):
-        """Start sceny koncowej: robot wstaje z placu budowy i rusza czyscic
-        droge do portu. Batch 30: pula fali i bossowie w kolejce ZOSTAJA -
-        desant trwa podczas finalu, a robot idzie na czolo kolumny."""
+        """Start sceny koncowej: robot wstaje z placu budowy i rusza do
+        portu. Batch 30: pula fali i bossowie w kolejce ZOSTAJA - desant
+        trwa podczas finalu. Decyzja Daniela (24.10): robot idzie prosto
+        do portu (po drodze depcze i strzela), a po dojsciu od razu
+        niszczy statek."""
         sx, sy = self._robot_site()
         # Sciezka marszu: od BRAMY (koniec _GUARD_PATH) do PORTU (poczatek)
         # + podejscie pod statek. Wspolrzedna s: 0 przy bramie, max w porcie.
@@ -5973,35 +5975,26 @@ class Game:
                 b["x"], b["y"] = self._point_on_path(b["s"])
             return
         if phase == "march":
-            # Batch 30: cel marszu to CZOLO kolumny - zyjacy wrog najblizej
-            # bramy (najmniejsze s). Robot idzie mu naprzeciw wzdluz drogi;
-            # gdy droga czysta (brak zywych i pusty desant), dokancza droge
-            # do portu i dopiero wtedy przechodzi do fazy lasera.
+            # Decyzja Daniela (24.10): cel marszu to zawsze PORT (koniec
+            # drogi, s = total). Po drodze robot rozwala wrogow na biezaco
+            # (deptanie + laser ponizej), a po dojsciu do portu OD RAZU
+            # przechodzi do lasera w statek - bez czekania, az kazdy
+            # przeciwnik sie zdesantuje albo zginie.
             b["march_t"] = b.get("march_t", 0) + 1
             if b.get("s") is None:
                 b["s"] = self._project_on_path(b["x"], b["y"])
                 b["x"], b["y"] = self._point_on_path(b["s"])
             pts, cum = self._bot_path
             total = cum[-1]
-            front_s = None
-            for en in self.enemies:
-                if en.dying or en.dead or en.reached_end:
-                    continue
-                s_e = self._project_on_path(en.x, en.y)
-                if front_s is None or s_e < front_s:
-                    front_s = s_e
-            spawning = sum(self.current_wave) > 0 or len(self.pending_bosses) > 0
-            s_tgt = front_s if front_s is not None else total
-            ds = s_tgt - b["s"]
+            ds = total - b["s"]
             if abs(ds) > 1.0:
                 b["s"] += max(-1.7, min(1.7, ds))
                 nx, ny = self._point_on_path(b["s"])
                 if nx != b["x"]:
                     b["facing"] = 1 if nx > b["x"] else -1
                 b["x"], b["y"] = nx, ny
-            if (front_s is None and not spawning and b["s"] >= total - 1.5) \
-                    or b["march_t"] > 30000:
-                # Droga czysta i robot przy statku (albo bezpiecznik) -> laser
+            if b["s"] >= total - 1.5 or b["march_t"] > 30000:
+                # Robot przy statku (albo bezpiecznik anty-soft-lock) -> laser
                 self._robot_phase = "laser"
                 b["t"] = 0
                 b["facing"] = -1
