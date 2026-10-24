@@ -19,13 +19,19 @@ try:
 except Exception:
     pass
 pygame.display.set_caption('Island Defenders')
+# gui_theme wczesnie: ekran ladowania tworzy display przez
+# theme.set_display (naprawa macOS, runda 3) - to PIERWSZY i docelowo
+# JEDYNY set_mode procesu; StartMenu i Game reuzywaja ten sam tryb
+# (fullscreen natywny), wiec format powierzchni jest jeden przez
+# cale zycie gry.
+import gui_theme as theme
 # Ekran ladowania (zanim ciezkie assety) - fullscreen zeby nie bylo czarnego paska
 try:
     _info = pygame.display.Info()
     _lw, _lh = _info.current_w, _info.current_h
     if not _lw or _lw <= 0 or not _lh or _lh <= 0:
         _lw, _lh = 1280, 720
-    _load_win = pygame.display.set_mode((_lw, _lh), pygame.FULLSCREEN)
+    _load_win = theme.set_display((_lw, _lh), pygame.FULLSCREEN)
     _load_win.fill((26, 17, 9))
     _lf = pygame.font.SysFont("arial", 36)
     _lt = _lf.render(i18n.t("loading"), True, (245, 236, 214))
@@ -33,7 +39,7 @@ try:
     pygame.display.flip()
 except Exception:
     try:
-        _load_win = pygame.display.set_mode((1280, 720))
+        _load_win = theme.set_display((1280, 720))
     except Exception:
         pass
 # Normalizacja grafik: od tego miejsca kazdy pygame.image.load zwraca
@@ -304,16 +310,18 @@ class Game:
         _info = pygame.display.Info()
         self._native_w, self._native_h = _info.current_w, _info.current_h
         # Display w natywnej rozdzielczosci (bez SCALED - reczne smoothscale)
+        # przez theme.set_display (naprawa macOS, runda 3): StartMenu i
+        # ekran ladowania uzywaja dokladnie tego trybu, wiec display jest
+        # REUZYWANY bez set_mode i bez zmiany formatu powierzchni; przy
+        # realnej zmianie trybu set_display samo podbija generacje
+        # displaya i czysci cache powierzchni.
         # Fallback jesli FULLSCREEN nie dziala
         try:
-            self._screen = pygame.display.set_mode((self._native_w, self._native_h), pygame.FULLSCREEN)
+            self._screen = theme.set_display((self._native_w, self._native_h), pygame.FULLSCREEN)
         except pygame.error:
-            self._screen = pygame.display.set_mode((self._native_w, self._native_h))
+            self._screen = theme.set_display((self._native_w, self._native_h))
         # Uzyj RZECZYWISTEGO rozmiaru (Windows moze zwrocic inny niz zadany)
         self._native_w, self._native_h = self._screen.get_size()
-        # Display powstal na nowo (po StartMenu) - powierzchnie GUI z
-        # cache'a byly konwertowane pod poprzedni display; przebuduj je.
-        theme.clear_cache()
         # Bufor gry 1124x720 - cala logika bez zmian. Konwersja do
         # formatu aktywnego displaya (naprawa macOS, runda 2): bufor
         # w domyslnym formacie pygame wymuszal konwersje formatu przy
@@ -547,6 +555,13 @@ class Game:
         self._clear_timer = 0  # Zabezpieczenie przed zawieszeniem fali
         self.gold_notifications = []  # Widoczne powiadomienia o zlocie [(tekst, timer)]
         self.corpses = []  # Trupy wrogow: [img, x, y, timer]
+        # Naprawa macOS, runda 3: cache wariantow fade trupow
+        # (klucz: id klatki + skwantowana alfa + generacja displaya),
+        # warstwa chmur SRCALPHA i znacznik generacji prerenderu HUD.
+        self._corpse_fades = {}
+        self._cloud_layer = None
+        self._cloud_layer_gen = -1
+        self._hud_prerender_gen = -1
         self.early_wave_rect = None  # R2: prostokat przycisku "Nastepna fala"
         self.wave_modifier = None  # U8: modyfikator fali (swift/rich/swarm)
         # Bombardowanie cinematic
@@ -678,25 +693,11 @@ class Game:
         self.font_f13 = pygame.font.SysFont(_fn, 13, bold=True)
         self.font_f11 = pygame.font.SysFont(_fn, 11)
         self.font_small16 = pygame.font.SysFont(_fn, 16)
-        # Prerender pigulek HUD (tla statyczne, nie tworzone co klatke)
+        # Prerender pigulek HUD i statycznych napisow - budowane przez
+        # _build_hud_prerender() (wolane tu i leniwie z draw_hud po
+        # zmianie generacji displaya - naprawa macOS, runda 3).
         self._pill_h = 44
-        self._pills = []
-        for _w in (180, 130, 150):
-            # Styl A: drewniana pigulka z mosiadzna ramka (lekko przezroczysta)
-            _s = theme.wood_panel(_w, self._pill_h, radius=self._pill_h // 2,
-                                  corners=False).copy()
-            _s.set_alpha(222)
-            self._pills.append(_s)
-        self._lives_icon = pygame.transform.scale(lives_img, (28, 28))
-        self._money_icon = pygame.transform.scale(money_img, (28, 28))
-        self._coin_icon15 = pygame.transform.scale(money_img, (15, 15))
-        # Prerender statycznych napisow (wydajnosc)
-        self._txt_paused = self.font_p36.render(tr("hud.paused"), True, (255, 255, 255))
-        self._txt_paused_sub = self.font_s16.render(tr("hud.paused_sub"), True, (200, 200, 200))
-        self._txt_ready = self.font_f11.render(tr("hud.ready"), True, (255, 255, 200))
-        self._txt_no_tower = self.font_f11.render(tr("hud.no_tower"), True, (120, 120, 120))
-        self._txt_next = self.font_small16.render(tr("hud.next"), True, (255, 255, 255))
-        self._txt_boss = self.font_small16.render(tr("hud.boss_next"), True, (255, 50, 50))
+        self._build_hud_prerender()
         # Licznik klatek i cache czasu animacji ambient (wydajnosc)
         self._frame = 0
         self._ambient_t = 0.0
@@ -2137,15 +2138,15 @@ class Game:
                     if event.key == pygame.K_F11:
                         self._fullscreen = not self._fullscreen
                         if self._fullscreen:
-                            self._screen = pygame.display.set_mode(
+                            self._screen = theme.set_display(
                                 (self._native_w, self._native_h), pygame.FULLSCREEN)
                         else:
                             # Zwykle okno w rozmiarze gry (wczesniej: okno na
                             # caly ekran z czarnym tlem i gra 1:1 na srodku)
-                            self._screen = pygame.display.set_mode((self.width, self.height))
-                        theme.clear_cache()  # nowy display = przebuduj cache GUI
-                        # Cache powierzchni tej instancji tez pod stary
-                        # display (gradient Blood Moon, sprite robota)
+                            self._screen = theme.set_display((self.width, self.height))
+                        # set_display samo czysci cache i podbija generacje
+                        # displaya przy realnej zmianie trybu (runda 3);
+                        # cache tej instancji czyscimy jak dawniej.
                         self._bm_cache = None
                         if hasattr(self, "_robot_img_cache"):
                             self._robot_img_cache.clear()
@@ -3609,6 +3610,38 @@ class Game:
                         return "continue"
         return "quit"
         
+    def _corpse_faded(self, img, alpha):
+        """Wariant trupa o danej alfie z cache (naprawa macOS, runda 3).
+
+        Klucz: (id klatki, alfa skwantowana co 16, generacja displaya);
+        wpis trzyma SILNA referencje do klatki zrodlowej, wiec id() nie
+        moze zostac w miedzyczasie przejete przez inna powierzchnie.
+        Budowa przez theme.fade_copy - bez set_alpha i bez flag blend."""
+        alpha_q = max(0, min(255, (int(alpha) // 16) * 16))
+        key = (id(img), alpha_q, theme.display_generation())
+        ent = self._corpse_fades.get(key)
+        if ent is not None:
+            return ent[1]
+        if len(self._corpse_fades) > 96:
+            self._corpse_fades.clear()
+        surf = theme.fade_copy(img, alpha_q)
+        self._corpse_fades[key] = (img, surf)
+        return surf
+
+    def _cloud_layer_surface(self):
+        """Pelnoekranowa warstwa SRCALPHA na chmury (naprawa macOS,
+        runda 3). Powierzchnia `win` po .convert() NIE ma kanalu alfa,
+        wiec draw.circle z kolorem RGBA rysowal na niej LITA biel
+        (alfa ignorowana) - chmura zaslaniala HUD biala plama. Kola
+        rysujemy na warstwie z prawdziwa alfa i blitujemy warstwe."""
+        gen = theme.display_generation()
+        if self._cloud_layer is None or self._cloud_layer_gen != gen:
+            self._cloud_layer = pygame.Surface((self.width, self.height),
+                                               pygame.SRCALPHA)
+            self._cloud_layer_gen = gen
+        self._cloud_layer.fill((0, 0, 0, 0))
+        return self._cloud_layer
+
     def draw(self):
         self._frame += 1
         # Jeden odczyt czasu na klatke (wydajnosc) - uzywany w calej klatce
@@ -3685,20 +3718,17 @@ class Game:
             self.moving_object._rain_mod = 1.0  # jw.: brak kary zasiegu za deszcz
             self.moving_object.draw_radius(self.win)
             self.moving_object._placement_valid = None
-        # Trupy pod wrogami (znikaja stopniowo)
+        # Trupy pod wrogami (znikaja stopniowo). Fade idzie przez
+        # theme.fade_copy (naprawa macOS, runda 3): alfa jest WMNOZONA
+        # w piksele kopii, a blit to zwykly blit z alfa per-piksel -
+        # ten sam, ktorym rysuja sie zywi wrogowie. Zadnego set_alpha
+        # (SDL alpha-mod) na tej sciezce: po rundach 1-2 na Macu trup
+        # dalej wracal jako wielki czarny prostokat - klatka smierci
+        # elity/bossa to plotno 160-200 px, w wiekszosci przezroczyste,
+        # i to wlasnie ta przezroczysta czesc rysowala sie na czarno.
         for img, x, y, timer in self.corpses:
             alpha = min(255, timer * 2)
-            # Swieza powierzchnia w formacie AKTUALNEGO displaya, nie
-            # copy() klatki skonwertowanej pod wczesniejszy display -
-            # na macOS copy()+set_alpha wracalo z czarnym tlem trupa
-            # (naprawa macOS, runda 2). convert_alpha() zawsze daje
-            # nowa powierzchnie (wspoldzielona klatka smierci nietknieta),
-            # a set_alpha na niej to ten sam fade co wczesniej.
-            try:
-                corpse = img.convert_alpha()
-            except Exception:
-                corpse = img.copy()
-            corpse.set_alpha(alpha)
+            corpse = self._corpse_faded(img, alpha)
             self.win.blit(corpse, (x - corpse.get_width()/2, y - corpse.get_height()/2 - 35))
         # 1: Uszkodzenia zamku (baza na koncu sciezki)
         self.draw_castle_damage()
@@ -3964,12 +3994,22 @@ class Game:
         # rysowane PO menu (draw() wywoluje menu przed chmurami), wiec lecialy
         # po wierzchu panelu i zaslanialy widok.
         # UWAGA: t = _now_s MUSI zostac poza ifem - uzywaja go tez mewy/liscie ponizej.
+        # Naprawa macOS, runda 3 (objaw C): kola NIE ida juz wprost na
+        # self.win - win po .convert() nie ma kanalu alfa, wiec kolor
+        # RGBA (255,255,255,90) rysowal sie jako LITA biel i chmura
+        # zaslaniala HUD (zycia/fala) biala plama. Rysujemy na warstwe
+        # SRCALPHA i blitujemy ja w tym samym miejscu kolejnosci;
+        # dodatkowo cy jest dociskane do >= 76, zeby kola nigdy nie
+        # wchodzily w pas HUD-u na gorze ekranu.
         t = self._anim_s
         if not (self._building_menu_open or self._tent_menu_open):
+            layer = self._cloud_layer_surface()
             for i, (base_x, cy, size) in enumerate(self.clouds):
                 cx = (base_x + t * 8) % (self.width + 200) - 100
+                cy = max(76, cy)
                 for ox in [-20, 0, 20]:
-                    pygame.draw.circle(self.win, (255, 255, 255, 90), (int(cx + ox), int(cy)), size // 2)
+                    pygame.draw.circle(layer, (255, 255, 255, 90), (int(cx + ox), int(cy)), size // 2)
+            self.win.blit(layer, (0, 0))
         # A9: mewy
         for i, (base_x, gy, phase) in enumerate(self.seagulls):
             gx = (base_x + t * 12) % (self.width + 100) - 50
@@ -4159,16 +4199,14 @@ class Game:
         elif action == "fullscreen":
             self._fullscreen = not self._fullscreen
             if self._fullscreen:
-                self._screen = pygame.display.set_mode(
+                self._screen = theme.set_display(
                     (self._native_w, self._native_h), pygame.FULLSCREEN)
             else:
                 # Zwykle okno w rozmiarze gry 1124x720 (jak F11)
-                self._screen = pygame.display.set_mode((self.width, self.height))
-            # Nowy display = przebuduj cache powierzchni (jak F11) -
-            # wczesniej ta sciezka odtwarzala display BEZ czyszczenia
-            # i powierzchnie spod poprzedniego displaya wracaly
-            # z popsuta alfa (naprawa macOS, runda 2)
-            theme.clear_cache()
+                self._screen = theme.set_display((self.width, self.height))
+            # set_display samo czysci cache i podbija generacje displaya
+            # przy realnej zmianie trybu (naprawa macOS, runda 3);
+            # cache tej instancji czyscimy jak dawniej.
             self._bm_cache = None
             if hasattr(self, "_robot_img_cache"):
                 self._robot_img_cache.clear()
@@ -5332,7 +5370,12 @@ class Game:
             # Gradient, poswiata i chmury sa BUFOROWANE (budowane raz) -
             # wczesniej co klatke powstawały nowe powierzchnie na caly
             # ekran. Bonus bez zmian: tylko +10% dmg wiez (logika trafien).
+            # Cache nosi znacznik generacji displaya (naprawa macOS,
+            # runda 3): wpis spod poprzedniego displaya przebudowuje
+            # sie sam, nawet gdyby czyszczenie przy F11/pauzie umknelo.
             cache = getattr(self, "_bm_cache", None)
+            if cache is not None and cache[0] != theme.display_generation():
+                cache = None
             if cache is None:
                 grad = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
                 _top, _mid, _bot = (130, 10, 10), (96, 8, 14), (70, 8, 12)
@@ -5356,9 +5399,9 @@ class Game:
                     cs = pygame.Surface((cw, ch), pygame.SRCALPHA)
                     pygame.draw.ellipse(cs, (30, 2, 4, ca), (0, 0, cw, ch))
                     clouds.append(cs)
-                cache = (grad, glow, clouds)
+                cache = (theme.display_generation(), grad, glow, clouds)
                 self._bm_cache = cache
-            grad, glow, clouds = cache
+            _gen, grad, glow, clouds = cache
             grad.set_alpha(240 + int(10 * math.sin(t * 1.4)))
             self.win.blit(grad, (0, 0))
             # Ciemne chmury suna wolno przez krwawe niebo
@@ -6131,6 +6174,10 @@ class Game:
             return
 
     def _robot_sprite(self, flipped):
+        # Cache spod innej generacji displaya = przebuduj (runda 3)
+        if getattr(self, "_robot_cache_gen", -1) != theme.display_generation():
+            self._robot_img_cache.clear()
+            self._robot_cache_gen = theme.display_generation()
         key = "f" if flipped else "n"
         if key not in self._robot_img_cache:
             img = pygame.image.load(os.path.join("images", "robot.png"))
@@ -7527,7 +7574,35 @@ class Game:
         self._placement_mask = mask
         self._placement_sig = self._placement_signature()
 
+    def _build_hud_prerender(self):
+        """(Prze)budowuje prerenderowane powierzchnie HUD: pigulki,
+        ikony i statyczne napisy. Powierzchnie sa zwiazane z formatem
+        displaya, pod ktorym powstaly - draw_hud przebudowuje je, gdy
+        generacja displaya sie zmienila (naprawa macOS, runda 3)."""
+        self._pills = []
+        for _w in (180, 130, 150):
+            # Styl A: drewniana pigulka z mosiadzna ramka (lekko przezroczysta)
+            _s = theme.wood_panel(_w, self._pill_h, radius=self._pill_h // 2,
+                                  corners=False).copy()
+            _s.set_alpha(222)
+            self._pills.append(_s)
+        self._lives_icon = pygame.transform.scale(lives_img, (28, 28))
+        self._money_icon = pygame.transform.scale(money_img, (28, 28))
+        self._coin_icon15 = pygame.transform.scale(money_img, (15, 15))
+        # Prerender statycznych napisow (wydajnosc)
+        self._txt_paused = self.font_p36.render(tr("hud.paused"), True, (255, 255, 255))
+        self._txt_paused_sub = self.font_s16.render(tr("hud.paused_sub"), True, (200, 200, 200))
+        self._txt_ready = self.font_f11.render(tr("hud.ready"), True, (255, 255, 200))
+        self._txt_no_tower = self.font_f11.render(tr("hud.no_tower"), True, (120, 120, 120))
+        self._txt_next = self.font_small16.render(tr("hud.next"), True, (255, 255, 255))
+        self._txt_boss = self.font_small16.render(tr("hud.boss_next"), True, (255, 50, 50))
+        self._hud_prerender_gen = theme.display_generation()
+
     def draw_hud(self):
+        # Prerender HUD spod innej generacji displaya = przebuduj
+        # (naprawa macOS, runda 3; pigulki i napisy statyczne).
+        if getattr(self, "_hud_prerender_gen", -1) != theme.display_generation():
+            self._build_hud_prerender()
         # DEBUG: F3 pokazuje stan wewnetrzny
         if getattr(self, '_debug_show', False):
             dbg_font = pygame.font.SysFont("consolas", 14)

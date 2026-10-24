@@ -25,13 +25,17 @@ class StartMenu:
     def __init__(self, width, height, bg):
         self.width = width
         self.height = height
-        # FULLSCREEN w natywnej rozdzielczosci, BEZ SCALED (brak czarnych paskow)
+        # FULLSCREEN w natywnej rozdzielczosci, BEZ SCALED (brak czarnych paskow).
+        # Display idzie przez theme.set_display (naprawa macOS, runda 3):
+        # ekran ladowania utworzyl juz dokladnie ten tryb, wiec display
+        # jest REUZYWANY (zero zmiany formatu powierzchni), a czyszczeniem
+        # cache'y przy realnej zmianie trybu zajmuje sie samo set_display.
         try:
-            self.win = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+            self.win = theme.set_display((0, 0), pygame.FULLSCREEN)
         except pygame.error:
-            self.win = pygame.display.set_mode((width, height))
+            self.win = theme.set_display((width, height))
         pygame.display.set_caption("Island Defenders")
-        theme.clear_cache()  # nowy display = powierzchnie GUI od nowa
+        self.show_diag = False  # ekran diagnostyczny F9 (runda 3)
         self.rw, self.rh = self.win.get_size()
         # Tlo na caly ekran (cover - wypelnia, przycina nadmiar)
         self.bg = self._cover_scale(bg, self.rw, self.rh)
@@ -216,6 +220,9 @@ class StartMenu:
             self.draw_resolution()
         if self.show_credits:
             self.draw_credits()
+        if self.show_diag:
+            import diag
+            diag.draw_diag(self.win)
         pygame.display.update()
 
     def _draw_flags(self, mouse):
@@ -595,6 +602,23 @@ class StartMenu:
                 if event.type == pygame.QUIT:
                     pygame.mixer.music.stop()
                     return None
+                # Ekran diagnostyczny F9 (naprawa macOS, runda 3):
+                # ESC/F9 zamyka; otwarcie zapisuje log + zrzut do
+                # katalogu domowego (island_diag.log / island_diag.png)
+                if event.type == pygame.KEYDOWN and self.show_diag:
+                    if event.key in (pygame.K_ESCAPE, pygame.K_F9):
+                        self.show_diag = False
+                    continue
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_F9:
+                    if not (self.show_help or self.show_achievements
+                            or self.show_resolution or self.show_credits):
+                        self.show_diag = True
+                        import diag
+                        diag.write_diag_files(self.win)
+                    continue
+                if event.type == pygame.MOUSEBUTTONDOWN and self.show_diag:
+                    self.show_diag = False
+                    continue
                 # Credits: ESC zamyka (klik gdziekolwiek tez - nizej)
                 if event.type == pygame.KEYDOWN and self.show_credits:
                     if event.key == pygame.K_ESCAPE:

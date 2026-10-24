@@ -43,28 +43,29 @@ def blit_text(surf, font, text, color, x, y):
 
 
 def render_text(font, text, color):
-    """font.render z cache powierzchni (napisy w menu powtarzaja sie co klatke)."""
+    """font.render z cache powierzchni (napisy w menu powtarzaja sie co klatke).
+
+    Wpis cache nosi znacznik GENERACJI displaya (naprawa macOS,
+    runda 3): powierzchnia z font.render ma RGB = jednolity kolor
+    czcionki, a ksztalt liter niesie WYLACZNIE kanal alfa - wpis
+    zbudowany pod poprzedni display potrafi po jego odtworzeniu
+    wrocic z popsuta alfa i napis renderuje sie jako prostokat
+    w kolorze czcionki (objaw przerywany: ten sam sklep raz
+    czytelny, raz zepsuty). Wpis z innej generacji jest przy
+    uzyciu budowany od nowa, niezaleznie od czyszczenia cache."""
     key = (id(font), text, color)
-    s = _TEXT_CACHE.get(key)
-    if s is None:
-        if len(_TEXT_CACHE) >= _TEXT_CACHE_MAX:
-            _TEXT_CACHE.clear()
-        s = font.render(text, True, color)
-        # Normalizacja jak przy grafikach (naprawa macOS, runda 2):
-        # powierzchnia z font.render ma RGB = jednolity kolor czcionki,
-        # a ksztalt liter niesie WYLACZNIE kanal alfa - gdy taka
-        # powierzchnia wroci z cache po odtworzeniu displaya i alfa
-        # zgubi sie przy blicie, napis renderuje sie jako prostokat
-        # w kolorze czcionki. Konwersja do formatu aktywnego displaya
-        # (raz, przy tworzeniu wpisu) + czyszczenie cache przy kazdym
-        # odtworzeniu displaya (rejestracja nizej) trzymaja napisy
-        # w tym samym formacie co reszta gry.
-        try:
-            if pygame.display.get_surface() is not None:
-                s = s.convert_alpha()
-        except Exception:
-            pass
-        _TEXT_CACHE[key] = s
+    ent = _TEXT_CACHE.get(key)
+    if ent is not None and ent[0] == theme.display_generation():
+        return ent[1]
+    if len(_TEXT_CACHE) >= _TEXT_CACHE_MAX:
+        _TEXT_CACHE.clear()
+    s = font.render(text, True, color)
+    try:
+        if pygame.display.get_surface() is not None:
+            s = s.convert_alpha()
+    except Exception:
+        pass
+    _TEXT_CACHE[key] = (theme.display_generation(), s)
     return s
 
 

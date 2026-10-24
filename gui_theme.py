@@ -56,6 +56,102 @@ def clear_cache():
             pass
 
 
+# --- Zarzadzanie displayem i generacje cache'y (naprawa macOS, runda 3) ---
+# Werdykt z prawdziwego Maca po rundach 1-2: objawy wracaly PRZERYWANIE
+# (ten sam sklep raz czytelny, raz jako lite prostokaty; trupy dalej
+# czarne). Wspolny mianownik przeoczonych sciezek: kazde set_mode
+# tworzy display o (potencjalnie) innym formacie niz poprzedni, a gra
+# odtwarzala display w wielu miejscach (ekran ladowania -> StartMenu
+# -> Game -> F11 -> pauza/fullscreen) i nie kazdy cache byl po tym
+# przebudowywany. Dlatego runda 3 jest strukturalna:
+#  1) JEDEN punkt tworzenia displaya: set_display() - jesli zaden
+#     tryb sie nie zmienia (typowy przeplyw ladowanie -> menu -> gra
+#     to TEN SAM fullscreen natywny), display jest REUZYWANY i zaden
+#     format sie nie zmienia przez cale zycie procesu.
+#  2) Kazda REALNA zmiana trybu podbija GENERACJE displaya i czyści
+#     cache przez clear_cache(). Wpisy cache'y nosza znacznik
+#     generacji - nawet gdyby jakies miejsce czyszczenia umknelo,
+#     wpis spod starej generacji sam sie przebuduje przy uzyciu.
+_display_gen = 0
+_set_mode_calls = 0
+_display_mode = None  # (w, h, fullscreen) RZECZYWISTY tryb aktywnego displaya
+
+
+def display_generation():
+    """Numer generacji aktywnego displaya (rosnie przy kazdym set_mode)."""
+    return _display_gen
+
+
+def set_mode_call_count():
+    """Ile razy w tym procesie wywolano pygame.display.set_mode
+    (przez set_display). Do logu diagnostycznego F9."""
+    return _set_mode_calls
+
+
+def set_display(size, flags=0):
+    """Jedyne miejsce wywolan pygame.display.set_mode w grze.
+
+    Jesli aktywny display ma juz dokladnie ten tryb (rozmiar +
+    fullscreen), zwraca go BEZ set_mode - format powierzchni w calym
+    procesie zostaje wtedy jeden i ten sam. Przy realnej zmianie:
+    set_mode + podbicie generacji + clear_cache()."""
+    global _display_gen, _set_mode_calls, _display_mode
+    want_fs = bool(flags & pygame.FULLSCREEN)
+    cur = None
+    try:
+        cur = pygame.display.get_surface()
+    except Exception:
+        cur = None
+    if cur is not None and _display_mode is not None:
+        cw, ch, cfs = _display_mode
+        if cfs == want_fs and (tuple(size) == (0, 0)
+                               or tuple(size) == (cw, ch)):
+            return cur
+    surf = pygame.display.set_mode(size, flags)
+    _set_mode_calls += 1
+    _display_gen += 1
+    _display_mode = (surf.get_width(), surf.get_height(), want_fs)
+    clear_cache()
+    return surf
+
+
+def fade_copy(img, alpha):
+    """Kopia powierzchni z przemnozonym kanalem alfa (fade trupa).
+
+    Zamiast set_alpha() (SDL_SetSurfaceAlphaMod - modulacja przy
+    blicie, ktora na macOS wracala z czarnym tlem trupa w rundach
+    1-2) mnozymy SAME piksele kanalu alfa przez PixelArray, a potem
+    rysujemy zwyklym blitem - dokladnie ta sciezka, ktora dla zywych
+    wrogow na Macu dziala. Powierzchnia zrodlowa nietknieta."""
+    alpha = max(0, min(255, int(alpha)))
+    s = img.copy()
+    # UWAGA: NIE wolac tu set_alpha (ani wartosci, ani None). Kopia ma
+    # zostac w DOKLADNIE tym stanie powierzchni, w jakim zywe klatki
+    # wrogow blituja sie poprawnie (alfa powierzchniowa 255 = neutralna,
+    # odziedziczona po convert_alpha). Eksperyment na VM (batch35,
+    # F1-blit/F2b): ta sama kopia z set_alpha(None) blitowala
+    # przezroczysty rog na CZARNO - SDL wybiera sciezke blitu po
+    # stanie alfy powierzchni, a nie tylko po pikselach.
+    if alpha >= 255:
+        return s
+    if alpha <= 0:
+        s.fill((0, 0, 0, 0))
+        return s
+    px = pygame.PixelArray(s)
+    try:
+        w, h = s.get_size()
+        for x in range(w):
+            col = px[x]
+            for y in range(h):
+                c = s.unmap_rgb(col[y])
+                if c.a:
+                    col[y] = s.map_rgb((c.r, c.g, c.b,
+                                        (c.a * alpha) // 255))
+    finally:
+        del px
+    return s
+
+
 def _wood_raw(w, h, base, plank_h=26):
     """Surowa tekstura desek (bez zaokraglen): poziome deski, sloje, seki.
     UWAGA na alfe: pygame.draw na powierzchni SRCALPHA wypala alfe koloru
@@ -137,15 +233,16 @@ def wood_panel(w, h, radius=14, base=WOOD_PANEL, border=BRASS, corners=True,
     """Gotowa powierzchnia panelu: drewno + zaokraglenie + mosiadzna ramka.
     Cachowana - bezpieczna do rysowania co klatke."""
     key = ("panel", w, h, radius, base, border, corners, plank_h)
-    s = _cache.get(key)
-    if s is None:
-        s = _wood_raw(w, h, base, plank_h)
-        _apply_radius(s, radius)
-        pygame.draw.rect(s, (*border, 255), s.get_rect(), 2,
-                         border_radius=radius)
-        if corners and w >= 90 and h >= 60:
-            _brass_corners(s, radius)
-        _cache[key] = s
+    ent = _cache.get(key)
+    if ent is not None and ent[0] == _display_gen:
+        return ent[1]
+    s = _wood_raw(w, h, base, plank_h)
+    _apply_radius(s, radius)
+    pygame.draw.rect(s, (*border, 255), s.get_rect(), 2,
+                     border_radius=radius)
+    if corners and w >= 90 and h >= 60:
+        _brass_corners(s, radius)
+    _cache[key] = (_display_gen, s)
     return s
 
 
@@ -154,18 +251,19 @@ def wood_button(w, h, radius=12, hover=False, base=None):
     if base is None:
         base = WOOD_BTN_HOVER if hover else WOOD_BTN
     key = ("btn", w, h, radius, base)
-    s = _cache.get(key)
-    if s is None:
-        s = _wood_raw(w, h, base, plank_h=22)
-        _apply_radius(s, radius)
-        pygame.draw.rect(s, (*BRASS, 255), s.get_rect(), 2,
-                         border_radius=radius)
-        # Delikatny polysk u gory (zamiast dawnego "blysk szkla")
-        sheen = pygame.Surface((max(1, w - 16), max(1, h // 3)), pygame.SRCALPHA)
-        pygame.draw.rect(sheen, (255, 232, 180, 26), sheen.get_rect(),
+    ent = _cache.get(key)
+    if ent is not None and ent[0] == _display_gen:
+        return ent[1]
+    s = _wood_raw(w, h, base, plank_h=22)
+    _apply_radius(s, radius)
+    pygame.draw.rect(s, (*BRASS, 255), s.get_rect(), 2,
+                     border_radius=radius)
+    # Delikatny polysk u gory (zamiast dawnego "blysk szkla")
+    sheen = pygame.Surface((max(1, w - 16), max(1, h // 3)), pygame.SRCALPHA)
+    pygame.draw.rect(sheen, (255, 232, 180, 26), sheen.get_rect(),
                          border_radius=8)
-        s.blit(sheen, (8, 5))
-        _cache[key] = s
+    s.blit(sheen, (8, 5))
+    _cache[key] = (_display_gen, s)
     return s
 
 
@@ -174,12 +272,14 @@ def wood_fill(surf, rect, radius=10, base=WOOD_CARD, border=BRASS_DARK,
     """Wypelnia rect na surf tekstura drewna z zaokraglonymi rogami
     (+ opcjonalna ramka). Cachowane per rozmiar/kolor."""
     key = ("fill", rect.w, rect.h, radius, base, border, border_w)
-    t = _cache.get(key)
-    if t is None:
+    ent = _cache.get(key)
+    if ent is not None and ent[0] == _display_gen:
+        t = ent[1]
+    else:
         t = _wood_raw(rect.w, rect.h, base, plank_h=24)
         _apply_radius(t, radius)
         if border_w:
             pygame.draw.rect(t, (*border, 255), t.get_rect(), border_w,
                              border_radius=radius)
-        _cache[key] = t
+        _cache[key] = (_display_gen, t)
     surf.blit(t, (rect.x, rect.y))

@@ -3,6 +3,8 @@ import random
 import math
 import os
 
+import gui_theme as theme
+
 _coin_img = None
 
 def _get_coin_img():
@@ -49,7 +51,15 @@ class ParticleSystem:
                 del self.particles[i]
 
     def draw(self, win):
-        # Cache kolistych sprite'ow (rozmiar + poziom alfy) - brak alokacji co klatke
+        # Cache kolistych sprite'ow (rozmiar + poziom alfy) - brak alokacji co klatke.
+        # Wpisy sa wiazone z GENERACJA displaya (naprawa macOS, runda 3):
+        # po odtworzeniu displaya (F11 / pauza-fullscreen) cache jest
+        # budowany od nowa, bo powierzchnie spod poprzedniego displaya
+        # potrafia wrocic z popsuta alfa.
+        _gen = theme.display_generation()
+        if getattr(self, "_circle_cache_gen", -1) != _gen:
+            self._circle_cache.clear()
+            self._circle_cache_gen = _gen
         for x, y, vx, vy, life, max_life, color, size, grav in self.particles:
             alpha_bucket = int(15 * life / max_life)  # 16 poziomow
             key = (size, alpha_bucket)
