@@ -31,6 +31,7 @@ class StartMenu:
         except pygame.error:
             self.win = pygame.display.set_mode((width, height))
         pygame.display.set_caption("Island Defenders")
+        theme.clear_cache()  # nowy display = powierzchnie GUI od nowa
         self.rw, self.rh = self.win.get_size()
         # Tlo na caly ekran (cover - wypelnia, przycina nadmiar)
         self.bg = self._cover_scale(bg, self.rw, self.rh)

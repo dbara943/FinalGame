@@ -9,11 +9,22 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
 # Najwyzsza jakosc skalowania GPU (ostrzejszy fullscreen)
 os.environ.setdefault("SDL_HINT_RENDER_SCALE_QUALITY", "2")
 pygame.font.init()
+# Display MUSI istniec PRZED importami ladujacymi grafiki: bez aktywnego
+# trybu wideo konwersje powierzchni ida w proznie i na macOS konczylo sie
+# to czarnymi sprite'ami / popsuta alfa (pierwszy test na prawdziwym
+# Macu, 24.10.2026). Dlatego: jawny init, sanity-check rozmiaru z Info()
+# i awaryjne zwykle okno, gdyby fullscreen sie nie udal.
+try:
+    pygame.display.init()
+except Exception:
+    pass
 pygame.display.set_caption('Island Defenders')
 # Ekran ladowania (zanim ciezkie assety) - fullscreen zeby nie bylo czarnego paska
 try:
     _info = pygame.display.Info()
     _lw, _lh = _info.current_w, _info.current_h
+    if not _lw or _lw <= 0 or not _lh or _lh <= 0:
+        _lw, _lh = 1280, 720
     _load_win = pygame.display.set_mode((_lw, _lh), pygame.FULLSCREEN)
     _load_win.fill((26, 17, 9))
     _lf = pygame.font.SysFont("arial", 36)
@@ -21,7 +32,26 @@ try:
     _load_win.blit(_lt, (_lw//2 - _lt.get_width()//2, _lh//2 - 20))
     pygame.display.flip()
 except Exception:
-    pass
+    try:
+        _load_win = pygame.display.set_mode((1280, 720))
+    except Exception:
+        pass
+# Normalizacja grafik: od tego miejsca kazdy pygame.image.load zwraca
+# powierzchnie skonwertowana convert_alpha() do formatu aktywnego
+# displaya. Surowe powierzchnie prosto z dekodera PNG maja format
+# zalezny od platformy - to one renderowaly sie na czarno na macOS.
+# Konwersja do formatu ekranu to standardowa praktyka pygame; na
+# Windows/Linux wyglad gry sie nie zmienia (szybszy blit gratis).
+_orig_image_load = pygame.image.load
+def _load_normalized(*args, **kwargs):
+    _surf = _orig_image_load(*args, **kwargs)
+    try:
+        if pygame.display.get_surface() is not None:
+            return _surf.convert_alpha()
+    except Exception:
+        pass
+    return _surf
+pygame.image.load = _load_normalized
 import math
 from enemies.forkman import Forkman
 from enemies.swordman import Swordman
@@ -281,6 +311,9 @@ class Game:
             self._screen = pygame.display.set_mode((self._native_w, self._native_h))
         # Uzyj RZECZYWISTEGO rozmiaru (Windows moze zwrocic inny niz zadany)
         self._native_w, self._native_h = self._screen.get_size()
+        # Display powstal na nowo (po StartMenu) - powierzchnie GUI z
+        # cache'a byly konwertowane pod poprzedni display; przebuduj je.
+        theme.clear_cache()
         # Bufor gry 1124x720 - cala logika bez zmian
         self.win = pygame.Surface((self.width, self.height))
         self._fullscreen = True
@@ -2101,6 +2134,7 @@ class Game:
                             # Zwykle okno w rozmiarze gry (wczesniej: okno na
                             # caly ekran z czarnym tlem i gra 1:1 na srodku)
                             self._screen = pygame.display.set_mode((self.width, self.height))
+                        theme.clear_cache()  # nowy display = przebuduj cache GUI
                     if event.key == pygame.K_F3:
                         self._debug_show = not getattr(self, '_debug_show', False)
                     # G: zamazanie pola stawiania wl/wyl

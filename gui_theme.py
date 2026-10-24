@@ -28,6 +28,15 @@ GOLD_TEXT = (255, 215, 100)      # zloto cen / tytulow (jak dawniej)
 _cache = {}
 
 
+def clear_cache():
+    """Czysci cache powierzchni GUI. Powierzchnie z cache'u sa po
+    convert_alpha(), czyli zwiazane z formatem displaya, przy ktorym
+    powstaly - po kazdym (od)tworzeniu displaya (menu -> gra, F11)
+    trzeba je zbudowac od nowa, inaczej potrafia wrocic z popsuta
+    alfa (przezroczysty sklep przy pierwszym otwarciu na macOS)."""
+    _cache.clear()
+
+
 def _wood_raw(w, h, base, plank_h=26):
     """Surowa tekstura desek (bez zaokraglen): poziome deski, sloje, seki.
     UWAGA na alfe: pygame.draw na powierzchni SRCALPHA wypala alfe koloru
