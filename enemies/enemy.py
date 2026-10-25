@@ -3,6 +3,8 @@ import math
 import os
 import random
 
+import gui_theme as theme
+
 # Pomost (drewniany, przy statku): Reinforced Docks spowalnia wrogow 15%
 # TYLKO w tym prostokacie (x, y, w, h). Poza nim predkosc normalna.
 _PIER_RECT = (240, 600, 340, 120)
@@ -90,7 +92,9 @@ class Enemy:
         shine = pygame.Surface(img.get_size())
         shine.fill((40, 25, 0))
         tinted.blit(shine, (0, 0), special_flags=pygame.BLEND_ADD)
-        return tinted
+        # Runda 4 (macOS): BLEND_ADD dopisuje RGB takze pod alfa == 0
+        # (stad trup elity (40,25,0,0) w logu z Maca) - wyczysc wynik.
+        return theme.sanitize_alpha(tinted)
 
     def apply_golden(self):
         """Golden Touch: zamienia sprite'y na zlote odmiany (TEN SAM rozmiar, bez skalowania).

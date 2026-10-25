@@ -65,6 +65,10 @@ def render_text(font, text, color):
             s = s.convert_alpha()
     except Exception:
         pass
+    # Runda 4 (macOS): font.render zostawia kolor czcionki w RGB pod
+    # pikselami o alfa == 0 (ksztalt liter niesie tylko kanal alfa) -
+    # na macOS te piksele wracaly jako prostokaty w kolorze czcionki.
+    s = theme.sanitize_alpha(s)
     _TEXT_CACHE[key] = (theme.display_generation(), s)
     return s
 

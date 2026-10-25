@@ -1,4 +1,4 @@
-# Scena diagnostyczna grafik (naprawa macOS, runda 3).
+# Scena diagnostyczna grafik (naprawa macOS, runda 3; sonda rundy 4).
 #
 # Ekran dostepny klawiszem F9 z menu glownego. Renderuje na JEDNYM
 # ekranie wszystkie podejrzane sciezki rysowania (zywy wrog, trup
@@ -207,7 +207,7 @@ def write_diag_files(win):
     draw_diag(win)
     pygame.display.flip()
     lines = []
-    lines.append("Island Defenders - diagnostic log (macOS graphics, round 3)")
+    lines.append("Island Defenders - diagnostic log (macOS graphics, round 4)")
     lines.append(f"time: {datetime.now().isoformat(timespec='seconds')}")
     lines.append(f"sys.platform: {sys.platform}")
     lines.append(f"platform: {platform.platform()}")
@@ -225,6 +225,30 @@ def write_diag_files(win):
     lines.append("--- probe surfaces ---")
     for name, surf in log_surfaces:
         lines.append(_report(name, surf))
+    # Runda 4: dowod czyszczenia RGB pod alfa == 0. "As stored" to
+    # produkcyjna klatka trupa elity po wszystkich hookach sanitize;
+    # replika polysku odtwarza historyczne zabrudzenie filtra zlotego
+    # (BLEND_ADD (40,25,0) - dokladnie ten kolor widac bylo w logu
+    # rundy 3 jako (40,25,0,0)), zeby log pokazal przed/po na tej
+    # samej powierzchni: przed = N brudnych pikseli, po = 0.
+    lines.append("--- round 4: sanitize probe ---")
+    try:
+        _edie = [s for n, s in log_surfaces
+                 if n == "elite corpse frame as stored"][0]
+        lines.append("[elite corpse frame as stored] "
+                     f"dirty px = {theme.dirty_pixel_count(_edie)}")
+        _replica = _edie.copy()
+        _shine = pygame.Surface(_replica.get_size())
+        _shine.fill((40, 25, 0))
+        _replica.blit(_shine, (0, 0), special_flags=pygame.BLEND_ADD)
+        lines.append("[gold-shine replica - pre-fix dirt] "
+                     "dirty px before sanitize = "
+                     f"{theme.dirty_pixel_count(_replica)}")
+        theme.sanitize_alpha(_replica)
+        lines.append("[gold-shine replica after sanitize] "
+                     f"dirty px = {theme.dirty_pixel_count(_replica)}")
+    except Exception as e:
+        lines.append(f"[sanitize probe] <failed: {e}>")
     try:
         with open(_LOG_PATH, "w", encoding="utf-8") as fh:
             fh.write("\n".join(lines) + "\n")

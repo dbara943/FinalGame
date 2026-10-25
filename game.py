@@ -48,12 +48,16 @@ except Exception:
 # zalezny od platformy - to one renderowaly sie na czarno na macOS.
 # Konwersja do formatu ekranu to standardowa praktyka pygame; na
 # Windows/Linux wyglad gry sie nie zmienia (szybszy blit gratis).
+# Runda 4 (po logu z Maca 25.10.2026): dodatkowo sanitize_alpha -
+# dekodery PNG zachowuja RGB pod przezroczystymi pikselami, a sciezka
+# SDL/Metal na macOS te smieci pokazuje; czyszczenie jest niewidoczne
+# na poprawnych rendererach.
 _orig_image_load = pygame.image.load
 def _load_normalized(*args, **kwargs):
     _surf = _orig_image_load(*args, **kwargs)
     try:
         if pygame.display.get_surface() is not None:
-            return _surf.convert_alpha()
+            return theme.sanitize_alpha(_surf.convert_alpha())
     except Exception:
         pass
     return _surf

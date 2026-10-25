@@ -133,9 +133,9 @@ def fade_copy(img, alpha):
     # przezroczysty rog na CZARNO - SDL wybiera sciezke blitu po
     # stanie alfy powierzchni, a nie tylko po pikselach.
     if alpha >= 255:
-        return s
+        return sanitize_alpha(s)
     if alpha <= 0:
-        s.fill((0, 0, 0, 0))
+        s.fill((0, 0, 0, 0))  # same zera - z definicji czysta
         return s
     px = pygame.PixelArray(s)
     try:
@@ -149,7 +149,70 @@ def fade_copy(img, alpha):
                                         (c.a * alpha) // 255))
     finally:
         del px
-    return s
+    return sanitize_alpha(s)
+
+
+def sanitize_alpha(surf):
+    """Zeruje RGB wszedzie, gdzie alfa == 0 (naprawa macOS, runda 4).
+
+    Log z prawdziwego Maca (25.10.2026, island_diag.log) pokazal, ze
+    nasze powierzchnie nosza niezerowe RGB pod w pelni przezroczystymi
+    pikselami: trup elity (40,25,0,0) - kolor "polysku" z filtra
+    zlotego (BLEND_ADD dopisuje RGB takze pod alfa 0), srodek panelu
+    sklepu (42,27,15,0), napisy z kolorem czcionki pod alfa 0.
+    Windows/Linux te piksele ignoruje (alfa 0 = niewidzialne), ale
+    sciezka SDL/Metal na macOS pokazuje je jako ciemne bloki, duchy
+    faktur i przeklamane kolory. Czyszczenie jest niewidoczne na
+    poprawnych rendererach - zmienia wylacznie piksele, ktorych i
+    tak nie widac. Dziala W MIEJSCU i zwraca te sama powierzchnie.
+
+    Implementacja bez nowych zaleznosci: maska z powierzchni
+    (C-predkosc) zamieniona na powierzchnie bialo/czarna i przemnozona
+    BLEND_RGBA_MULT - RGB zeruje sie dokladnie tam, gdzie alfa == 0,
+    a kanal alfa zostaje nietkniety (alfa maski = 255 wszedzie).
+    Powierzchnie bez alfy per piksel (brak SRCALPHA / brak maski
+    alfa / colorkey) sa pomijane - nie maja pikseli alfa == 0."""
+    try:
+        if not (surf.get_flags() & pygame.SRCALPHA):
+            return surf
+        if surf.get_masks()[3] == 0 or surf.get_colorkey() is not None:
+            return surf
+        m = pygame.mask.from_surface(surf, threshold=0)
+        if m.count() == surf.get_width() * surf.get_height():
+            return surf  # brak przezroczystych pikseli - nic do czyszczenia
+        ms = m.to_surface(setcolor=(255, 255, 255, 255),
+                          unsetcolor=(0, 0, 0, 255))
+        surf.blit(ms, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+    except Exception:
+        pass
+    return surf
+
+
+def dirty_pixel_count(surf):
+    """Dokladna liczba 'brudnych' pikseli: alfa == 0 i RGB != 0.
+
+    Tylko do diagnostyki (F9) i testow - PixelArray piksel po pikselu,
+    wiec wolac na malych powierzchniach (sprite'y, nie plansze)."""
+    try:
+        if not (surf.get_flags() & pygame.SRCALPHA):
+            return 0
+        if surf.get_masks()[3] == 0:
+            return 0
+    except Exception:
+        return 0
+    n = 0
+    px = pygame.PixelArray(surf)
+    try:
+        w, h = surf.get_size()
+        for x in range(w):
+            col = px[x]
+            for y in range(h):
+                c = surf.unmap_rgb(col[y])
+                if c.a == 0 and (c.r or c.g or c.b):
+                    n += 1
+    finally:
+        del px
+    return n
 
 
 def _wood_raw(w, h, base, plank_h=26):

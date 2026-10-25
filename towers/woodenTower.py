@@ -6,6 +6,7 @@ import math
 import time
 from menu.menu import Menu
 import random
+import gui_theme as theme
 
 menu_bg = pygame.transform.scale(pygame.image.load(os.path.join("images", "menu.png")), (150, 75))
 upgrade_btn = pygame.transform.scale(pygame.image.load(os.path.join("images", "upgrade.png")), (50, 50))
@@ -328,7 +329,9 @@ def _gold_tint(img):
     bright = pygame.Surface(img.get_size())
     bright.fill((30, 18, 0))
     gold.blit(bright, (0, 0), special_flags=pygame.BLEND_ADD)
-    return gold
+    # Runda 4 (macOS): BLEND_ADD dopisuje RGB takze pod alfa == 0 -
+    # wyczysc wynik, jak w filtrze zlotym wrogow.
+    return theme.sanitize_alpha(gold)
 
 # Golden tower: ten sam model, ale wyraznie zloty (wieza + pociski)
 tower_imgs3 = [_gold_tint(img) for img in tower_imgs3]
