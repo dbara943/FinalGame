@@ -28,6 +28,7 @@ from effects.particles import ParticleSystem
 _LOG_PATH = os.path.join(os.path.expanduser("~"), "island_diag.log")
 _PNG_PATH = os.path.join(os.path.expanduser("~"), "island_diag.png")
 _PNG2_PATH = os.path.join(os.path.expanduser("~"), "island_diag2.png")
+_PNG3_PATH = os.path.join(os.path.expanduser("~"), "island_diag3.png")
 
 _SWATCH = (64, 62, 74)
 _BG = (24, 19, 13)
@@ -427,6 +428,104 @@ def draw_diag_r5(win):
     return canvas
 
 
+# ---------------------------------------------------------------------
+# RUNDA 7 (po tescie rozgrywki rundy 6): dane sa juz czyste (log rundy 6:
+# panel sklepu i pigulka dirty = 0), a scena F9 renderuje sie poprawnie -
+# ale W GRZE dalej: (1) sklep nie robi sie polprzezroczysty w spoczynku,
+# (2) czarne prostokaty przy rzadku fali/zycia/zlota, (3) sklep zaslania
+# menu budynku. Strony 1-2 skladaja sondy na zwyklym canvasie menu;
+# gra rysuje na bufor Game.win (.convert(), 1124x720) i prezentuje go
+# przez smoothscale do natywnej rozdzielczosci (_present, fullscreen).
+# Strona 3 odtwarza DOKLADNIE ten potok: prawdziwy rzad HUD, prawdziwy
+# sklep w stanie alfa 150 (mysz daleko) i 255 (mysz na przycisku),
+# zywi wrogowie - wszystko na buforze .convert() 1124x720 na tle w paski
+# (przezroczystosc widac od razu), a na koncu smoothscale na display
+# tym samym wywolaniem co _present(). Jesli strona 3 jest czysta,
+# a gra dalej nie - zostaje tylko prezentacja zywego okna (dowod:
+# zdjecie telefonem, o ktore prosimy osobno).
+# ---------------------------------------------------------------------
+
+def _make_menu_r7(x, y):
+    """VerticalMenu z produkcyjnymi ikonami (jak _build_shop_panel_r5,
+    ale zwraca samo menu do rysowania na buforze gry)."""
+    from menu.menu import VerticalMenu
+    menu = VerticalMenu(x, y, pygame.Surface((375, 475)))
+    menu.add_btn(_shop_icon_r5("1.png", "2.png"), "t1", 100, damage=1)
+    menu.add_btn(_shop_icon_r5("2.png", "1.png"), "t2", 500, damage=3)
+    menu.add_btn(_shop_icon_r5("6.png", "6.png"), "t3", 650, damage=2)
+    menu.add_btn(_shop_icon_r5("3.png", "3.png"), "t4", 750, damage=5)
+    menu.add_btn(_shop_icon_r5("4.png", "4.png"), "t5", 1000, damage=9)
+    menu.add_btn(_shop_icon_r5("5.png", "5.png"), "t6", 2000, damage=12)
+    return menu
+
+
+def draw_diag_r7(win):
+    """Strona 3: jedna klatka zbudowana jak klatka gry i zaprezentowana
+    jak _present() w fullscreen. Rysuje bezposrednio na `win`."""
+    gwin = pygame.Surface((1124, 720)).convert()
+    # Tlo w paski + jasny pas poziomy: przezroczystosc paneli widac od razu
+    for i, x in enumerate(range(0, 1124, 92)):
+        pygame.draw.rect(gwin, (96, 116, 74) if i % 2 == 0 else (64, 84, 56),
+                         (x, 0, 92, 720))
+    pygame.draw.rect(gwin, (206, 186, 128), (0, 300, 1124, 60))
+    font_l = pygame.font.SysFont("arial", 15, bold=True)
+
+    def label(text, x, y):
+        gwin.blit(render_text(font_l, text, _LABEL), (x, y))
+
+    label("ROUND 7 - REAL GAME PIPELINE (_present)", 520, 14)
+
+    # Rzad HUD: produkcyjna kompozycja draw_hud (pigulki + ikony +
+    # napisy czyszczone jak po fixie _hud_text), element po elemencie
+    pill_h, pills, items, hud_font = _hud_parts_r5()
+    for x, pi, icon, text in items:
+        gwin.blit(pills[pi], (x, 10))
+        w_ = pills[pi].get_width()
+        lab = theme.sanitize_alpha(hud_font.render(text, True, theme.CREAM))
+        cy = 10 + pill_h // 2 - lab.get_height() // 2
+        if icon is None:
+            gwin.blit(lab, (x + w_ // 2 - lab.get_width() // 2, cy))
+        else:
+            group_w = icon.get_width() + 8 + lab.get_width()
+            gx = x + w_ // 2 - group_w // 2
+            gwin.blit(icon, (gx, 10 + pill_h // 2 - icon.get_height() // 2))
+            gwin.blit(lab, (gx + icon.get_width() + 8, cy))
+    label("20 HUD row (game buffer)", 10, 60)
+
+    # Sklep A: stan spoczynkowy (mysz daleko) - produkcyjne alfa 150
+    menu_a = _make_menu_r7(100, 285)
+    menu_a.draw(gwin, mouse_pos=(-999, -999))
+    label("21 SHOP alpha 150", 16, 596)
+    # Sklep B: mysz na pierwszym przycisku - produkcyjne alfa 255.
+    # Pierwszy przebieg na powierzchnie robocza ustawia geometrie
+    # przyciskow, drugi rysuje wlasciwie z kursorem na przycisku.
+    menu_b = _make_menu_r7(330, 285)
+    scratch = pygame.Surface((620, 620), pygame.SRCALPHA)
+    menu_b.draw(scratch, mouse_pos=(-999, -999))
+    b0 = menu_b.buttons[0]
+    hover = (b0.x + b0.width // 2, b0.y + b0.height // 2)
+    menu_b.draw(gwin, mouse_pos=hover)
+    label("22 SHOP alpha 255", 246, 596)
+
+    # Panel zlozony wczesniej (alfa wpisana w piksele, bez set_alpha)
+    panel = _build_shop_panel_r5()
+    gwin.blit(panel, (480, 145))
+    label("23 SHOP pre-composed (pixel alpha)", 480, 596)
+
+    # Zywi wrogowie bezposrednio na buforze
+    f = Forkman()
+    elite = Forkman()
+    elite.make_elite()
+    gwin.blit(f.imgs[0], (760, 180))
+    gwin.blit(elite.imgs[0], (900, 172))
+    label("24 NORMAL", 736, 262)
+    label("25 ELITE", 896, 262)
+
+    # Prezentacja: DOKLADNIE wywolanie z Game._present() (fullscreen)
+    pygame.transform.smoothscale(gwin, win.get_size(), win)
+    return gwin
+
+
 def write_diag_files(win):
     """Rysuje scene, zapisuje island_diag.png i island_diag.log
     do katalogu domowego. Wolane przy otwarciu ekranu F9."""
@@ -447,10 +546,17 @@ def write_diag_files(win):
         pygame.image.save(win, _PNG2_PATH)
     except Exception:
         pass
+    gwin_r7 = draw_diag_r7(win)
+    pygame.display.flip()
+    try:
+        pygame.image.save(win, _PNG3_PATH)
+    except Exception:
+        pass
     lines = []
-    lines.append("Island Defenders - diagnostic log (macOS graphics, round 6)")
+    lines.append("Island Defenders - diagnostic log (macOS graphics, round 7)")
     lines.append("screenshots: island_diag.png (page 1), "
-                 "island_diag2.png (page 2)")
+                 "island_diag2.png (page 2), island_diag3.png (page 3)")
+    lines.append(_report("r7 game buffer (.convert 1124x720)", gwin_r7))
     lines.append(f"time: {datetime.now().isoformat(timespec='seconds')}")
     lines.append(f"sys.platform: {sys.platform}")
     lines.append(f"platform: {platform.platform()}")
