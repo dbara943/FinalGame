@@ -1,4 +1,5 @@
-# Scena diagnostyczna grafik (naprawa macOS, runda 3; sonda rundy 4).
+# Scena diagnostyczna grafik (naprawa macOS, runda 3; sonda rundy 4;
+# strona 2 dokladana w rundzie 5).
 #
 # Ekran dostepny klawiszem F9 z menu glownego. Renderuje na JEDNYM
 # ekranie wszystkie podejrzane sciezki rysowania (zywy wrog, trup
@@ -200,14 +201,243 @@ def draw_diag(win):
     return canvas
 
 
+# ---------------------------------------------------------------------
+# RUNDA 5 (po retescie Weroniki, 8.11.2026): strona 1 przeszla czysta -
+# sanitize_alpha dziala, a scena F9 renderuje sie poprawnie. Gra dalej
+# psuje sie w trzech miejscach, ktorych sondy strony 1 NIE pokrywaja:
+# (1) zywe elity wygladaja na polprzezroczyste, (2) ikony wiez w sklepie
+# maja czarne tla, (3) pigulki HUD (fala/zycia/zloto) maja czarne konce.
+# Strona 2 rysuje PRAWDZIWE sciezki gry (prawdziwy VerticalMenu.draw,
+# prawdziwa kompozycja pigulek z draw_hud, zywa klatka elity) - kazda
+# DWA razy: bezposrednio (jak strona 1) oraz przez skonwertowany bufor
+# .convert() 1:1 (jak Game.win, na ktory gra rysuje kazda klatke).
+# Roznica miedzy wersjami na zrzucie wskaże winny etap potoku.
+# HUD ma i trzeci wariant: te same surowe napisy po sanitize_alpha -
+# font.render zostawia kolor czcionki pod alfa 0 (u nas 740 z 1178 px
+# probki), a draw_hud jako jedyna sciezka w grze tego nie czysci;
+# jesli wariant 19 wyglada czysto, a 17/18 nie - naprawa jest znana.
+# ---------------------------------------------------------------------
+
+def _shop_icon_r5(tower_file, proj_file):
+    """DOKLADNA replika budowniczego ikon sklepu z Game.__init__."""
+    s = pygame.Surface((46, 46), pygame.SRCALPHA)
+    t = pygame.transform.smoothscale(
+        pygame.image.load(os.path.join("images", "turrets", "towers",
+                                       tower_file)), (46, 46))
+    s.blit(t, (0, 0))
+    p = pygame.transform.smoothscale(
+        pygame.image.load(os.path.join("images", "turrets", "projectiles",
+                                       proj_file)), (20, 20))
+    s.blit(p, (26, 26))
+    return s
+
+
+def _build_shop_panel_r5():
+    """Prawdziwy panel sklepu: VerticalMenu z produkcyjnymi ikonami,
+    rysowany metoda draw() w stanie spoczynkowym (mysz poza panelem,
+    czyli alfa calosci 150 - stan, w ktorym gracz widzi sklep przez
+    wiekszosc gry). Zwraca przechwycona powierzchnie panelu."""
+    from menu.menu import VerticalMenu
+    menu = VerticalMenu(300, 140, pygame.Surface((375, 475)))
+    menu.add_btn(_shop_icon_r5("1.png", "2.png"), "t1", 100, damage=1)
+    menu.add_btn(_shop_icon_r5("2.png", "1.png"), "t2", 500, damage=3)
+    menu.add_btn(_shop_icon_r5("6.png", "6.png"), "t3", 650, damage=2)
+    menu.add_btn(_shop_icon_r5("3.png", "3.png"), "t4", 750, damage=5)
+    menu.add_btn(_shop_icon_r5("4.png", "4.png"), "t5", 1000, damage=9)
+    menu.add_btn(_shop_icon_r5("5.png", "5.png"), "t6", 2000, damage=12)
+    cap = pygame.Surface((620, 520), pygame.SRCALPHA)
+    menu.draw(cap, mouse_pos=(-999, -999))
+    rect = menu.get_rect()  # te same wspolrzedne, w ktorych draw() rysowal na cap
+    panel = pygame.Surface(rect.size, pygame.SRCALPHA)
+    panel.blit(cap, (0, 0), rect)
+    return panel
+
+
+def _hud_parts_r5():
+    """Elementy rzedu HUD dokladnie jak w Game.draw_hud: pigulki
+    wood_panel + set_alpha(222), ikony transform.scale 28x28, napisy
+    SUROWYM font.render (draw_hud nie uzywa cache render_text)."""
+    pill_h = 44
+    pills = []
+    for w_ in (180, 130, 150):
+        s = theme.wood_panel(w_, pill_h, radius=pill_h // 2,
+                             corners=False).copy()
+        s.set_alpha(222)
+        pills.append(s)
+    lives = pygame.image.load(os.path.join("images", "heart.png"))
+    money = pygame.image.load(os.path.join("images", "coin.png"))
+    lives_icon = pygame.transform.scale(lives, (28, 28))
+    money_icon = pygame.transform.scale(money, (28, 28))
+    hud_font = pygame.font.SysFont("segoe ui, calibri, arial", 26, bold=True)
+    items = [(10, 0, None, "FALA 3"),
+             (200, 1, lives_icon, "12"),
+             (340, 2, money_icon, "1500")]
+    return pill_h, pills, items, hud_font
+
+
+def _draw_hud_row_r5(base, sanitize_labels):
+    """Rysuje rzad pigulek na powierzchni `base` (500x60) tak, jak
+    draw_hud rysuje bezposrednio na Game.win: pigulka, ikona i surowy
+    napis osobnymi blitami - bez kompozycji posredniej, ktora sama
+    czyscila brud spod alfy napisow."""
+    pill_h, pills, items, hud_font = _hud_parts_r5()
+    raw_label = None
+    for x, pi, icon, text in items:
+        base.blit(pills[pi], (x, 8))
+        w_ = pills[pi].get_width()
+        label = hud_font.render(text, True, theme.CREAM)
+        if raw_label is None:
+            raw_label = label
+        if sanitize_labels:
+            label = theme.sanitize_alpha(label.copy())
+        cy = 8 + pill_h // 2 - label.get_height() // 2
+        if icon is None:
+            base.blit(label, (x + w_ // 2 - label.get_width() // 2, cy))
+        else:
+            group_w = icon.get_width() + 8 + label.get_width()
+            gx = x + w_ // 2 - group_w // 2
+            base.blit(icon, (gx, 8 + pill_h // 2 - icon.get_height() // 2))
+            base.blit(label, (gx + icon.get_width() + 8, cy))
+    return raw_label
+
+
+def _build_hud_variants_r5():
+    """Trzy warianty rzedu HUD (po 500x60, tlo = pole testowe):
+    A) produkcyjny: zwykle Surface, surowe napisy (jak strona 1);
+    B) produkcyjny na buforze .convert() (jak Game.win);
+    C) jak B, ale napisy po sanitize_alpha - kandydat na naprawe.
+    Zwraca (warianty, pigulka, surowy napis, ikona) - tez do logu."""
+    _ph, pills, _items, _hf = _hud_parts_r5()
+    lives_icon = _items[1][2]
+    var_a = pygame.Surface((500, 60))
+    var_a.fill(_SWATCH)
+    raw_label = _draw_hud_row_r5(var_a, sanitize_labels=False)
+    var_b = pygame.Surface((500, 60)).convert()
+    var_b.fill(_SWATCH)
+    _draw_hud_row_r5(var_b, sanitize_labels=False)
+    var_c = pygame.Surface((500, 60)).convert()
+    var_c.fill(_SWATCH)
+    _draw_hud_row_r5(var_c, sanitize_labels=True)
+    return (var_a, var_b, var_c), pills[0], raw_label, lives_icon
+
+
+def _probes_r5():
+    """Powierzchnie rundy 5 + lista powierzchni do logu."""
+    f = Forkman()
+    elite = Forkman()
+    elite.make_elite()
+    panel = _build_shop_panel_r5()
+    hud_variants, pill, raw_label, lives_icon = _build_hud_variants_r5()
+    icon1 = _shop_icon_r5("1.png", "2.png")
+    log_surfaces = [
+        ("r5 live frame (control)", f.imgs[0]),
+        ("r5 ELITE live frame as stored", elite.imgs[0]),
+        ("r5 shop icon composite t1", icon1),
+        ("r5 shop panel composed (VerticalMenu.draw, alpha 150)", panel),
+        ("r5 HUD pill (wood_panel + set_alpha 222)", pill),
+        ("r5 HUD raw label (font.render, draw_hud path)", raw_label),
+        ("r5 HUD raw label SANITIZED",
+         theme.sanitize_alpha(raw_label.copy())),
+        ("r5 HUD lives icon (transform.scale 28x28)", lives_icon),
+    ]
+    return {"normal": f.imgs[0], "elite": elite.imgs[0],
+            "panel": panel, "hud": hud_variants}, log_surfaces
+
+
+def _via_canvas(surf, w, h):
+    """Rysuje `surf` wycentrowane na skonwertowanym buforze .convert()
+    (format Game.win) wypelnionym kolorem pola testowego - produkcyjny
+    etap posredni gry, w odroznieniu od zwyklego Surface strony 1."""
+    buf = pygame.Surface((w, h)).convert()
+    buf.fill(_SWATCH)
+    buf.blit(surf, (w // 2 - surf.get_width() // 2,
+                    h // 2 - surf.get_height() // 2))
+    return buf
+
+
+def _direct(surf, w, h):
+    """Jak _via_canvas, ale na zwyklym Surface (sciezka strony 1)."""
+    base = pygame.Surface((w, h))
+    base.fill(_SWATCH)
+    base.blit(surf, (w // 2 - surf.get_width() // 2,
+                     h // 2 - surf.get_height() // 2))
+    return base
+
+
+def draw_diag_r5(win):
+    """Strona 2 sceny F9: prawdziwe sciezki gry, bezposrednio vs przez
+    bufor .convert(). Zwraca canvas 1124x720 (jak strona 1)."""
+    pr, _log = _probes_r5()
+    canvas = pygame.Surface((1124, 720))
+    canvas.fill(_BG)
+    font_t = pygame.font.SysFont("arial", 26, bold=True)
+    font_l = pygame.font.SysFont("arial", 15, bold=True)
+    title = font_t.render("ROUND 5 - REAL GAME PATHS (direct vs game buffer)",
+                          True, (255, 210, 63))
+    canvas.blit(title, (20, 14))
+
+    # Rzad A: zywi wrogowie - kontrola i elita, bezposrednio / przez bufor
+    cells = [
+        ("11 NORMAL direct", _direct(pr["normal"], 200, 150)),
+        ("12 ELITE direct", _direct(pr["elite"], 200, 150)),
+        ("13 ELITE via buffer", _via_canvas(pr["elite"], 200, 150)),
+        ("14 NORMAL via buffer", _via_canvas(pr["normal"], 200, 150)),
+    ]
+    for i, (label, surf) in enumerate(cells):
+        x = 20 + i * 218
+        canvas.blit(surf, (x, 60))
+        lbl = font_l.render(label, True, _LABEL)
+        canvas.blit(lbl, (x + 100 - lbl.get_width() // 2, 216))
+
+    # Rzad B: prawdziwy panel sklepu (stan alfa 150) - dwie drogi
+    panel = pr["panel"]
+    pw, ph = panel.get_size()
+    canvas.blit(panel, (20, 250))
+    pbuf = pygame.Surface((pw, ph)).convert()
+    pbuf.fill(_BG)
+    pbuf.blit(panel, (0, 0))
+    canvas.blit(pbuf, (40 + pw, 250))
+    for x, txt in ((20, "15 SHOP PANEL direct"),
+                   (40 + pw, "16 SHOP PANEL via buffer")):
+        lbl = font_l.render(txt, True, _LABEL)
+        canvas.blit(lbl, (x + 4, 250 + ph + 6))
+
+    # Rzad B prawa kolumna: rzad pigulek HUD - trzy warianty z draw_hud
+    hud_a, hud_b, hud_c = pr["hud"]
+    hx = 1124 - 520
+    canvas.blit(hud_a, (hx, 250))
+    canvas.blit(hud_b, (hx, 336))
+    canvas.blit(hud_c, (hx, 422))
+    for y, txt in ((250, "17 HUD production (plain surface)"),
+                   (336, "18 HUD production (game buffer)"),
+                   (422, "19 HUD sanitized labels (game buffer)")):
+        lbl = font_l.render(txt, True, _LABEL)
+        canvas.blit(lbl, (hx + 4, y + 62))
+
+    info = font_l.render("Buffer = Surface.convert() jak Game.win; "
+                         "17 = zwykle Surface (jak strona 1).",
+                         True, _LABEL)
+    canvas.blit(info, (hx, 508))
+
+    if win.get_size() != canvas.get_size():
+        win.blit(pygame.transform.smoothscale(canvas, win.get_size()), (0, 0))
+    else:
+        win.blit(canvas, (0, 0))
+    return canvas
+
+
 def write_diag_files(win):
     """Rysuje scene, zapisuje island_diag.png i island_diag.log
     do katalogu domowego. Wolane przy otwarciu ekranu F9."""
     _items, log_surfaces, extra = _probes()
     draw_diag(win)
     pygame.display.flip()
+    page1 = win.copy()
+    draw_diag_r5(win)
+    pygame.display.flip()
+    page2 = win.copy()
     lines = []
-    lines.append("Island Defenders - diagnostic log (macOS graphics, round 4)")
+    lines.append("Island Defenders - diagnostic log (macOS graphics, round 5)")
     lines.append(f"time: {datetime.now().isoformat(timespec='seconds')}")
     lines.append(f"sys.platform: {sys.platform}")
     lines.append(f"platform: {platform.platform()}")
@@ -249,13 +479,29 @@ def write_diag_files(win):
                      f"dirty px = {theme.dirty_pixel_count(_replica)}")
     except Exception as e:
         lines.append(f"[sanitize probe] <failed: {e}>")
+    # Runda 5: prawdziwe sciezki gry - formaty + brudne piksele powierzchni
+    # budowanych produkcyjnym kodem (panel sklepu, pigulki HUD, zywa elita).
+    lines.append("--- round 5: real game paths ---")
+    try:
+        _pr5, r5_surfaces = _probes_r5()
+        for name, surf in r5_surfaces:
+            lines.append(_report(name, surf))
+            lines.append(f"[{name}] dirty px = "
+                         f"{theme.dirty_pixel_count(surf)}")
+    except Exception as e:
+        lines.append(f"[round 5 probes] <failed: {e}>")
     try:
         with open(_LOG_PATH, "w", encoding="utf-8") as fh:
             fh.write("\n".join(lines) + "\n")
     except Exception:
         pass
     try:
-        pygame.image.save(win, _PNG_PATH)
+        # Zrzut = strona 1 nad strona 2 (jeden plik, jak zawsze)
+        combined = pygame.Surface((page1.get_width(),
+                                   page1.get_height() + page2.get_height()))
+        combined.blit(page1, (0, 0))
+        combined.blit(page2, (0, page1.get_height()))
+        pygame.image.save(combined, _PNG_PATH)
     except Exception:
         pass
     return _LOG_PATH, _PNG_PATH
