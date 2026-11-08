@@ -276,7 +276,18 @@ def _wood_raw(w, h, base, plank_h=26):
     flat = pygame.Surface((w, h))
     flat.fill(base)
     flat.blit(surf, (0, 0))
-    return flat.convert_alpha()
+    out = flat.convert_alpha()
+    # Runda 6 (macOS): na formacie displaya z maska alfa (macOS) powyzsze
+    # splaszczenie zwraca powierzchnie z alfa 0 w calym drewnie - log
+    # Weroniki z rundy 5: pigulka HUD 6672/7920 px z RGB pod alfa 0,
+    # srodek (53,37,22,0); zlozony panel sklepu 42558 brudnych px.
+    # Takie panele blitowane z set_alpha (HUD 222, sklep 150) rysuja sie
+    # tam jako czarne ksztalty. Wymus kanal alfa na 255 wprost:
+    # BLEND_RGBA_ADD (0,0,0,255) doklada wylacznie do alfy (saturacja),
+    # RGB nietkniete; gdzie alfa juz jest 255, to no-op. Zaokraglenia
+    # rogow (_apply_radius) przycinaja alfe PO tym kroku, jak dotad.
+    out.fill((0, 0, 0, 255), special_flags=pygame.BLEND_RGBA_ADD)
+    return out
 
 
 def _apply_radius(surf, radius):

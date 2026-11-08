@@ -303,6 +303,18 @@ class SpikeCluster:
     def click(self, X, Y):
         return abs(X - self.x) <= 30 and abs(Y - self.y) <= 25
 
+
+def _hud_text(font, text, color):
+    """font.render + sanitize_alpha dla napisow HUD (naprawa macOS,
+    runda 6). Surowy font.render zostawia kolor czcionki w RGB pod
+    alfa 0 (log Weroniki z rundy 5: 1805 brudnych px na jednym napisie
+    HUD), a sciezka SDL/Metal pokazuje te piksele jako czarne
+    prostokaty wokol liter. Napisy menu ida przez cache render_text,
+    ktory czysci od rundy 4; HUD renderuje dynamicznie co klatke,
+    wiec czyscimy bez cache."""
+    return theme.sanitize_alpha(font.render(text, True, color))
+
+
 class Game:
     def __init__(self, lives=20, money=200, sound=True, difficulty="NORMAL"):
         self.width = 1124
@@ -7594,12 +7606,12 @@ class Game:
         self._money_icon = pygame.transform.scale(money_img, (28, 28))
         self._coin_icon15 = pygame.transform.scale(money_img, (15, 15))
         # Prerender statycznych napisow (wydajnosc)
-        self._txt_paused = self.font_p36.render(tr("hud.paused"), True, (255, 255, 255))
-        self._txt_paused_sub = self.font_s16.render(tr("hud.paused_sub"), True, (200, 200, 200))
-        self._txt_ready = self.font_f11.render(tr("hud.ready"), True, (255, 255, 200))
-        self._txt_no_tower = self.font_f11.render(tr("hud.no_tower"), True, (120, 120, 120))
-        self._txt_next = self.font_small16.render(tr("hud.next"), True, (255, 255, 255))
-        self._txt_boss = self.font_small16.render(tr("hud.boss_next"), True, (255, 50, 50))
+        self._txt_paused = _hud_text(self.font_p36, tr("hud.paused"), (255, 255, 255))
+        self._txt_paused_sub = _hud_text(self.font_s16, tr("hud.paused_sub"), (200, 200, 200))
+        self._txt_ready = _hud_text(self.font_f11, tr("hud.ready"), (255, 255, 200))
+        self._txt_no_tower = _hud_text(self.font_f11, tr("hud.no_tower"), (120, 120, 120))
+        self._txt_next = _hud_text(self.font_small16, tr("hud.next"), (255, 255, 255))
+        self._txt_boss = _hud_text(self.font_small16, tr("hud.boss_next"), (255, 50, 50))
         self._hud_prerender_gen = theme.display_generation()
 
     def draw_hud(self):
@@ -7617,7 +7629,7 @@ class Game:
                 f"clear_timer={self._clear_timer}",
             ]
             for i, line in enumerate(lines):
-                txt = dbg_font.render(line, True, (255, 255, 0))
+                txt = _hud_text(dbg_font, line, (255, 255, 0))
                 self.win.blit(txt, (10, 120 + i*20))
         # Rzad spojnych "pigulek": fala, zycia, kasa (tla prerenderowane)
         pill_h = self._pill_h
@@ -7630,7 +7642,7 @@ class Game:
         for x, pi, icon, text in items:
             self.win.blit(self._pills[pi], (x, y))
             w = self._pills[pi].get_width()
-            label = self.hud_font.render(text, True, theme.CREAM)
+            label = _hud_text(self.hud_font, text, theme.CREAM)
             cy = y + pill_h // 2 - label.get_height() // 2
             if icon is None:
                 self.win.blit(label, (x + w // 2 - label.get_width() // 2, cy))
@@ -7646,7 +7658,7 @@ class Game:
         s2 = theme.wood_panel(sr.width, sr.height, radius=10, corners=False).copy()
         s2.set_alpha(222)
         self.win.blit(s2, sr)
-        label = self.hud_font.render(f"{self.speed}x", True, theme.CREAM)
+        label = _hud_text(self.hud_font, f"{self.speed}x", theme.CREAM)
         self.win.blit(label, (sr.x + sr.width//2 - label.get_width()//2,
                               sr.y + sr.height//2 - label.get_height()//2))
         # Licznik wrogow biezacej fali (nowoczesny, dynamiczny)
@@ -7677,7 +7689,7 @@ class Game:
                     enemy_cls = self.enemy_classes[i]
                     temp = enemy_cls()
                     icon = pygame.transform.scale(temp.imgs[0], (32, 32))
-                    cnt_label = font_cnt.render(str(count), True, (255, 255, 120))
+                    cnt_label = _hud_text(font_cnt, str(count), (255, 255, 120))
                     items.append((icon, cnt_label))
                 except:
                     pass
@@ -7685,7 +7697,7 @@ class Game:
                 try:
                     boss_temp = Boss()
                     boss_icon = pygame.transform.scale(boss_temp.imgs[0], (32, 32))
-                    blabel = font_cnt.render(tr("hud.boss"), True, (255, 100, 100))
+                    blabel = _hud_text(font_cnt, tr("hud.boss"), (255, 100, 100))
                     items.append((boss_icon, blabel))
                 except:
                     pass
@@ -7706,7 +7718,7 @@ class Game:
             self.win.blit(s, (preview_x, preview_y))
             # Naglowek "Enemies" - wycentrowany
             font_head = pygame.font.SysFont("arial", 14, bold=True)
-            label = font_head.render(tr("hud.enemies"), True, theme.BRASS_BRIGHT)
+            label = _hud_text(font_head, tr("hud.enemies"), theme.BRASS_BRIGHT)
             self.win.blit(label, (preview_x + panel_w//2 - label.get_width()//2, preview_y + 5))
             # Ikony - liczba OBOK sprite'a, wycentrowana w pionie
             x_off = preview_x + 10

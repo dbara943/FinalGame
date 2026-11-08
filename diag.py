@@ -27,6 +27,7 @@ from effects.particles import ParticleSystem
 
 _LOG_PATH = os.path.join(os.path.expanduser("~"), "island_diag.log")
 _PNG_PATH = os.path.join(os.path.expanduser("~"), "island_diag.png")
+_PNG2_PATH = os.path.join(os.path.expanduser("~"), "island_diag2.png")
 
 _SWATCH = (64, 62, 74)
 _BG = (24, 19, 13)
@@ -430,14 +431,26 @@ def write_diag_files(win):
     """Rysuje scene, zapisuje island_diag.png i island_diag.log
     do katalogu domowego. Wolane przy otwarciu ekranu F9."""
     _items, log_surfaces, extra = _probes()
+    # Runda 6: zapis DOKLADNIE jak w rundzie 4 - kazda strona prosto
+    # z powierzchni displaya. Laczenie stron przez kopie i wspolna
+    # powierzchnie (runda 5) na macOS niszczylo kanal alfa pliku -
+    # nawet niezmieniona strona 1 wrocila jako czarne prostokaty.
     draw_diag(win)
     pygame.display.flip()
-    page1 = win.copy()
+    try:
+        pygame.image.save(win, _PNG_PATH)
+    except Exception:
+        pass
     draw_diag_r5(win)
     pygame.display.flip()
-    page2 = win.copy()
+    try:
+        pygame.image.save(win, _PNG2_PATH)
+    except Exception:
+        pass
     lines = []
-    lines.append("Island Defenders - diagnostic log (macOS graphics, round 5)")
+    lines.append("Island Defenders - diagnostic log (macOS graphics, round 6)")
+    lines.append("screenshots: island_diag.png (page 1), "
+                 "island_diag2.png (page 2)")
     lines.append(f"time: {datetime.now().isoformat(timespec='seconds')}")
     lines.append(f"sys.platform: {sys.platform}")
     lines.append(f"platform: {platform.platform()}")
@@ -493,15 +506,6 @@ def write_diag_files(win):
     try:
         with open(_LOG_PATH, "w", encoding="utf-8") as fh:
             fh.write("\n".join(lines) + "\n")
-    except Exception:
-        pass
-    try:
-        # Zrzut = strona 1 nad strona 2 (jeden plik, jak zawsze)
-        combined = pygame.Surface((page1.get_width(),
-                                   page1.get_height() + page2.get_height()))
-        combined.blit(page1, (0, 0))
-        combined.blit(page2, (0, page1.get_height()))
-        pygame.image.save(combined, _PNG_PATH)
     except Exception:
         pass
     return _LOG_PATH, _PNG_PATH
