@@ -526,6 +526,96 @@ def draw_diag_r7(win):
     return gwin
 
 
+# ---------------------------------------------------------------------
+# RUNDA 8: przechwycenie PRAWDZIWEJ klatki gry (F9 w trakcie rozgrywki).
+# Strony 1-3 sa czyste nawet na Macu i nawet przez potok _present(),
+# a rozgrywka dalej pokazuje objawy - wiec zamiast emulowac gre w menu,
+# zapisujemy klatke z wnetrza samej gry: bufor Game.win po zlozeniu
+# calej klatki oraz ekran po _present(), plus stan gry i pomiary
+# (pigulki uzywane przez biezaca instancje Game, liczba w pelni czarnych
+# pikseli w rzedzie HUD i w panelu sklepu na samej klatce).
+# Rozstrzyga: win brudny -> winny element kompozycji klatki; win czysty,
+# disp brudny -> prezentacja; oba czyste -> zywe okno/kompozytor.
+# ---------------------------------------------------------------------
+
+def _black_count(surf, rect):
+    """Piksele w pelni kryjace i prawie czarne (r,g,b < 10) w prostokacie."""
+    cnt = 0
+    x0 = max(0, rect.left)
+    y0 = max(0, rect.top)
+    x1 = min(surf.get_width(), rect.right)
+    y1 = min(surf.get_height(), rect.bottom)
+    for yy in range(y0, y1):
+        for xx in range(x0, x1):
+            r, g, b, a = surf.get_at((xx, yy))
+            if a == 255 and r < 10 and g < 10 and b < 10:
+                cnt += 1
+    return cnt
+
+
+def capture_game_frame(game):
+    """Zapisuje biezaca klatke gry; wywolywane z Game.draw() po
+    _present(), gdy gracz nacisnal F9 (flaga _diag_capture_pending)."""
+    import datetime
+    import glob
+    home = os.path.expanduser("~")
+    n = len(glob.glob(os.path.join(home, "island_game*_win.png"))) + 1
+    win_path = os.path.join(home, "island_game%d_win.png" % n)
+    disp_path = os.path.join(home, "island_game%d_disp.png" % n)
+    try:
+        pygame.image.save(game.win, win_path)
+    except Exception:
+        pass
+    try:
+        pygame.image.save(game._screen, disp_path)
+    except Exception:
+        pass
+    lines = []
+    lines.append("--- game capture #%d %s ---" % (
+        n, datetime.datetime.now().isoformat(timespec="seconds")))
+    try:
+        mouse = game._mouse_pos()
+    except Exception:
+        mouse = None
+    lines.append(
+        "wave=%s lives=%s money=%s mouse=%s building_menu=%s "
+        "tent_menu=%s selected_tower=%s enemies=%d" % (
+            getattr(game, "wave", None), getattr(game, "lives", None),
+            getattr(game, "money", None), mouse,
+            getattr(game, "_building_menu_open", None),
+            getattr(game, "_tent_menu_open", None),
+            getattr(game, "selected_tower", None) is not None,
+            len(getattr(game, "enemies", []))))
+    for name, surf in (("pill wave", game._pills[0]),
+                       ("pill lives", game._pills[1]),
+                       ("pill gold", game._pills[2])):
+        lines.append(_report("game " + name, surf))
+    hud_rect = pygame.Rect(0, 0, 540, 64)
+    lines.append("win HUD-row opaque-black px = %d"
+                 % _black_count(game.win, hud_rect))
+    try:
+        shop_rect = game.menu.get_rect()
+        lines.append("win shop-panel opaque-black px = %d (rect %s)"
+                     % (_black_count(game.win, shop_rect), shop_rect))
+    except Exception:
+        pass
+    try:
+        sx = game._screen.get_width() / game.win.get_width()
+        sy = game._screen.get_height() / game.win.get_height()
+        disp_hud = pygame.Rect(0, 0, int(540 * sx), int(64 * sy))
+        lines.append("disp HUD-row opaque-black px = %d"
+                     % _black_count(game._screen, disp_hud))
+    except Exception:
+        pass
+    lines.append(_report("game win (full frame buffer)", game.win))
+    try:
+        with open(os.path.join(home, "island_game.log"), "a",
+                  encoding="utf-8") as fh:
+            fh.write("\n".join(lines) + "\n")
+    except Exception:
+        pass
+
+
 def write_diag_files(win):
     """Rysuje scene, zapisuje island_diag.png i island_diag.log
     do katalogu domowego. Wolane przy otwarciu ekranu F9."""
@@ -553,7 +643,7 @@ def write_diag_files(win):
     except Exception:
         pass
     lines = []
-    lines.append("Island Defenders - diagnostic log (macOS graphics, round 7)")
+    lines.append("Island Defenders - diagnostic log (macOS graphics, round 8)")
     lines.append("screenshots: island_diag.png (page 1), "
                  "island_diag2.png (page 2), island_diag3.png (page 3)")
     lines.append(_report("r7 game buffer (.convert 1124x720)", gwin_r7))

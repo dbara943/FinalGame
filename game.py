@@ -2087,6 +2087,9 @@ class Game:
                     self.menu_dragging = False
                     self._site_drag_end()
                 if event.type == pygame.KEYDOWN:
+                    # Diag runda 8: F9 w grze = przechwycenie prawdziwej klatki
+                    if event.key == pygame.K_F9:
+                        self._diag_capture_pending = True
                     # Pomoc otwarta: strzalki / A,D zmieniaja strone (nie zamykaja)
                     if getattr(self, '_show_help', False) and event.key in (pygame.K_LEFT, pygame.K_a):
                         self._help_page = max(0, self._help_page - 1)
@@ -4140,6 +4143,14 @@ class Game:
             self.draw_pause_menu()
 
         self._present()
+        # Diag runda 8: po prezentacji zapisz te klatke (bufor + ekran)
+        if getattr(self, "_diag_capture_pending", False):
+            self._diag_capture_pending = False
+            try:
+                import diag
+                diag.capture_game_frame(self)
+            except Exception:
+                pass
 
     def _draw_bombard_zoom(self):
         """Subtelne oznaczenie celu podczas bombardowania."""
