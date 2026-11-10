@@ -7611,7 +7611,18 @@ class Game:
             # Styl A: drewniana pigulka z mosiadzna ramka (lekko przezroczysta)
             _s = theme.wood_panel(_w, self._pill_h, radius=self._pill_h // 2,
                                   corners=False).copy()
-            _s.set_alpha(222)
+            # Runda 10 (macOS): NIE przez set_alpha(). Pigulki mialy ten
+            # sam defekt co panel sklepu przed runda 9: blit powierzchni
+            # z alfa pikselowa + modulacja set_alpha(222) na bufor
+            # .convert() kopiuje na Macu RGB bez mieszania z tlem, wiec
+            # ciemne drewno pigulki (53,37,22) wychodzilo niemal czarne
+            # zamiast mieszac sie z niebem do brazu jak na innych
+            # platformach (Weronika: "czarne kwadraty" pod suma zyc
+            # i pieniedzy). Wpikamy alfe 222 w piksele maska MULT -
+            # dokladnie wzor rundy 9 w VerticalMenu.draw - i dalej
+            # pigulka idzie jednym zwyklym blitem z alfa pikselowa.
+            _s.blit(theme.alpha_mask(_w, self._pill_h, 222), (0, 0),
+                    special_flags=pygame.BLEND_RGBA_MULT)
             self._pills.append(_s)
         self._lives_icon = pygame.transform.scale(lives_img, (28, 28))
         self._money_icon = pygame.transform.scale(money_img, (28, 28))
@@ -7667,7 +7678,10 @@ class Game:
         # Predkosc
         sr = self.speed_btn_rect
         s2 = theme.wood_panel(sr.width, sr.height, radius=10, corners=False).copy()
-        s2.set_alpha(222)
+        # Runda 10 (macOS): jak pigulki wyzej - alfa 222 wpikana
+        # w piksele maska MULT zamiast set_alpha().
+        s2.blit(theme.alpha_mask(sr.width, sr.height, 222), (0, 0),
+                special_flags=pygame.BLEND_RGBA_MULT)
         self.win.blit(s2, sr)
         label = _hud_text(self.hud_font, f"{self.speed}x", theme.CREAM)
         self.win.blit(label, (sr.x + sr.width//2 - label.get_width()//2,
@@ -7725,7 +7739,10 @@ class Game:
             preview_y = 65
             # Tlo w stylu A: drewno + mosiadz (lekko przezroczyste)
             s = theme.wood_panel(panel_w, panel_h, radius=14, corners=False).copy()
-            s.set_alpha(225)
+            # Runda 10 (macOS): jak pigulki wyzej - alfa 225 wpikana
+            # w piksele maska MULT zamiast set_alpha().
+            s.blit(theme.alpha_mask(panel_w, panel_h, 225), (0, 0),
+                   special_flags=pygame.BLEND_RGBA_MULT)
             self.win.blit(s, (preview_x, preview_y))
             # Naglowek "Enemies" - wycentrowany
             font_head = pygame.font.SysFont("arial", 14, bold=True)

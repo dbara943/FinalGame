@@ -312,6 +312,22 @@ def _brass_corners(surf, radius, col=BRASS_BRIGHT, arm=15, width=3, inset=1):
         pygame.draw.line(surf, col, (cx, cy), (cx, cy + dy * a), width)
 
 
+_ALPHA_MASK_CACHE = {}
+
+
+def alpha_mask(w, h, alpha):
+    """Cache'owana jednolita maska alfa do wpikania przezroczystosci
+    w piksele powierzchni przez BLEND_RGBA_MULT (zamiast set_alpha -
+    patrz fade_copy i naprawa sklepu, runda 9)."""
+    key = (w, h, alpha)
+    m = _ALPHA_MASK_CACHE.get(key)
+    if m is None:
+        m = pygame.Surface((w, h), pygame.SRCALPHA)
+        m.fill((255, 255, 255, alpha))
+        _ALPHA_MASK_CACHE[key] = m
+    return m
+
+
 def wood_panel(w, h, radius=14, base=WOOD_PANEL, border=BRASS, corners=True,
                plank_h=26):
     """Gotowa powierzchnia panelu: drewno + zaokraglenie + mosiadzna ramka.
