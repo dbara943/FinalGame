@@ -21,6 +21,23 @@ _FONT_CACHE = {}
 _TEXT_CACHE = {}
 _TEXT_CACHE_MAX = 800
 
+# --- Maska alfa do pieczenia przezroczystosci panelu sklepu (runda 9) ---
+# VerticalMenu.draw NIE uzywa juz set_alpha() na gotowym panelu (patrz
+# komentarz w draw). Zamiast modulacji alfa wpisujemy w piksele mnozeniem
+# przez jednolita maske (BLEND_RGBA_MULT: RGB x 255/255 = bez zmian,
+# A x alfa/255). Maska zalezy tylko od (w, h, alfa) - cachujemy ja.
+_ALPHA_MASK_CACHE = {}
+
+
+def _alpha_mask(w, h, alpha):
+    key = (w, h, alpha)
+    m = _ALPHA_MASK_CACHE.get(key)
+    if m is None:
+        m = pygame.Surface((w, h), pygame.SRCALPHA)
+        m.fill((255, 255, 255, alpha))
+        _ALPHA_MASK_CACHE[key] = m
+    return m
+
 
 def sysfont(name, size, bold=False):
     """pygame.font.SysFont z cache - ten sam obiekt dla tych samych parametrow."""
@@ -498,9 +515,26 @@ class VerticalMenu(Menu):
             # Aktualizuj pozycje klikalna (wspolrzedne ekranu)
             item.x, item.y = bx, by
             item.width, item.height = panel_w - 24, 58
-        # Naloz caly panel z przezroczystoscia
+        # Naloz caly panel z przezroczystoscia.
+        # Runda 9 (macOS): NIE przez set_alpha(). Dowod z prawdziwej
+        # klatki Weroniki (runda 8, island_game1_win.png): piksele
+        # panelu w buforze gry to SUROWE RGB panelu (kremowy napis
+        # przycisku (252,245,226) co do jednostki, bez sladu mieszania
+        # z tlem), a wartosc 150 siedzi w KANALE ALFA bufora - czyli na
+        # jej Macu blit powierzchni z alfa pikselowa + modulacja
+        # set_alpha na bufor .convert() (ktory na macOS ma maske alfa)
+        # kopiuje RGB bez mieszania i zapisuje alfe w kanale, ktorego
+        # prezentacja (_present/flip) nie uzywa. Panel wychodzil w pelni
+        # nieprzezroczysty, choc ta sama kompozycja w izolacji (diag
+        # rund 5-7, swiezy bufor) mieszala sie poprawnie. Ta sama
+        # zasada, co theme.fade_copy: modulacja set_alpha to sciezka,
+        # ktora na macOS zawodzi, a alfa wpisana w piksele (zwykle
+        # blity sprite'ow) dziala. Mnozymy wiec kanal alfa zlozonego
+        # panelu przez maske - panel dalej blitowany jest jednym
+        # zwyklym blitem z alfa pikselowa, bez zadnej modulacji.
         if alpha < 255:
-            surf.set_alpha(alpha)
+            surf.blit(_alpha_mask(panel_w, panel_h, alpha), (0, 0),
+                      special_flags=pygame.BLEND_RGBA_MULT)
         win.blit(surf, (px, py))
     
     
