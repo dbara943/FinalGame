@@ -1686,9 +1686,16 @@ class Game:
         px = self.width - pw - 20
         py = 90
         # Tlo: drewno + zloty/mosiadzny obrys (styl A)
-        s = theme.wood_panel(pw, ph, radius=10, base=theme.WOOD_PANEL_DARK,
-                             border=theme.BRASS_BRIGHT, corners=False).copy()
-        s.set_alpha(232)
+        # Runda 11 (macOS): alfa 232 wpiekana w piksele przez
+        # theme.fade_copy zamiast set_alpha() - modulacja na buforze
+        # .convert() rysowala panel jako (prawie) czarny prostokat:
+        # dowod to zdjecie Weroniki z 11.11 (toast "Legenda" czarny na
+        # zywym ekranie, a w klatce F9 z bufora - brazowy). Ten sam
+        # wzorzec naprawy co pigulki HUD z rundy 10.
+        s = theme.fade_copy(
+            theme.wood_panel(pw, ph, radius=10, base=theme.WOOD_PANEL_DARK,
+                             border=theme.BRASS_BRIGHT, corners=False),
+            232)
         self.win.blit(s, (px, py))
         # Ikona
         icon = self.ach_mgr.icons.get(icon_cat)
@@ -4655,7 +4662,14 @@ class Game:
         for ox, oy in [(-2, 0), (2, 0), (0, -2), (0, 2)]:
             s.blit(outline, (pad_x + ox, pad_y + oy))
         s.blit(label, (pad_x, pad_y))
-        s.set_alpha(alpha)
+        # Runda 11 (macOS): NIE przez set_alpha() - gdy tylko alpha
+        # spadla ponizej 255, blit z modulacja na buforze .convert()
+        # kopiowal RGB bez mieszania: tlo (0,0,0,170) i przezroczyste
+        # rogi wracaly jako czysty czarny prostokat o ostrych rogach
+        # (dowod: zdjecia Weroniki 11.11 - pill poprawny na starcie,
+        # czarny kwadrat przy znikaniu). Alfa wpiekana w piksele
+        # przez theme.fade_copy, jak trupy (runda 3) i pigulki (runda 10).
+        s = theme.fade_copy(s, alpha)
         # Banner ponizej paska Enemies (konczy sie na y=127) - wczesniej na
         # y=95 wchodzil na licznik wrogow.
         self.win.blit(s, (self.width // 2 - bg_w // 2, 140))
