@@ -4,6 +4,8 @@ import math
 import time
 import os
 
+import gui_theme as theme
+
 # Fanfara piracka przy wplynieciu - JEDEN wspoldzielony obiekt, zeby
 # wyciszenie SFX w game.py moglo ustawic mu glosnosc (wczesniej sail_in
 # tworzylo nowy Sound przy kazdym wplynieciu i mute go nie lapal -
@@ -158,10 +160,24 @@ class Ship:
                 sy = by + random.randint(-10, 5)
                 pygame.draw.circle(win, (255, 255, 255, 120), (int(sx), int(sy)), 2)
         # Demoniczna runa (pulsujaca)
+        # Runda 14 (macOS): NIE przez set_alpha(). Powierzchnia z renderu
+        # czcionki niesie RGB koloru napisu pod KAZDYM pikselem - takze
+        # pod alfa 0 (ksztalt glifu siedzi tylko w kanale alfa) - a blit
+        # z modulacja set_alpha na bufor .convert() kopiuje na Macu to
+        # RGB bez mieszania: Weronika widziala prostokat runy jako lity
+        # fioletowy blok pod zaglem statku. Alfa wpiekana w piksele
+        # przez theme.fade_copy, jak komentarze w rundzie 11.
+        # Dodatkowe jawne sanitize_alpha: wewnatrz fade_copy czyszczenie
+        # po przebiegu PixelArray po cichu nie dochodzi do skutku
+        # (powierzchnia jest jeszcze zablokowana przez widok kolumny,
+        # blit maski rzuca blad polkniety przez except) - wywolane tutaj,
+        # po powrocie z fade_copy, czyszczenie naprawde zachodzi i RGB
+        # pod alfa 0 jest wyzerowane.
         rune_alpha = int(120 + 80 * math.sin(t * 2.5))
         rune_font = pygame.font.SysFont("arial", 22, bold=True)
-        rune = rune_font.render("ᚱ", True, (180, 80, 255))
-        rune.set_alpha(rune_alpha)
+        rune = theme.sanitize_alpha(
+            theme.fade_copy(rune_font.render("ᚱ", True, (180, 80, 255)),
+                            rune_alpha))
         win.blit(rune, (self.x - rune.get_width() // 2, self.y + 10 + bob))
         # Blysk armat przy strzale
         if self.cannon_flash > 0:
