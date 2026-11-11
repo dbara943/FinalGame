@@ -4004,10 +4004,13 @@ class Game:
             self.win.blit(bg, (bx, by))
             self.win.blit(label, (bx + 15, by + 18 - label.get_height() // 2))
         
-        # Spalenizna
+        # Spalenizna (runda 12, decyzja Daniela po uwadze Weroniki: byla
+        # niemal czarna plama - rozjasniona do jasnego popiolu i slabsza
+        # alfa, dalej czytelna jako slad po meteorycie, ale nie "czarna
+        # dziura" na planszy)
         for x, y, timer in self.scorch_marks:
             s = pygame.Surface((50, 30), pygame.SRCALPHA)
-            pygame.draw.ellipse(s, (30, 30, 30, min(150, timer)), s.get_rect())
+            pygame.draw.ellipse(s, (110, 100, 90, min(100, timer)), s.get_rect())
             self.win.blit(s, (x - 25, y - 15))
         # Czasteczki i efekty
         self.particles.draw(self.win)
@@ -6563,21 +6566,35 @@ class Game:
             full_lines = lines
             truncated = len(full_lines) > 2
             # Hover-scroll: karta z opisem dluzszym niz 2 linie przewija go
-            # plynnie w dol po najechaniu (0.5 s zwloki, 30 px/s), zeby dalo
+            # plynnie w dol po najechaniu (1 s zwloki, 10 px/s), zeby dalo
             # sie przeczytac calosc w KAZDYM jezyku; po wyjechaniu myszy
             # wraca na gore z forma ucieta ("...").
+            # Runda 12 (decyzja Daniela po uwadze Weroniki): przy 30 px/s
+            # srodek opisu przelatywal za szybko, by go przeczytac -
+            # zwolnione do 10 px/s (linia co ~1,5-1,8 s) i dluzsza zwloka
+            # na start, zeby zdazyc przeczytac poczatek; koniec opisu po
+            # dojechaniu stoi w miejscu, dopoki mysz jest na karcie.
             if not hasattr(self, "_upg_hover"):
                 self._upg_hover = {}
+                self._upg_hover_seen = {}
             if rect.collidepoint(mx, my):
-                self._upg_hover.setdefault(upg["id"], self._now_s)
+                # Runda 12: stary znacznik hoveru po zamknieciu i ponownym
+                # otwarciu menu sprawial, ze opis od razu skakal na koniec;
+                # gdy karty nie rysowano dluzej niz 0,5 s, hover zaczyna
+                # sie od nowa (opis znow od poczatku).
+                if (upg["id"] not in self._upg_hover
+                        or self._now_s - self._upg_hover_seen.get(upg["id"], 0.0) > 0.5):
+                    self._upg_hover[upg["id"]] = self._now_s
+                self._upg_hover_seen[upg["id"]] = self._now_s
                 _hstart = self._upg_hover[upg["id"]]
             else:
                 self._upg_hover.pop(upg["id"], None)
+                self._upg_hover_seen.pop(upg["id"], None)
                 _hstart = None
             scroll_off = 0.0
             if truncated and _hstart is not None:
                 scroll_off = min((len(full_lines) - 2) * desc_step,
-                                 max(0.0, (self._now_s - _hstart - 0.5)) * 30.0)
+                                 max(0.0, (self._now_s - _hstart - 1.0)) * 10.0)
             if truncated and scroll_off <= 0:
                 # Forma ucieta: 2 linie + wielokropek
                 lines = full_lines[:2]
