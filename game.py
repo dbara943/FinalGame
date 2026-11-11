@@ -3936,12 +3936,29 @@ class Game:
             pygame.draw.rect(btn_bg, (30, 90, 50, 230), btn_bg.get_rect(), border_radius=12)
             pygame.draw.rect(btn_bg, (100, 255, 150, 180), btn_bg.get_rect(), 2, border_radius=12)
             self.win.blit(btn_bg, (bx, by))
-            btn_font = self.font_btn18
-            # Wytlumaczenie: co robi przycisk + ile zlota za skip
-            line1 = btn_font.render(tr("hud.skip"), True, (200, 255, 210))
-            line2 = btn_font.render(tr("hud.skip_bonus", bonus=bonus), True, (255, 215, 100))
-            self.win.blit(line1, (bx + btn_w//2 - line1.get_width()//2, by + 6))
-            self.win.blit(line2, (bx + btn_w//2 - line2.get_width()//2, by + 28))
+            # Tekst: shrink-to-fit jak w reszcie UI (_font_fit). Ramka ma
+            # stala szerokosc 240px, a napisy linii 1 przy font_btn18 sa
+            # szersze od ramki w 6 z 7 jezykow (PL 292px, ES 330px, FR/PT
+            # 314px, RU 240px, DE 229px) - tekst rysowany od srodka
+            # wychodzil poza ramke, glownie z lewej (Weronika, runda 13:
+            # "poczatek zdania jest poza ramka" w wersji PL). Drabina do
+            # 11px miesci nawet ES z marginesem; wysokosci linii ida za
+            # wybranym fontem, zeby mniejszy tekst tez byl wycentrowany.
+            _skip1 = tr("hud.skip")
+            _skip2 = tr("hud.skip_bonus", bonus=bonus)
+            _avail = btn_w - 16
+            _f1 = self._font_fit(_skip1, _avail, (18, 16, 15, 14, 13, 12, 11),
+                                 bold=True)
+            _f2 = self._font_fit(_skip2, _avail, (18, 16, 15, 14, 13, 12, 11),
+                                 bold=True)
+            line1 = _f1.render(_skip1, True, (200, 255, 210))
+            line2 = _f2.render(_skip2, True, (255, 215, 100))
+            _gap = 4
+            _block_h = line1.get_height() + _gap + line2.get_height()
+            _ly = by + (btn_h - _block_h) // 2
+            self.win.blit(line1, (bx + btn_w//2 - line1.get_width()//2, _ly))
+            self.win.blit(line2, (bx + btn_w//2 - line2.get_width()//2,
+                                  _ly + line1.get_height() + _gap))
         else:
             self.early_wave_rect = None
         
