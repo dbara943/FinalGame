@@ -137,16 +137,28 @@ def fade_copy(img, alpha):
     if alpha <= 0:
         s.fill((0, 0, 0, 0))  # same zera - z definicji czysta
         return s
+    # Runda 15: widok kolumny px[x] TRZYMA BLOKADE powierzchni, dopoki
+    # zyje - a ostatnia kolumna z petli zyla jeszcze w chwili
+    # `return sanitize_alpha(s)`, wiec blit maski w sanitize rzucal
+    # "Surfaces must not be locked during blit", blad połykal except
+    # i czyszczenie po cichu nie zachodzilo (kopie z 0 < alfa < 255
+    # wychodzily z RGB != 0 pod alfa 0; pomiar rundy 14: 229 px
+    # na glifie runy). Dlatego KAZDY widok kolumny zwalniamy jawnie
+    # (del) od razu po jej przetworzeniu, a rodzicielski PixelArray
+    # w finally - sanitize na koncu dostaje odblokowana powierzchnie.
     px = pygame.PixelArray(s)
     try:
         w, h = s.get_size()
         for x in range(w):
             col = px[x]
-            for y in range(h):
-                c = s.unmap_rgb(col[y])
-                if c.a:
-                    col[y] = s.map_rgb((c.r, c.g, c.b,
-                                        (c.a * alpha) // 255))
+            try:
+                for y in range(h):
+                    c = s.unmap_rgb(col[y])
+                    if c.a:
+                        col[y] = s.map_rgb((c.r, c.g, c.b,
+                                            (c.a * alpha) // 255))
+            finally:
+                del col
     finally:
         del px
     return sanitize_alpha(s)
