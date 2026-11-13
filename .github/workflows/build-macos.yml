@@ -24,7 +24,7 @@ jobs:
 
       - name: Build app with PyInstaller
         run: |
-          pyinstaller --onefile --windowed --name "IslandDefenders" \
+          pyinstaller --windowed --name "IslandDefenders" \
             --add-data "images:images" \
             --add-data "sounds:sounds" \
             --add-data "lang:lang" \
