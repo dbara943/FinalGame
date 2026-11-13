@@ -2018,7 +2018,11 @@ class Game:
         logic_acc = 0.0
         ship_acc = 0.0
         while run:
-            clock.tick_busy_loop(RENDER_FPS)
+            # tick (nie tick_busy_loop): busy-loop trzymal jeden rdzen
+            # na 100% przez cala sesje - na laptopach bez wentylatora
+            # (MacBook Air Weroniki) konczylo sie to throttlingiem
+            # i lagami po kilkunastu minutach gry (runda 16).
+            clock.tick(RENDER_FPS)
 
             # Spawn wrogow: w update_game_logic (ticki logiki 100Hz), wiec
             # predkosc 2x/3x naprawde przyspiesza rozladunek statku.
@@ -4466,10 +4470,17 @@ class Game:
                               rect.y + (rect.h - g.get_height()) // 2))
 
     def _present(self):
-        """Wyswietla bufor 1124x720 w natywnej rozdzielczosci (smoothscale HQ)."""
+        """Wyswietla bufor 1124x720 w natywnej rozdzielczosci.
+
+        Runda 16 (wydajnosc): scale zamiast smoothscale. Pomiar
+        13.11.2026: smoothscale calego bufora do rozdzielczosci
+        Retiny (3024x1964) kosztowal ~8,8 ms co klatke - ponad
+        polowe budzetu 60 FPS - a scale ~3,7 ms. Grafika gry to
+        duze sprite'y, roznica jakosci przy powiekszeniu jest
+        minimalna, a zysk klatek odczuwalny od razu."""
         _sw, _sh = self._screen.get_size()
         if self._fullscreen:
-            pygame.transform.smoothscale(self.win, (_sw, _sh), self._screen)
+            pygame.transform.scale(self.win, (_sw, _sh), self._screen)
         else:
             # Okno 1:1 - bez skalowania, wycentrowane
             self._screen.fill((0, 0, 0))
@@ -4671,17 +4682,34 @@ class Game:
             self.announcements.remove(a)
             return
         alpha = min(255, a[1] * 4)
-        f = self.font_ann34
-        outline = f.render(a[0], True, (20, 20, 20))
-        label = f.render(a[0], True, (255, 210, 60))
-        pad_x, pad_y = 18, 8
-        bg_w = label.get_width() + pad_x * 2
-        bg_h = label.get_height() + pad_y * 2
-        s = pygame.Surface((bg_w, bg_h), pygame.SRCALPHA)
-        pygame.draw.rect(s, (0, 0, 0, 170), s.get_rect(), border_radius=16)
-        for ox, oy in [(-2, 0), (2, 0), (0, -2), (0, 2)]:
-            s.blit(outline, (pad_x + ox, pad_y + oy))
-        s.blit(label, (pad_x, pad_y))
+        # Runda 16 (wydajnosc): zlozony banner (2 rendery fontu 34px +
+        # tlo + obrys) budujemy RAZ na tresc ogloszenia i trzymamy
+        # w cache - wczesniej powstawal od zera w kazdej klatce przez
+        # cale zycie bannera. Per klatke zostaje tylko fade_copy
+        # (po rundzie 16 tani). Cache czyszczony przy zmianie
+        # generacji displaya, jak inne prerendery.
+        key = (a[0], theme.display_generation())
+        cache = getattr(self, "_ann_banner_cache", None)
+        if cache is None:
+            cache = self._ann_banner_cache = {}
+        s = cache.get(key)
+        if s is None:
+            f = self.font_ann34
+            outline = f.render(a[0], True, (20, 20, 20))
+            label = f.render(a[0], True, (255, 210, 60))
+            pad_x, pad_y = 18, 8
+            bg_w = label.get_width() + pad_x * 2
+            bg_h = label.get_height() + pad_y * 2
+            s = pygame.Surface((bg_w, bg_h), pygame.SRCALPHA)
+            pygame.draw.rect(s, (0, 0, 0, 170), s.get_rect(), border_radius=16)
+            for ox, oy in [(-2, 0), (2, 0), (0, -2), (0, 2)]:
+                s.blit(outline, (pad_x + ox, pad_y + oy))
+            s.blit(label, (pad_x, pad_y))
+            s = theme.sanitize_alpha(s)
+            if len(cache) > 8:
+                cache.clear()
+            cache[key] = s
+        bg_w, bg_h = s.get_size()
         # Runda 11 (macOS): NIE przez set_alpha() - gdy tylko alpha
         # spadla ponizej 255, blit z modulacja na buforze .convert()
         # kopiowal RGB bez mieszania: tlo (0,0,0,170) i przezroczyste

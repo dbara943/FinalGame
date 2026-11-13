@@ -137,30 +137,19 @@ def fade_copy(img, alpha):
     if alpha <= 0:
         s.fill((0, 0, 0, 0))  # same zera - z definicji czysta
         return s
-    # Runda 15: widok kolumny px[x] TRZYMA BLOKADE powierzchni, dopoki
-    # zyje - a ostatnia kolumna z petli zyla jeszcze w chwili
-    # `return sanitize_alpha(s)`, wiec blit maski w sanitize rzucal
-    # "Surfaces must not be locked during blit", blad połykal except
-    # i czyszczenie po cichu nie zachodzilo (kopie z 0 < alfa < 255
-    # wychodzily z RGB != 0 pod alfa 0; pomiar rundy 14: 229 px
-    # na glifie runy). Dlatego KAZDY widok kolumny zwalniamy jawnie
-    # (del) od razu po jej przetworzeniu, a rodzicielski PixelArray
-    # w finally - sanitize na koncu dostaje odblokowana powierzchnie.
-    px = pygame.PixelArray(s)
-    try:
-        w, h = s.get_size()
-        for x in range(w):
-            col = px[x]
-            try:
-                for y in range(h):
-                    c = s.unmap_rgb(col[y])
-                    if c.a:
-                        col[y] = s.map_rgb((c.r, c.g, c.b,
-                                            (c.a * alpha) // 255))
-            finally:
-                del col
-    finally:
-        del px
+    # Runda 16 (wydajnosc): zamiast petli per-piksel w Pythonie
+    # (PixelArray + map/unmap_rgb na kazdym pikselu - pomiar
+    # 13.11.2026: ~13 ms na wywolanie dla bannera/popupu, czyli
+    # wiekszosc budzetu klatki przy kazdym zanikaniu) mnozymy kanal
+    # alfa maska BLEND_RGBA_MULT - ten sam wzorzec, ktory od rundy 9/10
+    # dziala przy pigulkach HUD i panelu sklepu. Semantyka ta sama:
+    # RGB x 255/255 = bez zmian, A x alpha/255; sanitize na koncu jak
+    # dotad zeruje RGB pod alfa 0. Roznica wzgledem petli: co najwyzej
+    # +/-1 na kanale alfa (zaokraglenia dzielenia w SDL), niewidoczna.
+    # Brak PixelArray = brak blokad powierzchni (lekcja rundy 15).
+    w, h = s.get_size()
+    s.blit(alpha_mask(w, h, alpha), (0, 0),
+           special_flags=pygame.BLEND_RGBA_MULT)
     return sanitize_alpha(s)
 
 

@@ -6,6 +6,7 @@ import os
 import gui_theme as theme
 
 _coin_img = None
+_COIN_FRAMES = {}  # cache przeskalowanych klatek monety (runda 16)
 
 def _get_coin_img():
     """Grafika zlotej monety (ladowana raz, leniwie - modul importowany
@@ -107,7 +108,13 @@ class FloatingCoin:
             # Wirowanie: szerokosc pulsuje jak obracajaca sie moneta (3 pelne obroty)
             squash = 0.25 + 0.75 * abs(math.sin(p * math.pi * 3))
             wpx = max(4, int(size * squash))
-            coin = pygame.transform.smoothscale(img, (wpx, size))
+            # Runda 16 (wydajnosc): przeskalowane klatki monety trzymamy
+            # w cache (szerokosci 4..26 px) - wczesniej kazda moneta
+            # robila smoothscale w kazdej klatce swojego lotu.
+            coin = _COIN_FRAMES.get(wpx)
+            if coin is None:
+                coin = pygame.transform.smoothscale(img, (wpx, size))
+                _COIN_FRAMES[wpx] = coin
         else:
             # Fallback proceduralny: zlote kolko z obramowaniem
             coin = pygame.Surface((size, size), pygame.SRCALPHA)
