@@ -83,7 +83,19 @@ class Enemy:
         self.elite = False  # 6: elitarny wrog (3x HP, 5x zlota)
 
     def _apply_gold_filter(self, img):
-        """Zloty filtr (grayscale -> zloto) - jak posag ze zlota."""
+        """Zloty filtr (grayscale -> zloto) - jak posag ze zlota.
+
+        Runda 18 (macOS): na Macu powierzchnia po grayscale + blendach
+        wracala z uszkodzona alfa - KAZDY zloty wrog (elita i Golden
+        Touch) byl polprzezroczysty na calej planszy (Daniel widzial
+        to na Macu Weroniki 14.11.2026; na Windowsie i w renderze
+        programowym alfa byla poprawna, wiec testy tego nie lapaly).
+        Naprawa: przefiltrowane RGB przenosimy na KOPIE oryginalu
+        blitami wylacznie RGB - BLEND_RGB_MULT czarna powierzchnia
+        zeruje RGB kopii, BLEND_RGB_ADD doklada RGB z filtra. Kanal
+        alfa wyniku pochodzi w 100% z oryginalnego sprite'a i zaden
+        blend go nie dotyka, wiec nie ma czego zepsuc na zadnej
+        platformie."""
         gray = pygame.transform.grayscale(img)
         tinted = gray.copy()
         gold = pygame.Surface(img.get_size())
@@ -94,7 +106,13 @@ class Enemy:
         tinted.blit(shine, (0, 0), special_flags=pygame.BLEND_ADD)
         # Runda 4 (macOS): BLEND_ADD dopisuje RGB takze pod alfa == 0
         # (stad trup elity (40,25,0,0) w logu z Maca) - wyczysc wynik.
-        return theme.sanitize_alpha(tinted)
+        tinted = theme.sanitize_alpha(tinted)
+        final = img.copy()
+        black = pygame.Surface(img.get_size())
+        black.fill((0, 0, 0))
+        final.blit(black, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
+        final.blit(tinted, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
+        return theme.sanitize_alpha(final)
 
     def apply_golden(self):
         """Golden Touch: zamienia sprite'y na zlote odmiany (TEN SAM rozmiar, bez skalowania).
