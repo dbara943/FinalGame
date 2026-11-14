@@ -4472,15 +4472,21 @@ class Game:
     def _present(self):
         """Wyswietla bufor 1124x720 w natywnej rozdzielczosci.
 
-        Runda 16 (wydajnosc): scale zamiast smoothscale. Pomiar
-        13.11.2026: smoothscale calego bufora do rozdzielczosci
-        Retiny (3024x1964) kosztowal ~8,8 ms co klatke - ponad
-        polowe budzetu 60 FPS - a scale ~3,7 ms. Grafika gry to
-        duze sprite'y, roznica jakosci przy powiekszeniu jest
-        minimalna, a zysk klatek odczuwalny od razu."""
+        Runda 17: powrot do smoothscale. Runda 16 zamienila go na
+        scale dla wydajnosci, ale na ekranie Retiny (powiekszenie
+        ~2,7x) szybki skaler poszarpal drobne grafiki - Weronika
+        zglosila "rozmyta" monete i pikselujace sie sylwetki
+        zlotych wrogow przy blysku trafienia / powlokach statusow
+        (test porownawczy 14.11.2026 potwierdza: scale = ostre
+        schodki, smoothscale = gladkie krawedzie). Prawdziwe zyski
+        rundy 16 zostaja: fade_copy ~100x szybciej, koniec
+        busy-loopa (throttling), build bez --onefile i mniejsze
+        assety - to one powodowaly lagi, nie samo skalowanie
+        (smoothscale jest SIMD-owy; na Apple Silicon kosztuje
+        ulamek tego, co na pomiarowej VM)."""
         _sw, _sh = self._screen.get_size()
         if self._fullscreen:
-            pygame.transform.scale(self.win, (_sw, _sh), self._screen)
+            pygame.transform.smoothscale(self.win, (_sw, _sh), self._screen)
         else:
             # Okno 1:1 - bez skalowania, wycentrowane
             self._screen.fill((0, 0, 0))
@@ -6534,13 +6540,22 @@ class Game:
             # Easter egg: cavalry ukryte w normalnej grze
             mystery = (upg.get("endless_only") and not self.endless) or \
                 (upg.get("robot") and not self._robot_unlocked())
+            # Runda 17 (zgloszenie Daniela): TYTAN odblokowany, ale oboje
+            # straznicy nie zyja - karta wygladala normalnie, a klik "nic
+            # nie robil" (komunikat robot.need_guard laduje na planszy POD
+            # przyciemnionym menu i jest niewidoczny). Karta sama pokazuje
+            # blokade: czerwona ramka, plakietka z X i powod w opisie.
+            _robot_blocked = bool(upg.get("robot")) and not mystery \
+                and getattr(self, "_robot", None) is None \
+                and not any(d.get("alive") for d in getattr(self, "_dancers", []))
             # Locked: wymaga innego upgradu (zapasowy mechanizm - chain pokazuje
             # dziecko w slocie rodzica dopiero po kupieniu rodzica, wiec LOCKED
             # w praktyce sie nie pojawia)
             _req_id = upg.get("requires")
             locked = bool(_req_id) and _req_id not in owned_set
             _req_name = next((tr(f"upg.{u['id']}.name", u["name"]) for u in upg_list if u["id"] == _req_id), _req_id) if _req_id else ""
-            hover = rect.collidepoint(mx, my) and not maxed and not locked
+            hover = rect.collidepoint(mx, my) and not maxed and not locked \
+                and not _robot_blocked
             # L1 (poziom 1 kupiony, L2 wciaz do kupienia): karta wyglada jak
             # ZWYKLA karta do kupienia - bez zielonego tla i ramki "juz
             # kupione" (Daniel: zielen dawala bledne odczucie, ze upgrade
@@ -6554,7 +6569,7 @@ class Game:
             else:
                 theme.wood_fill(self.win, rect, radius=10,
                                 base=theme.WOOD_CARD_HOVER if hover else theme.WOOD_CARD,
-                                border=theme.BRASS)
+                                border=(196, 60, 48) if _robot_blocked else theme.BRASS)
             # Ikonka
             if mystery:
                 # Ciemna sylwetka ze znakiem zapytania
@@ -6583,6 +6598,15 @@ class Game:
                     icon = icons.get(upg["id"])
                 if icon:
                     self.win.blit(icon, (sx + 10, sy + (row_h - 56) // 2))
+                if _robot_blocked:
+                    # Czerwona plakietka z bialym X w rogu ikonki
+                    _bx, _by = sx + 10 + 47, sy + (row_h - 56) // 2 + 9
+                    pygame.draw.circle(self.win, (178, 34, 30), (_bx, _by), 11)
+                    pygame.draw.circle(self.win, (90, 16, 12), (_bx, _by), 11, 2)
+                    pygame.draw.line(self.win, (255, 255, 255),
+                                     (_bx - 5, _by - 5), (_bx + 5, _by + 5), 3)
+                    pygame.draw.line(self.win, (255, 255, 255),
+                                     (_bx - 5, _by + 5), (_bx + 5, _by - 5), 3)
                 name = tr(f"upg.{upg['id']}.name", upg["name"])
                 if _lvl >= 1 and upg["id"] != "robot":
                     name += " II"
@@ -6592,9 +6616,12 @@ class Game:
                     desc = tr(f"upg.{upg['id']}.desc2", _l2.get("desc", upg["desc"]))
                 else:
                     desc = tr(f"upg.{upg['id']}.desc", upg["desc"])
+                if _robot_blocked:
+                    desc = tr("robot.need_guard")
                 price_txt = tr("upg.locked") if locked else f"{self._price(_next_cost):,}"
             # Opis: wrap po szerokosci w pikselach (nie po liczbie znakow) - nic nie ucina
-            desc_col = (170, 158, 134) if mystery else theme.WARM_GRAY
+            desc_col = (255, 112, 92) if _robot_blocked else \
+                ((170, 158, 134) if mystery else theme.WARM_GRAY)
             desc_font = self._building_desc_font
             max_desc_w = col_w - 76 - 12 - 4  # tekst od sx+76 do prawej krawedzi karty
             words = desc.split()
